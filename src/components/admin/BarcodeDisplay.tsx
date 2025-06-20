@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { Button } from '@/components/ui/button'
 import { Copy, Printer, Download, AlertCircle } from 'lucide-react'
 import JsBarcode from 'jsbarcode'
@@ -30,16 +30,13 @@ const validateBarcode = (code: string, type: string): { isValid: boolean; error?
 }
 
 const validateUPC = (code: string): { isValid: boolean; error?: string; correctedCode?: string } => {
-  // Remove any non-digits
   const cleanCode = code.replace(/\D/g, '')
   
   if (cleanCode.length === 11) {
-    // Calculate check digit
     const checkDigit = calculateUPCCheckDigit(cleanCode)
     const correctedCode = cleanCode + checkDigit
     return { isValid: true, correctedCode }
   } else if (cleanCode.length === 12) {
-    // Validate existing check digit
     const providedCheckDigit = parseInt(cleanCode[11])
     const calculatedCheckDigit = calculateUPCCheckDigit(cleanCode.substring(0, 11))
     
@@ -81,7 +78,6 @@ const validateCODE128 = (code: string): { isValid: boolean; error?: string; corr
     return { isValid: false, error: 'CODE128 cannot be empty' }
   }
   
-  // CODE128 supports ASCII characters 0-127
   const isValidChars = code.split('').every(char => char.charCodeAt(0) <= 127)
   
   if (!isValidChars) {
@@ -92,7 +88,6 @@ const validateCODE128 = (code: string): { isValid: boolean; error?: string; corr
 }
 
 const validateCODE39 = (code: string): { isValid: boolean; error?: string; correctedCode?: string } => {
-  // CODE39 valid characters: 0-9, A-Z, space, and symbols: - . $ / + %
   const validChars = /^[0-9A-Z\-\.\$\/\+\%\s]*$/
   
   if (!validChars.test(code)) {
@@ -106,7 +101,6 @@ const validateCODE39 = (code: string): { isValid: boolean; error?: string; corre
   return { isValid: true, correctedCode: code.toUpperCase() }
 }
 
-// Check digit calculation functions
 const calculateUPCCheckDigit = (code: string): number => {
   let sum = 0
   for (let i = 0; i < code.length; i++) {
@@ -135,42 +129,43 @@ export default function BarcodeDisplay({
   const [copied, setCopied] = useState(false)
   const [validation, setValidation] = useState<{ isValid: boolean; error?: string; correctedCode?: string }>({ isValid: true })
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const svgRef = useRef<SVGSVGElement>(null)
 
-  // Size configurations
-  const sizeConfigs = {
-    small: {
-      width: 200,
-      height: 80,
-      fontSize: 10,
-      textMargin: 5,
-      containerClass: 'p-2',
-      nameClass: 'text-xs',
-      priceClass: 'text-sm font-bold'
-    },
-    medium: {
-      width: 300,
-      height: 100,
-      fontSize: 12,
-      textMargin: 8,
-      containerClass: 'p-3',
-      nameClass: 'text-sm',
-      priceClass: 'text-lg font-bold'
-    },
-    large: {
-      width: 400,
-      height: 120,
-      fontSize: 14,
-      textMargin: 10,
-      containerClass: 'p-4',
-      nameClass: 'text-base',
-      priceClass: 'text-xl font-bold'
+  // 🔧 FIX: Memoize the config object to prevent infinite re-renders
+  const config = useMemo(() => {
+    const sizeConfigs = {
+      small: {
+        width: 200,
+        height: 80,
+        fontSize: 10,
+        textMargin: 5,
+        containerClass: 'p-2',
+        nameClass: 'text-xs',
+        priceClass: 'text-sm font-bold'
+      },
+      medium: {
+        width: 300,
+        height: 100,
+        fontSize: 12,
+        textMargin: 8,
+        containerClass: 'p-3',
+        nameClass: 'text-sm',
+        priceClass: 'text-lg font-bold'
+      },
+      large: {
+        width: 400,
+        height: 120,
+        fontSize: 14,
+        textMargin: 10,
+        containerClass: 'p-4',
+        nameClass: 'text-base',
+        priceClass: 'text-xl font-bold'
+      }
     }
-  }
+    return sizeConfigs[size]
+  }, [size])
 
-  const config = sizeConfigs[size]
-
-  // Validate and generate barcode when barcode or type changes
+  // 🔧 FIX: Separate validation and barcode generation into different effects
+  // This prevents the infinite loop
   useEffect(() => {
     if (!barcode) {
       setValidation({ isValid: true })
@@ -179,28 +174,32 @@ export default function BarcodeDisplay({
 
     const result = validateBarcode(barcode, barcodeType)
     setValidation(result)
+  }, [barcode, barcodeType]) // Only depend on barcode and barcodeType
 
-    // Generate barcode if valid
-    if (result.isValid && result.correctedCode && canvasRef.current) {
-      try {
-        // Generate barcode on canvas
-        JsBarcode(canvasRef.current, result.correctedCode, {
-          format: barcodeType === 'EAN13' ? 'EAN13' : barcodeType,
-          width: barcodeType === 'CODE39' ? 1.5 : 2,
-          height: config.height - 40, // Leave space for text
-          displayValue: true,
-          fontSize: config.fontSize,
-          textMargin: config.textMargin,
-          margin: 10,
-          background: '#ffffff',
-          lineColor: '#000000'
-        })
-      } catch (error) {
-        console.error('Barcode generation error:', error)
-        setValidation({ isValid: false, error: 'Failed to generate barcode' })
-      }
+  // 🔧 FIX: Separate effect for barcode generation
+  useEffect(() => {
+    if (!validation.isValid || !validation.correctedCode || !canvasRef.current) {
+      return
     }
-  }, [barcode, barcodeType, config])
+
+    try {
+      JsBarcode(canvasRef.current, validation.correctedCode, {
+        format: barcodeType === 'EAN13' ? 'EAN13' : barcodeType,
+        width: barcodeType === 'CODE39' ? 1.5 : 2,
+        height: config.height - 40,
+        displayValue: true,
+        fontSize: config.fontSize,
+        textMargin: config.textMargin,
+        margin: 10,
+        background: '#ffffff',
+        lineColor: '#000000'
+      })
+    } catch (error) {
+      console.error('Barcode generation error:', error)
+      // 🔧 FIX: Don't update validation state here to prevent loop
+      // Instead, just log the error
+    }
+  }, [validation.isValid, validation.correctedCode, barcodeType, config]) // Safe dependencies
 
   const copyBarcode = () => {
     const codeToUse = validation.correctedCode || barcode
@@ -252,21 +251,17 @@ export default function BarcodeDisplay({
   const downloadBarcode = () => {
     if (!canvasRef.current) return
 
-    // Create a high-resolution canvas for download
     const downloadCanvas = document.createElement('canvas')
     const ctx = downloadCanvas.getContext('2d')
     if (!ctx) return
 
-    // Set high resolution
     const scale = 3
     downloadCanvas.width = config.width * scale
-    downloadCanvas.height = (config.height + 60) * scale // Extra space for text
+    downloadCanvas.height = (config.height + 60) * scale
 
-    // Fill white background
     ctx.fillStyle = '#ffffff'
     ctx.fillRect(0, 0, downloadCanvas.width, downloadCanvas.height)
 
-    // Generate high-res barcode
     const tempCanvas = document.createElement('canvas')
     try {
       JsBarcode(tempCanvas, validation.correctedCode || barcode, {
@@ -281,14 +276,12 @@ export default function BarcodeDisplay({
         lineColor: '#000000'
       })
 
-      // Draw barcode on download canvas
       const barcodeY = productName ? 30 * scale : 10 * scale
       ctx.drawImage(tempCanvas, 
         (downloadCanvas.width - tempCanvas.width) / 2, 
         barcodeY
       )
 
-      // Add product name if provided
       if (productName) {
         ctx.fillStyle = '#000000'
         ctx.font = `bold ${16 * scale}px Arial`
@@ -296,7 +289,6 @@ export default function BarcodeDisplay({
         ctx.fillText(productName, downloadCanvas.width / 2, 20 * scale)
       }
 
-      // Add price if provided
       if (price) {
         ctx.fillStyle = '#059669'
         ctx.font = `bold ${18 * scale}px Arial`
@@ -305,7 +297,6 @@ export default function BarcodeDisplay({
         ctx.fillText(price, downloadCanvas.width / 2, priceY)
       }
 
-      // Download the image
       const link = document.createElement('a')
       link.download = `barcode-${validation.correctedCode || barcode}.png`
       link.href = downloadCanvas.toDataURL('image/png', 1.0)
@@ -409,16 +400,6 @@ export default function BarcodeDisplay({
             <Download className="h-3 w-3" />
             Download
           </Button>
-        </div>
-      )}
-
-      {/* Info */}
-      {validation.isValid && (
-        <div className="bg-gray-50 p-2 rounded text-xs text-gray-600 text-center">
-          <div>✅ Scannable with any barcode scanner</div>
-          <div>📱 Compatible with POS systems</div>
-          <div>🏷️ Perfect for price tags and inventory</div>
-          <div>🎯 Auto-corrected check digits for accuracy</div>
         </div>
       )}
     </div>
