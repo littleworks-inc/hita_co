@@ -2,51 +2,48 @@ import { redirect, notFound } from 'next/navigation'
 import { getSession } from '@/lib/auth'
 import { db } from '@/lib/db'
 import AdminNavigation from '@/components/admin/AdminNavigation'
-import ProductForm from '@/components/admin/ProductForm'
+import CategoryForm from '@/components/admin/CategoryForm'
 import { ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui'
 
-interface EditProductPageProps {
+interface EditCategoryPageProps {
   params: {
     id: string
   }
 }
 
-export default async function EditProductPage({ params }: EditProductPageProps) {
+export default async function EditCategoryPage({ params }: EditCategoryPageProps) {
   const session = await getSession()
   
   if (!session) {
     redirect('/admin/login')
   }
 
-  // Get product data
-  const product = await db.product.findUnique({
+  // Get category data
+  const category = await db.category.findUnique({
     where: { id: params.id },
     include: {
-      category: true,
-      country: true,
-      supplier: true
+      parent: true
     }
   })
 
-  if (!product) {
+  if (!category) {
     notFound()
   }
 
-  // Get categories, countries, and suppliers for the form
-  const [categories, countries, suppliers] = await Promise.all([
-    db.category.findMany({
-      orderBy: { name: 'asc' }
-    }),
-    db.country.findMany({
-      orderBy: { name: 'asc' }
-    }),
-    db.supplier.findMany({
-      where: { isActive: true },
-      orderBy: { name: 'asc' }
-    })
-  ])
+  // Get existing categories to use as potential parents (excluding self and children)
+  const parentCategories = await db.category.findMany({
+    where: { 
+      parentId: null, // Only main categories can be parents
+      id: { not: params.id } // Can't be parent of itself
+    },
+    select: {
+      id: true,
+      name: true
+    },
+    orderBy: { name: 'asc' }
+  })
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -58,29 +55,27 @@ export default async function EditProductPage({ params }: EditProductPageProps) 
             {/* Header */}
             <div className="border-b border-gray-200 pb-5 mb-6">
               <div className="flex items-center gap-4">
-                <Link href="/admin/products">
+                <Link href="/admin/categories">
                   <Button variant="ghost" size="sm">
                     <ArrowLeft className="h-4 w-4 mr-2" />
-                    Back to Products
+                    Back to Categories
                   </Button>
                 </Link>
                 <div>
                   <h1 className="text-3xl font-bold leading-6 text-gray-900">
-                    Edit Product
+                    Edit Category
                   </h1>
                   <p className="mt-2 text-sm text-gray-500">
-                    Update product details, pricing, and inventory.
+                    Update category details and hierarchy.
                   </p>
                 </div>
               </div>
             </div>
 
-            {/* Product Form */}
-            <ProductForm 
-              categories={categories}
-              countries={countries}
-              suppliers={suppliers}
-              product={product}
+            {/* Category Form */}
+            <CategoryForm 
+              category={category}
+              parentCategories={parentCategories}
               mode="edit"
             />
           </div>
