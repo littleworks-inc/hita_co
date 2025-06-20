@@ -1,0 +1,278 @@
+# ==========================================
+# AI Interview Coach - .gitignore
+# ==========================================
+
+# Environment Variables & Configuration
+# ==========================================
+.env
+.env.*
+.env.example
+!.env.example
+!.env.template
+config/secrets.json
+config/local.json
+*.key
+*.pem
+*.p12
+*.pfx
+
+# Node.js Dependencies & Package Managers
+# ==========================================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
+
+# Package manager caches
+.npm
+.yarn/cache
+.yarn/unplugged
+.yarn/build-state.yml
+.yarn/install-state.gz
+.pnp.*
+
+# Build Output & Distribution
+# ==========================================
+dist/
+build/
+out/
+.next/
+.nuxt/
+.output/
+.vite/
+coverage/
+*.tsbuildinfo
+.nyc_output
+
+# Runtime & Process Files
+# ==========================================
+*.pid
+*.seed
+*.pid.lock
+.grunt
+
+# Logs & Debug Files
+# ==========================================
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
+
+# AI Interview Coach Specific
+# ==========================================
+# Interview recordings and media
+recordings/
+audio/
+video/
+uploads/
+media/
+*.mp3
+*.mp4
+*.wav
+*.m4a
+*.webm
+
+# AI model files and caches
+# models/
+*.model
+*.pkl
+*.joblib
+embeddings/
+vector-store/
+.chroma/
+.pinecone-cache/
+ai-cache/
+
+# User data and sessions
+user-data/
+sessions/
+interview-data/
+transcripts/
+*.transcript
+user-profiles/
+
+# Training data and datasets
+datasets/
+training-data/
+*.csv
+*.json.gz
+annotations/
+
+# Database Files
+# ==========================================
+*.db
+*.sqlite
+*.sqlite3
+db.json
+database/
+
+# IDE & Editor Files
+# ==========================================
+# VSCode
+.vscode/
+*.code-workspace
+
+# IntelliJ IDEA
+.idea/
+*.iws
+*.iml
+*.ipr
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Vim
+*.swp
+*.swo
+*~
+
+# Emacs
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+auto-save-list
+tramp
+.\#*
+
+# Operating System Files
+# ==========================================
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon?
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# Testing & Coverage
+# ==========================================
+coverage/
+*.lcov
+.nyc_output/
+test-results/
+playwright-report/
+test-results.xml
+junit.xml
+
+# Temporary Files & Caches
+# ==========================================
+tmp/
+temp/
+.tmp/
+.cache/
+.parcel-cache/
+.next/
+.nuxt/
+.vite/
+
+# Docker
+# ==========================================
+.dockerignore
+docker-compose.override.yml
+.docker/
+
+# Cloud & Deployment
+# ==========================================
+.vercel
+.netlify
+.serverless/
+.aws-sam/
+
+# Miscellaneous
+# ==========================================
+*.tgz
+*.tar.gz
+*.zip
+*.rar
+.eslintcache
+.stylelintcache
+
+# Business & Financial Information (CONFIDENTIAL)
+# ==========================================
+revenue-projections.md
+business-projections.md
+monetization-plan.md
+financial-analysis.md
+pricing-strategy.md
+competitor-analysis.md
+partnership-agreements.md
+business-plan.md
+investor-deck.md
+financial-models.xlsx
+revenue-models.xlsx
+*.financial
+*.business
+business/
+financials/
+projections/
+
+# testing scripts and files
+test-analytics-api.js
+test-large-content.js
+test-validation.js
+test-all-endpoints.js
+
+debug-env.js
+
+test-api-key.js
+test-admin-routes.js
+test-db-connection.js
+migrate-sqlite-to-postgresql.js
+verify-migration.js
+test-frontend.html
+test-routes-now.js
+
+# Database data files (keep local only)
+backend/database/data/
+backend/database/backups/
+backend/database/logs/
+*.sql.backup
+*.dump
+.env.local
+*.backup
+
+
+# Testing and debug files
+*-test.js
+*-debug.js
+*-fix.js
+test-*.js
+debug-*.js
+*.backup
+.backup-*/

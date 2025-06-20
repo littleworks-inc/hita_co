@@ -1,0 +1,284 @@
+// Hita&Co Database Schema
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Admin Users
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  name      String?
+  role      String   @default("admin")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("users")
+}
+
+// Product Categories
+model Category {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  description String?
+  slug        String    @unique
+  parentId    String?
+  parent      Category? @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children    Category[] @relation("CategoryHierarchy")
+  products    Product[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@map("categories")
+}
+
+// Countries for sourcing
+model Country {
+  id           String    @id @default(cuid())
+  name         String    @unique
+  code         String    @unique // IN, BD, NP
+  currency     String    // INR, BDT, NPR
+  currencySymbol String  // ₹, ৳, रु
+  exchangeRate Float?    // Current exchange rate to USD
+  isDefault    Boolean   @default(false)
+  products     Product[]
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@map("countries")
+}
+
+// Main Products Table
+model Product {
+  id                String    @id @default(cuid())
+  sku               String    @unique
+  name              String
+  description       String?
+  shortDescription  String?
+  
+  // Images
+  images            String[]  // Array of image URLs
+  
+  // Category
+  categoryId        String
+  category          Category  @relation(fields: [categoryId], references: [id])
+  
+  // Sourcing Information
+  countryId         String
+  country           Country   @relation(fields: [countryId], references: [id])
+  originalPrice     Float     // Price in local currency
+  originalCurrency  String    // INR, BDT, NPR
+  
+  // Cost Breakdown
+  quantity          Int       @default(1)
+  gstPercentage     Float     @default(0)
+  shippingCost      Float     @default(0)
+  conversionCharges Float     @default(0)
+  additionalExpenses Float    @default(0)
+  
+  // Calculated Costs (in USD)
+  costPriceUSD      Float     // Total cost in USD
+  piecePriceUSD     Float     // Per piece cost in USD
+  
+  // Selling Price
+  profitMargin      Float     @default(0) // Percentage
+  discountPercentage Float    @default(0)
+  sellingPriceUSD   Float     // Final selling price in USD
+  
+  // Inventory
+  stockQuantity     Int       @default(0)
+  lowStockAlert     Int       @default(5)
+  
+  // SEO & Marketing
+  seoTitle          String?
+  seoDescription    String?
+  tags              String[]  // Array of tags
+  
+  // Status
+  isActive          Boolean   @default(true)
+  isFeatured        Boolean   @default(false)
+  
+  // Tracking
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  // Relations
+  orderItems        OrderItem[]
+  exhibitionItems   ExhibitionProduct[]
+
+  @@map("products")
+}
+
+// Orders
+model Order {
+  id              String      @id @default(cuid())
+  orderNumber     String      @unique
+  
+  // Customer Information
+  customerName    String
+  customerEmail   String
+  customerPhone   String
+  
+  // Shipping Address
+  shippingAddress Json
+  
+  // Order Details
+  subtotal        Float
+  tax             Float       @default(0)
+  shipping        Float       @default(0)
+  discount        Float       @default(0)
+  total           Float
+  currency        String      @default("USD")
+  
+  // Order Source
+  source          OrderSource @default(ONLINE)
+  locationNote    String?     // "Home pickup", "Exhibition: Winter Fair"
+  exhibitionId    String?
+  exhibition      Exhibition? @relation(fields: [exhibitionId], references: [id])
+  
+  // Payment
+  paymentMethod   PaymentMethod
+  paymentStatus   PaymentStatus @default(PENDING)
+  paymentId       String?     // Stripe payment ID
+  
+  // Order Status
+  status          OrderStatus @default(PENDING)
+  
+  // Tracking
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  
+  // Relations
+  items           OrderItem[]
+
+  @@map("orders")
+}
+
+// Order Items
+model OrderItem {
+  id              String  @id @default(cuid())
+  orderId         String
+  order           Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId       String
+  product         Product @relation(fields: [productId], references: [id])
+  quantity        Int
+  pricePerItem    Float
+  totalPrice      Float
+  
+  @@map("order_items")
+}
+
+// Exhibitions/Events
+model Exhibition {
+  id              String    @id @default(cuid())
+  title           String
+  description     String?
+  location        String
+  startDate       DateTime
+  endDate         DateTime
+  participationFee Float    @default(0)
+  
+  // Images
+  images          String[]
+  
+  // Status
+  isActive        Boolean   @default(true)
+  
+  // Tracking
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  // Relations
+  products        ExhibitionProduct[]
+  orders          Order[]
+
+  @@map("exhibitions")
+}
+
+// Exhibition Product Tracking
+model ExhibitionProduct {
+  id            String     @id @default(cuid())
+  exhibitionId  String
+  exhibition    Exhibition @relation(fields: [exhibitionId], references: [id], onDelete: Cascade)
+  productId     String
+  product       Product    @relation(fields: [productId], references: [id])
+  quantityTaken Int        // How many units brought to exhibition
+  quantitySold  Int        @default(0) // How many units sold
+  
+  @@unique([exhibitionId, productId])
+  @@map("exhibition_products")
+}
+
+// Store Settings (White-label customization)
+model StoreSetting {
+  id              String   @id @default(cuid())
+  storeName       String   @default("Hita&Co")
+  tagline         String?
+  logo            String?  // Logo URL
+  favicon         String?  // Favicon URL
+  
+  // Colors
+  primaryColor    String   @default("#000000")
+  secondaryColor  String   @default("#ffffff")
+  accentColor     String   @default("#f59e0b")
+  
+  // Contact Information
+  email           String?
+  phone           String?
+  address         Json?
+  
+  // Social Media
+  instagram       String?
+  facebook        String?
+  pinterest       String?
+  twitter         String?
+  
+  // AI Configuration
+  aiProvider      String?  // openai, gemini, claude, mistral
+  aiApiKey        String?
+  
+  // Other Settings
+  currency        String   @default("USD")
+  timezone        String   @default("America/New_York")
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("store_settings")
+}
+
+// Enums
+enum OrderSource {
+  ONLINE
+  HOME_VISIT
+  EXHIBITION
+}
+
+enum PaymentMethod {
+  CASH
+  CARD
+  UPI
+  STRIPE
+  PAYPAL
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
