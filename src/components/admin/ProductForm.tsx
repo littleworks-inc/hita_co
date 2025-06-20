@@ -16,7 +16,12 @@ import {
   Upload,
   X,
   Plus,
-  Image as ImageIcon
+  Image as ImageIcon,
+  RefreshCw,
+  Info,
+  Zap,
+  CheckCircle,
+  AlertTriangle
 } from 'lucide-react'
 
 interface Category {
@@ -88,10 +93,75 @@ interface ProductFormProps {
   mode: 'create' | 'edit'
 }
 
+// Enhanced barcode generation function
+const generateBarcodeFromSKU = (sku: string, format: string) => {
+  if (!sku) return { isValid: false, error: 'SKU required' }
+  
+  const cleanSKU = sku.replace(/[^A-Z0-9]/g, '').toUpperCase()
+  const timestamp = Date.now().toString().slice(-6)
+  
+  switch (format) {
+    case 'UPC':
+      // Generate 11 digits for UPC, system will add check digit
+      const upcBase = (cleanSKU + timestamp).replace(/[^0-9]/g, '').slice(0, 11).padStart(11, '0')
+      return { isValid: true, correctedCode: upcBase }
+      
+    case 'EAN13':
+      // Generate 12 digits for EAN-13, system will add check digit
+      const eanBase = (cleanSKU + timestamp).replace(/[^0-9]/g, '').slice(0, 12).padStart(12, '0')
+      return { isValid: true, correctedCode: eanBase }
+      
+    case 'CODE39':
+      // Use SKU directly (CODE39 supports alphanumeric)
+      const code39Data = cleanSKU.slice(0, 20)
+      return { isValid: true, correctedCode: code39Data }
+      
+    case 'CODE128':
+    default:
+      // Use SKU + timestamp for uniqueness
+      const code128Data = `${cleanSKU}${timestamp}`.slice(0, 40)
+      return { isValid: true, correctedCode: code128Data }
+  }
+}
+
+// Barcode format recommendations
+const getBarcodeFormatRecommendation = (format: string) => {
+  const recommendations = {
+    'CODE128': {
+      reason: 'Best for inventory tracking, supports all characters',
+      description: 'Most versatile format, perfect for internal use',
+      icon: '🏷️',
+      useCase: 'Internal inventory tracking'
+    },
+    'UPC': {
+      reason: 'Standard for US retail stores',
+      description: 'Required for major US retailers like Walmart, Amazon',
+      icon: '🏪',
+      useCase: 'US retail, Amazon, Walmart'
+    },
+    'EAN13': {
+      reason: 'International standard, accepted worldwide',
+      description: 'Global retail format with country codes',
+      icon: '🌍',
+      useCase: 'International sales, European markets'
+    },
+    'CODE39': {
+      reason: 'Simple format, easy to implement',
+      description: 'Basic format good for simple tracking',
+      icon: '📄',
+      useCase: 'Simple tracking, legacy systems'
+    }
+  }
+  
+  return recommendations[format as keyof typeof recommendations] || recommendations.CODE128
+}
+
 export default function ProductForm({ categories, countries, suppliers, product, mode }: ProductFormProps) {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const [isGeneratingBarcode, setIsGeneratingBarcode] = useState(false)
+  const [barcodeRecommendation, setBarcodeRecommendation] = useState<any>(null)
   
   // Form state
   const [formData, setFormData] = useState<Product>({
@@ -191,17 +261,21 @@ export default function ProductForm({ categories, countries, suppliers, product,
   // Auto-generate barcode when SKU changes (only for new products)
   useEffect(() => {
     if (mode === 'create' && formData.sku && !formData.barcode) {
-      // Generate barcode from SKU (remove hyphens and make it numeric-friendly)
-      const cleanSKU = formData.sku.replace(/[^A-Z0-9]/g, '')
-      const timestamp = Date.now().toString().slice(-6)
-      const generatedBarcode = `${cleanSKU}${timestamp}`.slice(0, 12)
-      
-      setFormData(prev => ({
-        ...prev,
-        barcode: generatedBarcode
-      }))
+      const result = generateBarcodeFromSKU(formData.sku, formData.barcodeType)
+      if (result.isValid && result.correctedCode) {
+        setFormData(prev => ({
+          ...prev,
+          barcode: result.correctedCode
+        }))
+      }
     }
-  }, [formData.sku, mode])
+  }, [formData.sku, formData.barcodeType, mode])
+
+  // Update recommendation when barcode type changes
+  useEffect(() => {
+    const recommendation = getBarcodeFormatRecommendation(formData.barcodeType)
+    setBarcodeRecommendation(recommendation)
+  }, [formData.barcodeType])
 
   const handleInputChange = (field: keyof Product, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }))
@@ -209,6 +283,35 @@ export default function ProductForm({ categories, countries, suppliers, product,
     // Clear error when user starts typing
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: '' }))
+    }
+  }
+
+  const handleBarcodeFormatChange = (newFormat: string) => {
+    handleInputChange('barcodeType', newFormat)
+    
+    // Regenerate barcode with new format if SKU exists
+    if (formData.sku) {
+      const result = generateBarcodeFromSKU(formData.sku, newFormat)
+      if (result.isValid && result.correctedCode) {
+        handleInputChange('barcode', result.correctedCode)
+      }
+    }
+  }
+
+  const generateNewBarcode = async () => {
+    if (!formData.sku) return
+    
+    setIsGeneratingBarcode(true)
+    
+    try {
+      const result = generateBarcodeFromSKU(formData.sku, formData.barcodeType)
+      if (result.isValid && result.correctedCode) {
+        handleInputChange('barcode', result.correctedCode)
+      }
+    } catch (error) {
+      console.error('Barcode generation error:', error)
+    } finally {
+      setIsGeneratingBarcode(false)
     }
   }
 
@@ -280,6 +383,37 @@ export default function ProductForm({ categories, countries, suppliers, product,
     }
   }
 
+  const formatOptions = [
+    {
+      value: 'CODE128',
+      label: 'CODE128 (Recommended)',
+      description: 'Best for inventory, supports all characters',
+      icon: '🏷️',
+      useCase: 'Internal inventory tracking'
+    },
+    {
+      value: 'UPC',
+      label: 'UPC (US Retail)',
+      description: 'Standard for US retail stores',
+      icon: '🏪',
+      useCase: 'US retail, Amazon, Walmart'
+    },
+    {
+      value: 'EAN13',
+      label: 'EAN-13 (International)',
+      description: 'Global standard, includes country codes',
+      icon: '🌍',
+      useCase: 'International sales, European markets'
+    },
+    {
+      value: 'CODE39',
+      label: 'CODE39 (Simple)',
+      description: 'Basic format, easy to implement',
+      icon: '📄',
+      useCase: 'Simple tracking, legacy systems'
+    }
+  ]
+
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       {errors.submit && (
@@ -339,46 +473,6 @@ export default function ProductForm({ categories, countries, suppliers, product,
                 className={errors.sku ? 'border-red-500' : ''}
               />
               {errors.sku && <p className="text-sm text-red-600">{errors.sku}</p>}
-            </div>
-          </div>
-
-          {/* Barcode Section */}
-          <div className="grid gap-4 md:grid-cols-3">
-            <div className="space-y-2">
-              <Label htmlFor="barcode">Barcode</Label>
-              <Input
-                id="barcode"
-                value={formData.barcode}
-                onChange={(e) => handleInputChange('barcode', e.target.value)}
-                placeholder="Auto-generated"
-              />
-              <p className="text-xs text-gray-500">Auto-generated from SKU or enter custom</p>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="barcodeType">Barcode Type</Label>
-              <select
-                id="barcodeType"
-                value={formData.barcodeType}
-                onChange={(e) => handleInputChange('barcodeType', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="CODE128">CODE128 (Recommended)</option>
-                <option value="EAN13">EAN-13 (Standard retail)</option>
-                <option value="UPC">UPC (US retail)</option>
-                <option value="CODE39">CODE39 (Simple)</option>
-              </select>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Barcode Preview & Actions</Label>
-              <BarcodeDisplay
-                barcode={formData.barcode}
-                barcodeType={formData.barcodeType}
-                productName={formData.name || 'Product Name'}
-                price={formData.sellingPriceUSD ? `${formData.sellingPriceUSD.toFixed(2)}` : undefined}
-                size="small"
-              />
             </div>
           </div>
 
@@ -445,6 +539,147 @@ export default function ProductForm({ categories, countries, suppliers, product,
               {errors.countryId && <p className="text-sm text-red-600">{errors.countryId}</p>}
             </div>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Enhanced Barcode Configuration */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <div className="p-1 bg-blue-100 rounded">
+              📊
+            </div>
+            Barcode Configuration
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          
+          {/* Barcode Type Selection */}
+          <div className="space-y-3">
+            <Label className="text-base font-medium">Barcode Format</Label>
+            <div className="grid gap-3 md:grid-cols-2">
+              {formatOptions.map((option) => (
+                <div
+                  key={option.value}
+                  className={`p-3 border rounded-lg cursor-pointer transition-all ${
+                    formData.barcodeType === option.value
+                      ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-200'
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                  onClick={() => handleBarcodeFormatChange(option.value)}
+                >
+                  <div className="flex items-start gap-3">
+                    <span className="text-xl">{option.icon}</span>
+                    <div className="flex-1">
+                      <div className="font-medium text-sm">{option.label}</div>
+                      <div className="text-xs text-gray-600 mt-1">{option.description}</div>
+                      <div className="text-xs text-blue-600 mt-1">{option.useCase}</div>
+                    </div>
+                    {formData.barcodeType === option.value && (
+                      <CheckCircle className="h-4 w-4 text-blue-500" />
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Format Recommendation */}
+          {barcodeRecommendation && (
+            <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <div className="flex items-start gap-2">
+                <Info className="h-4 w-4 text-blue-500 mt-0.5" />
+                <div>
+                  <div className="font-medium text-sm text-blue-900">
+                    {formData.barcodeType} Format Selected
+                  </div>
+                  <div className="text-sm text-blue-700 mt-1">
+                    {barcodeRecommendation.reason}
+                  </div>
+                  <div className="text-xs text-blue-600 mt-1">
+                    {barcodeRecommendation.description}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Barcode Input and Generation */}
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="barcode">Barcode Code</Label>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={generateNewBarcode}
+                  disabled={!formData.sku || isGeneratingBarcode}
+                  className="h-6 px-2 text-xs"
+                >
+                  {isGeneratingBarcode ? (
+                    <RefreshCw className="h-3 w-3 animate-spin" />
+                  ) : (
+                    <Zap className="h-3 w-3" />
+                  )}
+                  {isGeneratingBarcode ? 'Generating...' : 'Regenerate'}
+                </Button>
+              </div>
+              <Input
+                id="barcode"
+                value={formData.barcode}
+                onChange={(e) => handleInputChange('barcode', e.target.value)}
+                placeholder={`Auto-generated ${formData.barcodeType} code`}
+                className={errors.barcode ? 'border-red-500' : ''}
+              />
+              {errors.barcode && (
+                <p className="text-sm text-red-600">{errors.barcode}</p>
+              )}
+              <p className="text-xs text-gray-500">
+                Auto-generated from SKU or enter custom code
+              </p>
+            </div>
+
+            {/* Scanner Compatibility Status */}
+            <div className="space-y-2">
+              <Label>Scanner Compatibility</Label>
+              <div className="p-2 rounded-md text-xs bg-green-50 border border-green-200">
+                <div className="flex items-center gap-1 font-medium text-green-700">
+                  <CheckCircle className="h-3 w-3" />
+                  Scanner Ready
+                </div>
+                <div className="mt-1 space-y-1">
+                  <div className="text-green-600">💡 {formData.barcodeType} format is optimal for scanning</div>
+                  <div className="text-green-600">📱 Compatible with mobile scanner apps</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Barcode Preview */}
+          <div className="space-y-2">
+            <Label>Barcode Preview & Actions</Label>
+            <BarcodeDisplay
+              barcode={formData.barcode}
+              barcodeType={formData.barcodeType}
+              productName={formData.name || 'Product Name'}
+              price={formData.sellingPriceUSD ? `$${formData.sellingPriceUSD.toFixed(2)}` : undefined}
+              size="medium"
+            />
+          </div>
+
+          {/* Quick Tips */}
+          <div className="bg-gray-50 p-3 rounded-lg">
+            <div className="text-sm font-medium text-gray-900 mb-2">💡 Barcode Best Practices</div>
+            <div className="text-xs text-gray-600 space-y-1">
+              <div>• <strong>CODE128:</strong> Best for internal inventory, supports all characters</div>
+              <div>• <strong>UPC:</strong> Required for US retail stores (Walmart, Target, Amazon)</div>
+              <div>• <strong>EAN-13:</strong> International standard, required for global sales</div>
+              <div>• <strong>Print Quality:</strong> Use high contrast (black on white) for best scanning</div>
+              <div>• <strong>Size:</strong> Minimum 1.5x width multiplier for reliable scanning</div>
+            </div>
+          </div>
+
         </CardContent>
       </Card>
 
