@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle, Button, Input, Label } from '@/components/ui'
 import { generateSKU, calculateCostBreakdown, calculateSellingPrice, slugify } from '@/lib/utils'
 import ImageUpload from '@/components/admin/ImageUpload'
+import BarcodeDisplay from '@/components/admin/BarcodeDisplay'
 import Link from 'next/link'
 import {
   Package,
@@ -49,6 +50,10 @@ interface Product {
   shortDescription: string
   categoryId: string
   countryId: string
+  
+  // Barcode Information
+  barcode: string
+  barcodeType: string
   
   // Supplier Information
   supplierId: string
@@ -96,6 +101,10 @@ export default function ProductForm({ categories, countries, suppliers, product,
     shortDescription: product?.shortDescription || '',
     categoryId: product?.categoryId || '',
     countryId: product?.countryId || countries.find(c => c.isDefault)?.id || '',
+    
+    // Barcode Information
+    barcode: product?.barcode || '',
+    barcodeType: product?.barcodeType || 'CODE128',
     
     // Supplier Information
     supplierId: product?.supplierId || '',
@@ -178,6 +187,21 @@ export default function ProductForm({ categories, countries, suppliers, product,
       }))
     }
   }, [formData.name, mode])
+
+  // Auto-generate barcode when SKU changes (only for new products)
+  useEffect(() => {
+    if (mode === 'create' && formData.sku && !formData.barcode) {
+      // Generate barcode from SKU (remove hyphens and make it numeric-friendly)
+      const cleanSKU = formData.sku.replace(/[^A-Z0-9]/g, '')
+      const timestamp = Date.now().toString().slice(-6)
+      const generatedBarcode = `${cleanSKU}${timestamp}`.slice(0, 12)
+      
+      setFormData(prev => ({
+        ...prev,
+        barcode: generatedBarcode
+      }))
+    }
+  }, [formData.sku, mode])
 
   const handleInputChange = (field: keyof Product, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }))
@@ -264,6 +288,25 @@ export default function ProductForm({ categories, countries, suppliers, product,
         </div>
       )}
 
+      {/* Product Images & Videos - Enhanced */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <ImageIcon className="h-5 w-5" />
+            Product Images & Videos
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ImageUpload
+            images={formData.images}
+            onImagesChange={(images) => handleInputChange('images', images)}
+            maxImages={8}
+            maxVideos={2}
+            disabled={loading}
+          />
+        </CardContent>
+      </Card>
+
       {/* Basic Information */}
       <Card>
         <CardHeader>
@@ -296,6 +339,46 @@ export default function ProductForm({ categories, countries, suppliers, product,
                 className={errors.sku ? 'border-red-500' : ''}
               />
               {errors.sku && <p className="text-sm text-red-600">{errors.sku}</p>}
+            </div>
+          </div>
+
+          {/* Barcode Section */}
+          <div className="grid gap-4 md:grid-cols-3">
+            <div className="space-y-2">
+              <Label htmlFor="barcode">Barcode</Label>
+              <Input
+                id="barcode"
+                value={formData.barcode}
+                onChange={(e) => handleInputChange('barcode', e.target.value)}
+                placeholder="Auto-generated"
+              />
+              <p className="text-xs text-gray-500">Auto-generated from SKU or enter custom</p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="barcodeType">Barcode Type</Label>
+              <select
+                id="barcodeType"
+                value={formData.barcodeType}
+                onChange={(e) => handleInputChange('barcodeType', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="CODE128">CODE128 (Recommended)</option>
+                <option value="EAN13">EAN-13 (Standard retail)</option>
+                <option value="UPC">UPC (US retail)</option>
+                <option value="CODE39">CODE39 (Simple)</option>
+              </select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Barcode Preview & Actions</Label>
+              <BarcodeDisplay
+                barcode={formData.barcode}
+                barcodeType={formData.barcodeType}
+                productName={formData.name || 'Product Name'}
+                price={formData.sellingPriceUSD ? `${formData.sellingPriceUSD.toFixed(2)}` : undefined}
+                size="small"
+              />
             </div>
           </div>
 
@@ -643,24 +726,6 @@ export default function ProductForm({ categories, countries, suppliers, product,
               />
             </div>
           </div>
-        </CardContent>
-      </Card>
-
-      {/* Images */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <ImageIcon className="h-5 w-5" />
-            Product Images
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ImageUpload
-            images={formData.images}
-            onImagesChange={(images) => handleInputChange('images', images)}
-            maxImages={10}
-            disabled={loading}
-          />
         </CardContent>
       </Card>
 
