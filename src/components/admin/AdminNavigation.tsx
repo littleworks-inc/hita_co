@@ -165,11 +165,6 @@ export default function AdminNavigation() {
           </div>
         )}
       </div>
-
-      {/* Main content offset for desktop */}
-      <div className="lg:pl-64">
-        {/* Content will go here */}
-      </div>
     </>
   )
 }

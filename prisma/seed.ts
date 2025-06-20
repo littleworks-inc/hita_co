@@ -1,7 +1,11 @@
 import { PrismaClient } from '@prisma/client'
-import { hashPassword } from '../src/lib/auth'
+import bcrypt from 'bcryptjs'
 
 const prisma = new PrismaClient()
+
+async function hashPassword(password: string): Promise<string> {
+  return await bcrypt.hash(password, 12)
+}
 
 async function main() {
   console.log('🌱 Starting database seed...')

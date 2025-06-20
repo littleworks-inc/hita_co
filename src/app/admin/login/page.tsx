@@ -2,10 +2,8 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Button } from '@/components/ui'
-import { Input } from '@/components/ui'
-import { Label } from '@/components/ui'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui'
+import { Button, Input, Label, Card, CardContent, CardHeader, CardTitle } from '@/components/ui'
+
 
 export default function AdminLogin() {
   const router = useRouter()
