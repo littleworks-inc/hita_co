@@ -100,6 +100,10 @@ model Product {
   description       String?
   shortDescription  String?
   
+  // Barcode Information
+  barcode           String?   @unique
+  barcodeType       String?   @default("CODE128") // CODE128, EAN13, UPC, CODE39
+  
   // Images
   images            String[]  // Array of image URLs
   
