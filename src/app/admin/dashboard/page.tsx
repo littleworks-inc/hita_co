@@ -3,8 +3,7 @@ import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { formatPrice } from '@/lib/utils'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui'
-import { Button } from '@/components/ui'
+import { Card, CardContent, CardHeader, CardTitle, Button } from '@/components/ui'
 import AdminNavigation from '@/components/admin/AdminNavigation'
 import {
   Package,
@@ -224,93 +223,96 @@ export default async function AdminDashboard() {
     <div className="min-h-screen bg-gray-50">
       <AdminNavigation />
       
-      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-        <div className="px-4 py-6 sm:px-0">
-          <div className="border-b border-gray-200 pb-5 mb-6">
-            <h1 className="text-3xl font-bold leading-6 text-gray-900">
-              Dashboard
-            </h1>
-            <p className="mt-2 max-w-4xl text-sm text-gray-500">
-              Welcome back! Here's what's happening with your store.
-            </p>
-          </div>
-
-          <div className="space-y-6">
-            <Suspense fallback={<div>Loading stats...</div>}>
-              <DashboardStats />
-            </Suspense>
-
-            <div className="grid gap-6 md:grid-cols-2">
-              <Suspense fallback={<div>Loading orders...</div>}>
-                <RecentOrders />
-              </Suspense>
-
-              <Suspense fallback={<div>Loading alerts...</div>}>
-                <LowStockAlert />
-              </Suspense>
+      {/* Fixed: Added lg:pl-64 to push content away from sidebar */}
+      <main className="lg:pl-64">
+        <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+          <div className="px-4 py-6 sm:px-0">
+            <div className="border-b border-gray-200 pb-5 mb-6">
+              <h1 className="text-3xl font-bold leading-6 text-gray-900">
+                Dashboard
+              </h1>
+              <p className="mt-2 max-w-4xl text-sm text-gray-500">
+                Welcome back! Here's what's happening with your store.
+              </p>
             </div>
 
-            <div className="grid gap-6 md:grid-cols-3">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Quick Actions</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  <Button className="w-full" variant="outline">
-                    Add New Product
-                  </Button>
-                  <Button className="w-full" variant="outline">
-                    Create Exhibition
-                  </Button>
-                  <Button className="w-full" variant="outline">
-                    View Orders
-                  </Button>
-                </CardContent>
-              </Card>
+            <div className="space-y-6">
+              <Suspense fallback={<div>Loading stats...</div>}>
+                <DashboardStats />
+              </Suspense>
 
-              <Card>
-                <CardHeader>
-                  <CardTitle>Sales Overview</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    <div className="flex justify-between">
-                      <span className="text-sm text-muted-foreground">Online</span>
-                      <span className="text-sm font-medium">$2,340</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-sm text-muted-foreground">Home Visits</span>
-                      <span className="text-sm font-medium">$1,230</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-sm text-muted-foreground">Exhibitions</span>
-                      <span className="text-sm font-medium">$890</span>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+              <div className="grid gap-6 md:grid-cols-2">
+                <Suspense fallback={<div>Loading orders...</div>}>
+                  <RecentOrders />
+                </Suspense>
 
-              <Card>
-                <CardHeader>
-                  <CardTitle>Store Status</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                      <span className="text-sm">Store Online</span>
+                <Suspense fallback={<div>Loading alerts...</div>}>
+                  <LowStockAlert />
+                </Suspense>
+              </div>
+
+              <div className="grid gap-6 md:grid-cols-3">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Quick Actions</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    <Button className="w-full" variant="outline">
+                      Add New Product
+                    </Button>
+                    <Button className="w-full" variant="outline">
+                      Create Exhibition
+                    </Button>
+                    <Button className="w-full" variant="outline">
+                      View Orders
+                    </Button>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Sales Overview</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      <div className="flex justify-between">
+                        <span className="text-sm text-muted-foreground">Online</span>
+                        <span className="text-sm font-medium">$2,340</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-sm text-muted-foreground">Home Visits</span>
+                        <span className="text-sm font-medium">$1,230</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-sm text-muted-foreground">Exhibitions</span>
+                        <span className="text-sm font-medium">$890</span>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                      <span className="text-sm">Payments Active</span>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Store Status</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                        <span className="text-sm">Store Online</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                        <span className="text-sm">Payments Active</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
+                        <span className="text-sm">AI Tools Ready</span>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
-                      <span className="text-sm">AI Tools Ready</span>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+                  </CardContent>
+                </Card>
+              </div>
             </div>
           </div>
         </div>
