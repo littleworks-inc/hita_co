@@ -16,12 +16,14 @@ import {
   BarChart3,
   Users,
   Palette,
-  Building2
+  Building2,
+  FolderTree
 } from 'lucide-react'
 
 const navigation = [
   { name: 'Dashboard', href: '/admin/dashboard', icon: LayoutDashboard },
   { name: 'Products', href: '/admin/products', icon: Package },
+  { name: 'Categories', href: '/admin/categories', icon: FolderTree },
   { name: 'Suppliers', href: '/admin/suppliers', icon: Building2 },
   { name: 'Orders', href: '/admin/orders', icon: ShoppingCart },
   { name: 'Exhibitions', href: '/admin/exhibitions', icon: Calendar },
@@ -60,7 +62,7 @@ export default function AdminNavigation() {
             <nav className="mt-8 flex-1 space-y-1 px-2">
               {navigation.map((item) => {
                 const Icon = item.icon
-                const isActive = pathname === item.href
+                const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
                 return (
                   <Link
                     key={item.name}
@@ -134,7 +136,7 @@ export default function AdminNavigation() {
                 <nav className="space-y-1 px-2">
                   {navigation.map((item) => {
                     const Icon = item.icon
-                    const isActive = pathname === item.href
+                    const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
                     return (
                       <Link
                         key={item.name}
