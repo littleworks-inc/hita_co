@@ -53,6 +53,45 @@ model Country {
   @@map("countries")
 }
 
+// Suppliers Table
+model Supplier {
+  id              String    @id @default(cuid())
+  name            String    @unique
+  contactPerson   String?   // Main contact person
+  email           String?
+  phone           String?
+  whatsapp        String?
+  address         String?
+  city            String?
+  state           String?
+  country         String?
+  pincode         String?
+  
+  // Business Information
+  businessType    String?   // Manufacturer, Wholesaler, Retailer, Individual
+  gstNumber       String?   // GST registration number
+  panNumber       String?   // PAN card number
+  
+  // Banking Details (Optional)
+  bankName        String?
+  accountNumber   String?
+  ifscCode        String?
+  
+  // Additional Info
+  notes           String?   // Special notes about supplier
+  rating          Float?    // Supplier rating (1-5)
+  isActive        Boolean   @default(true)
+  
+  // Tracking
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  // Relations
+  products        Product[]
+
+  @@map("suppliers")
+}
+
 // Main Products Table
 model Product {
   id                String    @id @default(cuid())
@@ -73,6 +112,12 @@ model Product {
   country           Country   @relation(fields: [countryId], references: [id])
   originalPrice     Float     // Price in local currency
   originalCurrency  String    // INR, BDT, NPR
+  
+  // Supplier Information
+  supplierId        String
+  supplier          Supplier  @relation(fields: [supplierId], references: [id])
+  purchaseDate      DateTime? // When you bought it
+  invoiceNumber     String?   // Bill/receipt number
   
   // Cost Breakdown
   quantity          Int       @default(1)

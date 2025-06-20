@@ -1,11 +1,7 @@
 import { PrismaClient } from '@prisma/client'
-import bcrypt from 'bcryptjs'
+import { hashPassword } from '../src/lib/auth'
 
 const prisma = new PrismaClient()
-
-async function hashPassword(password: string): Promise<string> {
-  return await bcrypt.hash(password, 12)
-}
 
 async function main() {
   console.log('🌱 Starting database seed...')
@@ -203,6 +199,58 @@ async function main() {
 
   console.log('✅ Store settings created')
 
+  // Create sample suppliers
+  const sampleSuppliers = [
+    {
+      name: 'Rajesh Handicrafts',
+      contactPerson: 'Mr. Rajesh Kumar',
+      phone: '+91-9876543210',
+      email: 'rajesh@handicrafts.com',
+      address: 'Shop 15, Karol Bagh Market',
+      city: 'Delhi',
+      state: 'Delhi',
+      country: 'India',
+      businessType: 'Wholesaler',
+      rating: 4.5,
+      isActive: true
+    },
+    {
+      name: 'Bengal Artisans Co-op',
+      contactPerson: 'Mrs. Priya Sen',
+      phone: '+91-9123456789',
+      email: 'priya@bengalartisans.com',
+      address: 'Kumartuli Street',
+      city: 'Kolkata',
+      state: 'West Bengal',
+      country: 'India',
+      businessType: 'Cooperative',
+      rating: 4.0,
+      isActive: true
+    },
+    {
+      name: 'Local Market Vendor',
+      contactPerson: 'Amit Sharma',
+      phone: '+91-8765432109',
+      address: 'Chandni Chowk',
+      city: 'Delhi',
+      state: 'Delhi',
+      country: 'India',
+      businessType: 'Individual Seller',
+      rating: 3.5,
+      isActive: true
+    }
+  ]
+
+  for (const supplier of sampleSuppliers) {
+    await prisma.supplier.upsert({
+      where: { name: supplier.name },
+      update: {},
+      create: supplier,
+    })
+  }
+
+  console.log('✅ Sample suppliers created')
+
   // Create sample products
   const indiaCountry = await prisma.country.findUnique({
     where: { code: 'IN' }
@@ -212,7 +260,11 @@ async function main() {
     where: { slug: 'earrings' }
   })
 
-  if (indiaCountry && earringsCategory) {
+  const rajeshSupplier = await prisma.supplier.findUnique({
+    where: { name: 'Rajesh Handicrafts' }
+  })
+
+  if (indiaCountry && earringsCategory && rajeshSupplier) {
     const sampleProducts = [
       {
         sku: 'HC-EARR-001',
@@ -221,6 +273,9 @@ async function main() {
         shortDescription: 'Elegant traditional jhumkas',
         categoryId: earringsCategory.id,
         countryId: indiaCountry.id,
+        supplierId: rajeshSupplier.id,
+        purchaseDate: new Date('2024-01-15'),
+        invoiceNumber: 'INV-2024-001',
         originalPrice: 1500, // ₹1500
         originalCurrency: 'INR',
         quantity: 10,
@@ -247,6 +302,9 @@ async function main() {
         shortDescription: 'Festive kundan drops',
         categoryId: earringsCategory.id,
         countryId: indiaCountry.id,
+        supplierId: rajeshSupplier.id,
+        purchaseDate: new Date('2024-01-20'),
+        invoiceNumber: 'INV-2024-002',
         originalPrice: 2500,
         originalCurrency: 'INR',
         quantity: 5,
