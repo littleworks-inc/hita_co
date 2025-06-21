@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, Button, Input, Label } from '
 import { generateSKU, calculateCostBreakdown, calculateSellingPrice, slugify } from '@/lib/utils'
 import ImageUpload from '@/components/admin/ImageUpload'
 import BarcodeDisplay from '@/components/admin/BarcodeDisplay'
+import AIGenerateButton, { AISEOButton, AISocialButton } from '@/components/admin/AIGenerateButton'
 import Link from 'next/link'
 import {
   Package,
@@ -21,7 +22,12 @@ import {
   Info,
   Zap,
   CheckCircle,
-  AlertTriangle
+  AlertTriangle,
+  Sparkles,
+  Search,
+  Wand2,
+  Brain,
+  Settings2
 } from 'lucide-react'
 
 interface Category {
@@ -83,6 +89,15 @@ interface Product {
   isFeatured: boolean
   tags: string[]
   images: string[]
+  
+  // SEO fields
+  seoTitle?: string
+  seoDescription?: string
+  
+  // Social media fields
+  instagramCaption?: string
+  facebookCaption?: string
+  twitterCaption?: string
 }
 
 interface ProductFormProps {
@@ -102,23 +117,19 @@ const generateBarcodeFromSKU = (sku: string, format: string) => {
   
   switch (format) {
     case 'UPC':
-      // Generate 11 digits for UPC, system will add check digit
       const upcBase = (cleanSKU + timestamp).replace(/[^0-9]/g, '').slice(0, 11).padStart(11, '0')
       return { isValid: true, correctedCode: upcBase }
       
     case 'EAN13':
-      // Generate 12 digits for EAN-13, system will add check digit
       const eanBase = (cleanSKU + timestamp).replace(/[^0-9]/g, '').slice(0, 12).padStart(12, '0')
       return { isValid: true, correctedCode: eanBase }
       
     case 'CODE39':
-      // Use SKU directly (CODE39 supports alphanumeric)
       const code39Data = cleanSKU.slice(0, 20)
       return { isValid: true, correctedCode: code39Data }
       
     case 'CODE128':
     default:
-      // Use SKU + timestamp for uniqueness
       const code128Data = `${cleanSKU}${timestamp}`.slice(0, 40)
       return { isValid: true, correctedCode: code128Data }
   }
@@ -162,6 +173,13 @@ export default function ProductForm({ categories, countries, suppliers, product,
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [isGeneratingBarcode, setIsGeneratingBarcode] = useState(false)
   const [barcodeRecommendation, setBarcodeRecommendation] = useState<any>(null)
+  const [successMessage, setSuccessMessage] = useState('')
+  
+  // AI Configuration State
+  const [selectedTone, setSelectedTone] = useState<'professional' | 'casual' | 'elegant' | 'playful' | 'informative'>('elegant')
+  const [customPrompt, setCustomPrompt] = useState('')
+  const [useCustomPrompt, setUseCustomPrompt] = useState(false)
+  const [showAIConfig, setShowAIConfig] = useState(false)
   
   // Form state
   const [formData, setFormData] = useState<Product>({
@@ -198,7 +216,16 @@ export default function ProductForm({ categories, countries, suppliers, product,
     isActive: product?.isActive ?? true,
     isFeatured: product?.isFeatured ?? false,
     tags: product?.tags || [],
-    images: product?.images || []
+    images: product?.images || [],
+    
+    // SEO fields
+    seoTitle: product?.seoTitle || '',
+    seoDescription: product?.seoDescription || '',
+    
+    // Social media fields
+    instagramCaption: product?.instagramCaption || '',
+    facebookCaption: product?.facebookCaption || '',
+    twitterCaption: product?.twitterCaption || ''
   })
 
   // Tags input state
@@ -207,6 +234,276 @@ export default function ProductForm({ categories, countries, suppliers, product,
   // Get selected country for exchange rate
   const selectedCountry = countries.find(c => c.id === formData.countryId)
   const exchangeRate = selectedCountry?.exchangeRate || 1
+
+  /**
+   * Build dynamic product context from current form data
+   */
+  const buildProductContext = () => {
+    const selectedCategory = categories.find(c => c.id === formData.categoryId)
+    const selectedCountry = countries.find(c => c.id === formData.countryId)
+    const selectedSupplier = suppliers.find(s => s.id === formData.supplierId)
+
+    return {
+      name: formData.name.trim(),
+      category: selectedCategory?.name,
+      materials: extractMaterialsFromForm(),
+      colors: extractColorsFromForm(),
+      description: formData.shortDescription || formData.description,
+      price: formData.sellingPriceUSD,
+      currency: 'USD',
+      originalPrice: formData.originalPrice,
+      originalCurrency: formData.originalCurrency,
+      origin: selectedCountry?.name,
+      supplier: selectedSupplier?.name,
+      tags: formData.tags,
+      stockQuantity: formData.stockQuantity,
+      targetAudience: 'customers who appreciate authentic Indian ethnic wear and traditional craftsmanship'
+    }
+  }
+
+  /**
+   * Extract materials from all form inputs (description, tags, name)
+   */
+  const extractMaterialsFromForm = (): string[] => {
+    const materials = new Set<string>()
+    
+    const materialKeywords = [
+      // Fabrics
+      'silk', 'cotton', 'chiffon', 'georgette', 'crepe', 'satin', 'velvet', 'linen', 
+      'khadi', 'handloom', 'organic cotton', 'bamboo', 'jute', 'wool', 'cashmere', 
+      'modal', 'rayon', 'net', 'tulle', 'organza', 'taffeta', 'brocade', 'jacquard',
+      'denim', 'canvas', 'muslin', 'voile', 'lawn', 'poplin', 'twill', 'corduroy',
+      
+      // Metals & Stones
+      'silver', 'gold', 'rose gold', 'white gold', 'brass', 'copper', 'bronze',
+      'platinum', 'steel', 'stainless steel', 'pearl', 'diamond', 'ruby', 'emerald',
+      'sapphire', 'amethyst', 'turquoise', 'coral', 'jade', 'onyx', 'quartz',
+      'crystal', 'glass', 'ceramic', 'wood', 'bamboo', 'bone', 'horn',
+      
+      // Traditional materials
+      'kundan', 'meenakari', 'zardozi', 'gota', 'sequin', 'mirror work', 'embroidery',
+      'block print', 'hand painted', 'tie dye', 'bandhani', 'ikat', 'ajrakh'
+    ]
+
+    const allText = [
+      formData.name,
+      formData.description,
+      formData.shortDescription,
+      ...formData.tags
+    ].join(' ').toLowerCase()
+
+    materialKeywords.forEach(material => {
+      if (allText.includes(material.toLowerCase())) {
+        materials.add(material)
+      }
+    })
+
+    return Array.from(materials)
+  }
+
+  /**
+   * Extract colors from all form inputs
+   */
+  const extractColorsFromForm = (): string[] => {
+    const colors = new Set<string>()
+    
+    const colorKeywords = [
+      // Basic colors
+      'red', 'blue', 'green', 'yellow', 'orange', 'purple', 'pink', 'black', 'white',
+      'grey', 'gray', 'brown', 'beige', 'cream', 'ivory', 'off-white', 'pearl',
+      
+      // Metallic colors
+      'gold', 'silver', 'rose gold', 'copper', 'bronze', 'champagne', 'platinum',
+      
+      // Specific shades
+      'maroon', 'burgundy', 'wine', 'navy', 'royal blue', 'sky blue', 'teal', 
+      'turquoise', 'mint', 'sage', 'olive', 'forest green', 'lime', 'coral',
+      'salmon', 'peach', 'apricot', 'lavender', 'lilac', 'violet', 'indigo',
+      'magenta', 'fuchsia', 'crimson', 'scarlet', 'ruby', 'emerald', 'sapphire',
+      'mustard', 'ochre', 'rust', 'tan', 'khaki', 'taupe', 'charcoal', 'slate',
+      
+      // Traditional Indian colors
+      'saffron', 'turmeric', 'henna', 'mehendi', 'vermillion', 'sindoor'
+    ]
+
+    const allText = [
+      formData.name,
+      formData.description,
+      formData.shortDescription,
+      ...formData.tags
+    ].join(' ').toLowerCase()
+
+    colorKeywords.forEach(color => {
+      if (allText.includes(color.toLowerCase())) {
+        colors.add(color)
+      }
+    })
+
+    return Array.from(colors)
+  }
+
+  /**
+   * Check if form has enough data for AI generation
+   */
+  const isReadyForAI = (): boolean => {
+    return !!(formData.name?.trim() && formData.categoryId)
+  }
+
+  /**
+   * Get AI readiness status message
+   */
+  const getAIReadinessMessage = (): string => {
+    if (!formData.name?.trim()) return 'Product name required'
+    if (!formData.categoryId) return 'Category selection required'
+    return 'Ready for AI generation'
+  }
+
+  /**
+   * Handle AI generation with custom prompts
+   */
+  const handleCustomAIGeneration = async (targetField: string) => {
+    if (!isReadyForAI()) return
+
+    const context = buildProductContext()
+    
+    let prompt = customPrompt
+    
+    if (!useCustomPrompt) {
+      prompt = buildContextualPrompt(targetField, context)
+    }
+
+    try {
+      const response = await fetch('/api/ai/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contentType: 'custom',
+          productContext: context,
+          options: {
+            customPrompt: prompt,
+            tone: selectedTone,
+            length: getOptimalLength(targetField),
+            maxTokens: getMaxTokensForField(targetField)
+          }
+        })
+      })
+
+      const data = await response.json()
+      
+      if (data.success) {
+        handleInputChange(targetField, data.content)
+        setSuccessMessage(`${getFieldLabel(targetField)} generated successfully!`)
+        setTimeout(() => setSuccessMessage(''), 3000)
+      } else {
+        setErrors(prev => ({ ...prev, aiGeneration: data.error }))
+      }
+    } catch (error) {
+      setErrors(prev => ({ 
+        ...prev, 
+        aiGeneration: `Failed to generate ${getFieldLabel(targetField)}: ${error instanceof Error ? error.message : 'Unknown error'}`
+      }))
+    }
+  }
+
+  /**
+   * Build contextual prompt based on available form data
+   */
+  const buildContextualPrompt = (targetField: string, context: any): string => {
+    const hasPrice = context.price > 0
+    const hasMaterials = context.materials?.length > 0
+    const hasColors = context.colors?.length > 0
+    const hasOrigin = !!context.origin
+    const hasTags = context.tags?.length > 0
+
+    let prompt = `Create compelling content for "${context.name}"`
+    
+    if (context.category) {
+      prompt += `, a ${context.category.toLowerCase()}`
+    }
+
+    if (hasMaterials) {
+      prompt += ` made with ${context.materials.join(', ')}`
+    }
+
+    if (hasColors) {
+      prompt += ` featuring ${context.colors.join(', ')} colors`
+    }
+
+    if (hasPrice) {
+      prompt += ` priced at $${context.price}`
+    }
+
+    if (hasOrigin) {
+      prompt += ` sourced from ${context.origin}`
+    }
+
+    if (hasTags && context.tags.length > 0) {
+      prompt += `. Key features: ${context.tags.join(', ')}`
+    }
+
+    // Add field-specific instructions
+    switch (targetField) {
+      case 'description':
+        prompt += '. Write a detailed, engaging product description that highlights craftsmanship, cultural significance, and styling suggestions.'
+        break
+      case 'shortDescription':
+        prompt += '. Write a concise, compelling summary in 1-2 sentences that captures the essence and appeal.'
+        break
+      case 'seoTitle':
+        prompt += '. Create an SEO-optimized title under 60 characters with relevant keywords.'
+        break
+      case 'seoDescription':
+        prompt += '. Write an SEO meta description under 160 characters that encourages clicks.'
+        break
+      default:
+        prompt += '. Create engaging, authentic content that resonates with customers who appreciate quality and cultural heritage.'
+    }
+
+    return prompt
+  }
+
+  /**
+   * Get optimal content length for field
+   */
+  const getOptimalLength = (field: string): 'short' | 'medium' | 'long' => {
+    switch (field) {
+      case 'shortDescription':
+      case 'seoTitle':
+        return 'short'
+      case 'seoDescription':
+        return 'medium'
+      case 'description':
+        return 'long'
+      default:
+        return 'medium'
+    }
+  }
+
+  /**
+   * Get max tokens for field
+   */
+  const getMaxTokensForField = (field: string): number => {
+    switch (field) {
+      case 'shortDescription': return 100
+      case 'seoTitle': return 50
+      case 'seoDescription': return 200
+      case 'description': return 500
+      default: return 300
+    }
+  }
+
+  /**
+   * Get user-friendly field label
+   */
+  const getFieldLabel = (field: string): string => {
+    const labels: Record<string, string> = {
+      'description': 'Product Description',
+      'shortDescription': 'Short Description',
+      'seoTitle': 'SEO Title',
+      'seoDescription': 'SEO Description'
+    }
+    return labels[field] || field
+  }
 
   // Auto-calculate costs when relevant fields change
   useEffect(() => {
@@ -422,7 +719,124 @@ export default function ProductForm({ categories, countries, suppliers, product,
         </div>
       )}
 
-      {/* Product Images & Videos - Enhanced */}
+      {/* Success Message */}
+      {successMessage && (
+        <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-md flex items-center gap-2">
+          <CheckCircle className="h-4 w-4" />
+          {successMessage}
+        </div>
+      )}
+
+      {/* AI Configuration Panel */}
+      <Card className="mb-6">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5" />
+              AI Content Generation Settings
+            </CardTitle>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowAIConfig(!showAIConfig)}
+            >
+              <Settings2 className="h-4 w-4 mr-1" />
+              {showAIConfig ? 'Hide' : 'Configure'}
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* AI Readiness Status */}
+          <div className={`p-3 rounded-lg border ${isReadyForAI() 
+            ? 'bg-green-50 border-green-200' 
+            : 'bg-yellow-50 border-yellow-200'
+          }`}>
+            <div className="flex items-center gap-2">
+              {isReadyForAI() ? (
+                <CheckCircle className="h-4 w-4 text-green-600" />
+              ) : (
+                <AlertTriangle className="h-4 w-4 text-yellow-600" />
+              )}
+              <span className={`text-sm font-medium ${isReadyForAI() 
+                ? 'text-green-800' 
+                : 'text-yellow-800'
+              }`}>
+                {getAIReadinessMessage()}
+              </span>
+            </div>
+          </div>
+
+          {showAIConfig && (
+            <>
+              {/* Tone Selection */}
+              <div className="space-y-2">
+                <Label>Content Tone</Label>
+                <select
+                  value={selectedTone}
+                  onChange={(e) => setSelectedTone(e.target.value as any)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="elegant">Elegant & Sophisticated</option>
+                  <option value="professional">Professional & Informative</option>
+                  <option value="casual">Casual & Friendly</option>
+                  <option value="playful">Playful & Engaging</option>
+                  <option value="informative">Educational & Detailed</option>
+                </select>
+              </div>
+
+              {/* Custom Prompt Option */}
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="useCustomPrompt"
+                    checked={useCustomPrompt}
+                    onChange={(e) => setUseCustomPrompt(e.target.checked)}
+                    className="rounded"
+                  />
+                  <Label htmlFor="useCustomPrompt">Use custom prompt</Label>
+                </div>
+                
+                {useCustomPrompt && (
+                  <textarea
+                    value={customPrompt}
+                    onChange={(e) => setCustomPrompt(e.target.value)}
+                    placeholder="Enter your custom prompt for AI generation..."
+                    rows={3}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                )}
+              </div>
+
+              {/* Data Preview */}
+              {isReadyForAI() && (
+                <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                  <p className="text-sm font-medium text-gray-700 mb-2">AI will use this data:</p>
+                  <div className="text-xs text-gray-600 space-y-1">
+                    <div><strong>Product:</strong> {formData.name}</div>
+                    <div><strong>Category:</strong> {categories.find(c => c.id === formData.categoryId)?.name}</div>
+                    {extractMaterialsFromForm().length > 0 && (
+                      <div><strong>Materials:</strong> {extractMaterialsFromForm().join(', ')}</div>
+                    )}
+                    {extractColorsFromForm().length > 0 && (
+                      <div><strong>Colors:</strong> {extractColorsFromForm().join(', ')}</div>
+                    )}
+                    {formData.sellingPriceUSD > 0 && (
+                      <div><strong>Price:</strong> ${formData.sellingPriceUSD}</div>
+                    )}
+                    {formData.tags.length > 0 && (
+                      <div><strong>Tags:</strong> {formData.tags.join(', ')}</div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Product Images & Videos */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -476,26 +890,81 @@ export default function ProductForm({ categories, countries, suppliers, product,
             </div>
           </div>
 
+          {/* AI-Enhanced Short Description */}
           <div className="space-y-2">
-            <Label htmlFor="shortDescription">Short Description</Label>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="shortDescription">Short Description</Label>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => handleCustomAIGeneration('shortDescription')}
+                disabled={!isReadyForAI()}
+              >
+                <Wand2 className="h-4 w-4 mr-1" />
+                Generate Short
+              </Button>
+            </div>
             <Input
               id="shortDescription"
               value={formData.shortDescription}
               onChange={(e) => handleInputChange('shortDescription', e.target.value)}
-              placeholder="Brief description for listings"
+              placeholder="Brief description for listings (or use AI to generate)"
             />
           </div>
 
+          {/* AI-Enhanced Full Description */}
           <div className="space-y-2">
-            <Label htmlFor="description">Full Description</Label>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="description">Full Description</Label>
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleCustomAIGeneration('description')}
+                  disabled={!isReadyForAI()}
+                >
+                  <Wand2 className="h-4 w-4 mr-1" />
+                  Smart Generate
+                </Button>
+                <AIGenerateButton
+                  contentType="product_description"
+                  productContext={buildProductContext()}
+                  options={{
+                    tone: selectedTone,
+                    length: 'long'
+                  }}
+                  onSuccess={(content) => {
+                    handleInputChange('description', content)
+                    setSuccessMessage('Product description generated successfully!')
+                  }}
+                  onError={(error) => {
+                    setErrors(prev => ({ ...prev, aiGeneration: error }))
+                  }}
+                  disabled={!isReadyForAI()}
+                  size="sm"
+                  variant="ghost"
+                >
+                  <Sparkles className="h-3 w-3 mr-1" />
+                  Alternative
+                </AIGenerateButton>
+              </div>
+            </div>
             <textarea
               id="description"
-              rows={4}
+              rows={6}
               value={formData.description}
               onChange={(e) => handleInputChange('description', e.target.value)}
-              placeholder="Detailed product description"
+              placeholder="Detailed product description (or use Smart Generate based on your inputs)"
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
+            {errors.aiGeneration && (
+              <div className="flex items-center gap-2 text-sm text-red-600">
+                <AlertTriangle className="h-4 w-4" />
+                {errors.aiGeneration}
+              </div>
+            )}
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
@@ -537,6 +1006,127 @@ export default function ProductForm({ categories, countries, suppliers, product,
                 ))}
               </select>
               {errors.countryId && <p className="text-sm text-red-600">{errors.countryId}</p>}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* SEO & Marketing Section */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Search className="h-5 w-5" />
+            SEO & Marketing
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* SEO Meta Fields */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label htmlFor="seoTitle">SEO Title</Label>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => handleCustomAIGeneration('seoTitle')}
+                disabled={!isReadyForAI()}
+              >
+                <Sparkles className="h-3 w-3 mr-1" />
+                Generate
+              </Button>
+            </div>
+            <Input
+              id="seoTitle"
+              value={formData.seoTitle || ''}
+              onChange={(e) => handleInputChange('seoTitle', e.target.value)}
+              placeholder="SEO-optimized page title (60 characters max)"
+              maxLength={60}
+            />
+            <p className="text-xs text-gray-500">
+              {(formData.seoTitle || '').length}/60 characters
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label htmlFor="seoDescription">Meta Description</Label>
+              <AISEOButton
+                productContext={buildProductContext()}
+                onSuccess={(content) => {
+                  handleInputChange('seoDescription', content)
+                  setSuccessMessage('SEO description generated successfully!')
+                }}
+                onError={(error) => {
+                  setErrors(prev => ({ ...prev, seoGeneration: error }))
+                }}
+                disabled={!isReadyForAI()}
+              />
+            </div>
+            <textarea
+              id="seoDescription"
+              rows={3}
+              value={formData.seoDescription || ''}
+              onChange={(e) => handleInputChange('seoDescription', e.target.value)}
+              placeholder="SEO meta description (160 characters max)"
+              maxLength={160}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <p className="text-xs text-gray-500">
+              {(formData.seoDescription || '').length}/160 characters
+            </p>
+          </div>
+
+          {/* Social Media Captions */}
+          <div className="space-y-3">
+            <Label>Social Media Captions</Label>
+            <div className="grid gap-3">
+              {(['instagram', 'facebook', 'twitter'] as const).map((platform) => (
+                <div key={platform} className="flex items-center gap-2">
+                  <span className="text-sm font-medium capitalize min-w-[80px]">
+                    {platform}:
+                  </span>
+                  <div className="flex-1">
+                    <Input
+                      value={formData[`${platform}Caption` as keyof Product] || ''}
+                      onChange={(e) => handleInputChange(`${platform}Caption` as keyof Product, e.target.value)}
+                      placeholder={`${platform} caption...`}
+                      className="text-sm"
+                    />
+                  </div>
+                  <AISocialButton
+                    productContext={buildProductContext()}
+                    platform={platform}
+                    onSuccess={(content) => {
+                      handleInputChange(`${platform}Caption` as keyof Product, content)
+                      setSuccessMessage(`${platform} caption generated successfully!`)
+                    }}
+                    onError={(error) => {
+                      setErrors(prev => ({ ...prev, socialGeneration: error }))
+                    }}
+                    disabled={!isReadyForAI()}
+                  />
+                </div>
+              ))}
+            </div>
+            
+            {errors.socialGeneration && (
+              <div className="flex items-center gap-2 text-sm text-red-600">
+                <AlertTriangle className="h-4 w-4" />
+                {errors.socialGeneration}
+              </div>
+            )}
+          </div>
+
+          {/* AI Content Generation Status */}
+          <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="flex items-start gap-2">
+              <Sparkles className="h-4 w-4 text-blue-500 mt-0.5" />
+              <div className="text-sm">
+                <p className="font-medium text-blue-900">AI Content Generation</p>
+                <p className="text-blue-700 mt-1">
+                  Fill in the product name and category first, then use AI to generate compelling descriptions and marketing content based on your actual product data.
+                </p>
+              </div>
             </div>
           </div>
         </CardContent>
@@ -663,7 +1253,7 @@ export default function ProductForm({ categories, countries, suppliers, product,
               barcode={formData.barcode}
               barcodeType={formData.barcodeType}
               productName={formData.name || 'Product Name'}
-              price={formData.sellingPriceUSD ? `$${formData.sellingPriceUSD.toFixed(2)}` : undefined}
+              price={formData.sellingPriceUSD ? `${formData.sellingPriceUSD.toFixed(2)}` : undefined}
               size="medium"
             />
           </div>
@@ -1006,6 +1596,9 @@ export default function ProductForm({ categories, countries, suppliers, product,
                 </span>
               ))}
             </div>
+            <p className="text-xs text-gray-500">
+              Tags help with AI content generation and improve search visibility
+            </p>
           </div>
 
           {/* Status Toggles */}
@@ -1032,27 +1625,91 @@ export default function ProductForm({ categories, countries, suppliers, product,
               <Label htmlFor="isFeatured">Featured Product</Label>
             </div>
           </div>
+
+          {/* AI Content Summary */}
+          {(formData.description || formData.seoTitle || formData.seoDescription) && (
+            <div className="bg-gradient-to-r from-purple-50 to-blue-50 p-4 rounded-lg border border-purple-200">
+              <div className="flex items-center gap-2 mb-2">
+                <Brain className="h-4 w-4 text-purple-600" />
+                <span className="text-sm font-medium text-purple-900">AI Generated Content Summary</span>
+              </div>
+              <div className="space-y-2 text-xs text-purple-700">
+                {formData.description && (
+                  <div>✓ Product description ({formData.description.length} characters)</div>
+                )}
+                {formData.seoTitle && (
+                  <div>✓ SEO title ({formData.seoTitle.length}/60 characters)</div>
+                )}
+                {formData.seoDescription && (
+                  <div>✓ SEO description ({formData.seoDescription.length}/160 characters)</div>
+                )}
+                {(formData.instagramCaption || formData.facebookCaption || formData.twitterCaption) && (
+                  <div>✓ Social media captions ready</div>
+                )}
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
       {/* Submit Buttons */}
-      <div className="flex gap-4 justify-end">
+      <div className="flex gap-4 justify-end sticky bottom-4 bg-white p-4 border-t border-gray-200 rounded-lg shadow-lg">
         <Button
           type="button"
           variant="outline"
           onClick={() => router.back()}
+          disabled={loading}
         >
           Cancel
         </Button>
+        
+        {mode === 'edit' && (
+          <Link href={`/products/${product?.id}`} target="_blank">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={loading}
+              className="flex items-center gap-2"
+            >
+              <Eye className="h-4 w-4" />
+              Preview
+            </Button>
+          </Link>
+        )}
+        
         <Button
           type="submit"
           disabled={loading}
-          className="flex items-center gap-2"
+          className="flex items-center gap-2 min-w-[140px]"
         >
-          <Save className="h-4 w-4" />
-          {loading ? 'Saving...' : mode === 'create' ? 'Create Product' : 'Update Product'}
+          {loading ? (
+            <>
+              <RefreshCw className="h-4 w-4 animate-spin" />
+              Saving...
+            </>
+          ) : (
+            <>
+              <Save className="h-4 w-4" />
+              {mode === 'create' ? 'Create Product' : 'Update Product'}
+            </>
+          )}
         </Button>
       </div>
+
+      {/* AI Generation Progress Indicator */}
+      {loading && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg shadow-xl max-w-md w-full mx-4">
+            <div className="flex items-center gap-3 mb-4">
+              <RefreshCw className="h-5 w-5 animate-spin text-blue-600" />
+              <span className="text-lg font-medium">Saving Product</span>
+            </div>
+            <div className="text-sm text-gray-600">
+              Please wait while we save your product information and any AI-generated content...
+            </div>
+          </div>
+        </div>
+      )}
     </form>
   )
 }
