@@ -1,4 +1,4 @@
-'use client'
+'use client' 
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, Button, Input, Label } from '
 import { generateSKU, calculateCostBreakdown, calculateSellingPrice, slugify } from '@/lib/utils'
 import ImageUpload from '@/components/admin/ImageUpload'
 import BarcodeDisplay from '@/components/admin/BarcodeDisplay'
-import AIGenerateButton, { AISEOButton, AISocialButton } from '@/components/admin/AIGenerateButton'
+import AIGenerateButton, { AISEOButton } from '@/components/admin/AIGenerateButton'
 import Link from 'next/link'
 import {
   Package,
@@ -93,11 +93,6 @@ interface Product {
   // SEO fields
   seoTitle?: string
   seoDescription?: string
-  
-  // Social media fields
-  instagramCaption?: string
-  facebookCaption?: string
-  twitterCaption?: string
 }
 
 interface ProductFormProps {
@@ -181,7 +176,7 @@ export default function ProductForm({ categories, countries, suppliers, product,
   const [useCustomPrompt, setUseCustomPrompt] = useState(false)
   const [showAIConfig, setShowAIConfig] = useState(false)
   
-  // Form state
+  // Form state - Removed social media fields from initialization
   const [formData, setFormData] = useState<Product>({
     sku: product?.sku || '',
     name: product?.name || '',
@@ -218,14 +213,9 @@ export default function ProductForm({ categories, countries, suppliers, product,
     tags: product?.tags || [],
     images: product?.images || [],
     
-    // SEO fields
+    // SEO fields - Keep these
     seoTitle: product?.seoTitle || '',
-    seoDescription: product?.seoDescription || '',
-    
-    // Social media fields
-    instagramCaption: product?.instagramCaption || '',
-    facebookCaption: product?.facebookCaption || '',
-    twitterCaption: product?.twitterCaption || ''
+    seoDescription: product?.seoDescription || ''
   })
 
   // Tags input state
@@ -1011,7 +1001,7 @@ export default function ProductForm({ categories, countries, suppliers, product,
         </CardContent>
       </Card>
 
-      {/* SEO & Marketing Section */}
+      {/* SEO & Marketing Section - REMOVED SOCIAL MEDIA CAPTIONS */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -1076,55 +1066,15 @@ export default function ProductForm({ categories, countries, suppliers, product,
             </p>
           </div>
 
-          {/* Social Media Captions */}
-          <div className="space-y-3">
-            <Label>Social Media Captions</Label>
-            <div className="grid gap-3">
-              {(['instagram', 'facebook', 'twitter'] as const).map((platform) => (
-                <div key={platform} className="flex items-center gap-2">
-                  <span className="text-sm font-medium capitalize min-w-[80px]">
-                    {platform}:
-                  </span>
-                  <div className="flex-1">
-                    <Input
-                      value={formData[`${platform}Caption` as keyof Product] || ''}
-                      onChange={(e) => handleInputChange(`${platform}Caption` as keyof Product, e.target.value)}
-                      placeholder={`${platform} caption...`}
-                      className="text-sm"
-                    />
-                  </div>
-                  <AISocialButton
-                    productContext={buildProductContext()}
-                    platform={platform}
-                    onSuccess={(content) => {
-                      handleInputChange(`${platform}Caption` as keyof Product, content)
-                      setSuccessMessage(`${platform} caption generated successfully!`)
-                    }}
-                    onError={(error) => {
-                      setErrors(prev => ({ ...prev, socialGeneration: error }))
-                    }}
-                    disabled={!isReadyForAI()}
-                  />
-                </div>
-              ))}
-            </div>
-            
-            {errors.socialGeneration && (
-              <div className="flex items-center gap-2 text-sm text-red-600">
-                <AlertTriangle className="h-4 w-4" />
-                {errors.socialGeneration}
-              </div>
-            )}
-          </div>
-
-          {/* AI Content Generation Status */}
+          {/* AI Content Generation Status - Updated without social media reference */}
           <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
             <div className="flex items-start gap-2">
               <Sparkles className="h-4 w-4 text-blue-500 mt-0.5" />
               <div className="text-sm">
                 <p className="font-medium text-blue-900">AI Content Generation</p>
                 <p className="text-blue-700 mt-1">
-                  Fill in the product name and category first, then use AI to generate compelling descriptions and marketing content based on your actual product data.
+                  Fill in the product name and category first, then use AI to generate compelling descriptions and SEO content. 
+                  For social media content, use the dedicated Social Media section in the admin menu.
                 </p>
               </div>
             </div>
@@ -1626,7 +1576,7 @@ export default function ProductForm({ categories, countries, suppliers, product,
             </div>
           </div>
 
-          {/* AI Content Summary */}
+          {/* AI Content Summary - Updated to remove social media references */}
           {(formData.description || formData.seoTitle || formData.seoDescription) && (
             <div className="bg-gradient-to-r from-purple-50 to-blue-50 p-4 rounded-lg border border-purple-200">
               <div className="flex items-center gap-2 mb-2">
@@ -1642,9 +1592,6 @@ export default function ProductForm({ categories, countries, suppliers, product,
                 )}
                 {formData.seoDescription && (
                   <div>✓ SEO description ({formData.seoDescription.length}/160 characters)</div>
-                )}
-                {(formData.instagramCaption || formData.facebookCaption || formData.twitterCaption) && (
-                  <div>✓ Social media captions ready</div>
                 )}
               </div>
             </div>
