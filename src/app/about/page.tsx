@@ -6,26 +6,29 @@ import {
   Globe,
   Users,
   Award,
-  Handshake,
   Sparkles,
   ShoppingBag,
   ArrowRight,
   CheckCircle,
   Search,
   Menu,
-  X,
   User,
   Package
 } from 'lucide-react'
 
-// Get store settings for branding and content
+// Get store settings for dynamic content
 async function getStoreSettings() {
-  return await db.storeSetting.findFirst({
-    where: { id: 'default' }
-  })
+  try {
+    return await db.storeSetting.findFirst({
+      where: { id: 'default' }
+    })
+  } catch (error) {
+    console.error('Error fetching store settings:', error)
+    return null
+  }
 }
 
-// Generate metadata for SEO
+// Generate dynamic metadata
 export async function generateMetadata() {
   const storeSettings = await getStoreSettings()
   const storeName = storeSettings?.storeName || 'Hita&Co'
@@ -42,54 +45,72 @@ export async function generateMetadata() {
   }
 }
 
-// Simple Navigation Component (Server-side)
-function SimpleNavigation({ storeSettings }: { storeSettings: any }) {
+// Dynamic Navigation Component
+function DynamicNavigation({ storeSettings }: { storeSettings: any }) {
   const storeName = storeSettings?.storeName || 'Hita&Co'
-  const primaryColor = storeSettings?.primaryColor || '#1f2937'
+  const tagline = storeSettings?.tagline || 'Authentic Indian Ethnic Wear'
+  const primaryColor = storeSettings?.primaryColor || '#7c3aed'
+  const accentColor = storeSettings?.accentColor || '#f59e0b'
+  const logo = storeSettings?.logo
 
   return (
     <>
-      {/* Top Banner */}
-      <div className="bg-gradient-to-r from-purple-600 to-pink-600 text-white text-center py-2 px-4">
+      {/* Dynamic Top Banner */}
+      <div 
+        className="text-white text-center py-2 px-4"
+        style={{ 
+          background: `linear-gradient(to right, ${primaryColor}, ${accentColor})` 
+        }}
+      >
         <p className="text-sm font-medium">
           ✨ Free shipping on orders over $100 | Authentic handcrafted products
         </p>
       </div>
 
-      {/* Main Navigation */}
       <nav className="bg-white shadow-lg sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            {/* Logo */}
             <div className="flex items-center">
               <Link href="/" className="flex items-center space-x-3">
-                <div 
-                  className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-lg"
-                  style={{ backgroundColor: primaryColor }}
-                >
-                  {storeName.charAt(0)}
-                </div>
+                {logo ? (
+                  <img 
+                    src={logo} 
+                    alt={storeName} 
+                    className="w-10 h-10 object-contain rounded-full"
+                  />
+                ) : (
+                  <div 
+                    className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-lg"
+                    style={{ backgroundColor: primaryColor }}
+                  >
+                    {storeName.charAt(0)}
+                  </div>
+                )}
                 <div>
                   <h1 className="text-xl font-bold text-gray-900">{storeName}</h1>
-                  {storeSettings?.tagline && (
-                    <p className="text-xs text-gray-500">{storeSettings.tagline}</p>
-                  )}
+                  <p className="text-xs text-gray-500">{tagline}</p>
                 </div>
               </Link>
             </div>
 
-            {/* Desktop Navigation */}
             <div className="hidden md:flex items-center space-x-8">
               <Link href="/" className="text-sm font-medium text-gray-700 hover:text-purple-600">
                 Home
               </Link>
               <Link href="/products" className="text-sm font-medium text-gray-700 hover:text-purple-600">
-                All Products
+                Products
               </Link>
               <Link href="/categories" className="text-sm font-medium text-gray-700 hover:text-purple-600">
                 Categories
               </Link>
-              <Link href="/about" className="text-sm font-medium text-purple-600 border-b-2 border-purple-600">
+              <Link 
+                href="/about" 
+                className="text-sm font-medium border-b-2"
+                style={{ 
+                  color: primaryColor, 
+                  borderColor: primaryColor 
+                }}
+              >
                 About
               </Link>
               <Link href="/contact" className="text-sm font-medium text-gray-700 hover:text-purple-600">
@@ -97,26 +118,24 @@ function SimpleNavigation({ storeSettings }: { storeSettings: any }) {
               </Link>
             </div>
 
-            {/* Actions */}
             <div className="flex items-center space-x-4">
-              <button className="text-gray-700 hover:text-purple-600">
-                <Search className="h-6 w-6" />
-              </button>
-              <button className="text-gray-700 hover:text-red-500 relative">
-                <Heart className="h-6 w-6" />
+              <Search className="h-6 w-6 text-gray-700 hover:text-purple-600 cursor-pointer" />
+              <div className="relative">
+                <Heart className="h-6 w-6 text-gray-700 hover:text-red-500 cursor-pointer" />
                 <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
                   0
                 </span>
-              </button>
-              <button className="text-gray-700 hover:text-purple-600 relative">
-                <Package className="h-6 w-6" />
-                <span className="absolute -top-2 -right-2 bg-purple-600 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+              </div>
+              <div className="relative">
+                <Package className="h-6 w-6 text-gray-700 hover:text-purple-600 cursor-pointer" />
+                <span 
+                  className="absolute -top-2 -right-2 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center"
+                  style={{ backgroundColor: primaryColor }}
+                >
                   0
                 </span>
-              </button>
-              <button className="text-gray-700 hover:text-purple-600">
-                <User className="h-6 w-6" />
-              </button>
+              </div>
+              <User className="h-6 w-6 text-gray-700 hover:text-purple-600 cursor-pointer" />
             </div>
           </div>
         </div>
@@ -125,10 +144,12 @@ function SimpleNavigation({ storeSettings }: { storeSettings: any }) {
   )
 }
 
-// Hero Section Component
+// Dynamic Hero Section
 function AboutHero({ storeSettings }: { storeSettings: any }) {
   const storeName = storeSettings?.storeName || 'Hita&Co'
   const tagline = storeSettings?.tagline || 'Authentic Indian Ethnic Wear & Lifestyle'
+  const primaryColor = storeSettings?.primaryColor || '#7c3aed'
+  const accentColor = storeSettings?.accentColor || '#f59e0b'
 
   return (
     <section className="relative bg-gradient-to-br from-purple-50 to-pink-50 py-20">
@@ -136,14 +157,24 @@ function AboutHero({ storeSettings }: { storeSettings: any }) {
         <div className="text-center">
           <h1 className="text-4xl md:text-6xl font-bold text-gray-900 mb-6">
             About{' '}
-            <span className="bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
+            <span 
+              className="bg-clip-text text-transparent"
+              style={{ 
+                background: `linear-gradient(to right, ${primaryColor}, ${accentColor})`,
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent'
+              }}
+            >
               {storeName}
             </span>
           </h1>
           <p className="text-xl md:text-2xl text-gray-600 mb-8 max-w-3xl mx-auto">
             {tagline}
           </p>
-          <div className="flex items-center justify-center gap-2 text-purple-600">
+          <div 
+            className="flex items-center justify-center gap-2"
+            style={{ color: primaryColor }}
+          >
             <Sparkles className="h-5 w-5" />
             <span className="text-sm font-medium">Celebrating Indian Heritage Since 2020</span>
             <Sparkles className="h-5 w-5" />
@@ -154,7 +185,45 @@ function AboutHero({ storeSettings }: { storeSettings: any }) {
   )
 }
 
-// Our Story Section
+// Dynamic Call to Action Section
+function CallToActionSection({ storeSettings }: { storeSettings: any }) {
+  const primaryColor = storeSettings?.primaryColor || '#7c3aed'
+  const accentColor = storeSettings?.accentColor || '#f59e0b'
+
+  return (
+    <section className="py-16 bg-gray-900 text-white">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+        <h2 className="text-3xl md:text-4xl font-bold mb-4">
+          Ready to Explore Authentic Indian Craftsmanship?
+        </h2>
+        <p className="text-xl text-gray-300 mb-8 max-w-2xl mx-auto">
+          Join thousands of customers worldwide who trust us for authentic, handcrafted Indian products.
+        </p>
+        <div className="flex flex-col sm:flex-row gap-4 justify-center">
+          <Link
+            href="/products"
+            className="inline-flex items-center gap-2 text-white px-8 py-3 rounded-full font-semibold transition-colors"
+            style={{ 
+              background: `linear-gradient(to right, ${primaryColor}, ${accentColor})` 
+            }}
+          >
+            <ShoppingBag className="h-5 w-5" />
+            Shop Now
+          </Link>
+          <Link
+            href="/contact"
+            className="inline-flex items-center gap-2 border border-white text-white px-8 py-3 rounded-full font-semibold hover:bg-white hover:text-gray-900 transition-colors"
+          >
+            <Heart className="h-5 w-5" />
+            Get in Touch
+          </Link>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+// Static sections (can be made dynamic later)
 function OurStorySection() {
   return (
     <section className="py-16 bg-white">
@@ -166,12 +235,12 @@ function OurStorySection() {
             </h2>
             <div className="space-y-4 text-gray-600 leading-relaxed">
               <p>
-                Founded with a deep passion for Indian heritage and craftsmanship, Hita&Co began as a 
+                Founded with a deep passion for Indian heritage and craftsmanship, our journey began as a 
                 vision to bridge the gap between traditional artisans and modern consumers who appreciate 
                 authentic, handcrafted products.
               </p>
               <p>
-                Our journey started when our founder discovered the incredible talent of local artisans 
+                Our story started when our founder discovered the incredible talent of local artisans 
                 across India – from the skilled weavers of Rajasthan to the jewelry makers of Gujarat. 
                 These craftspeople carry forward centuries-old traditions, creating pieces that tell 
                 stories of culture, heritage, and timeless beauty.
@@ -184,13 +253,11 @@ function OurStorySection() {
             </div>
           </div>
           <div className="relative">
-            <div className="aspect-w-4 aspect-h-3 rounded-2xl overflow-hidden shadow-xl">
-              <div className="bg-gradient-to-br from-orange-100 to-red-100 flex items-center justify-center h-96">
-                <div className="text-center">
-                  <Heart className="h-16 w-16 text-red-500 mx-auto mb-4" />
-                  <p className="text-gray-600 font-medium">Crafted with Love</p>
-                  <p className="text-sm text-gray-500">Traditional Heritage</p>
-                </div>
+            <div className="bg-gradient-to-br from-orange-100 to-red-100 flex items-center justify-center h-96 rounded-2xl shadow-xl">
+              <div className="text-center">
+                <Heart className="h-16 w-16 text-red-500 mx-auto mb-4" />
+                <p className="text-gray-600 font-medium">Crafted with Love</p>
+                <p className="text-sm text-gray-500">Traditional Heritage</p>
               </div>
             </div>
           </div>
@@ -200,11 +267,12 @@ function OurStorySection() {
   )
 }
 
-// Mission & Values Section
-function MissionValuesSection() {
+function MissionValuesSection({ storeSettings }: { storeSettings: any }) {
+  const primaryColor = storeSettings?.primaryColor || '#7c3aed'
+
   const values = [
     {
-      icon: Handshake,
+      icon: Star,
       title: 'Authentic Craftsmanship',
       description: 'We partner directly with skilled artisans to bring you genuine, handcrafted products that preserve traditional techniques.'
     },
@@ -243,8 +311,11 @@ function MissionValuesSection() {
             const Icon = value.icon
             return (
               <div key={index} className="bg-white rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow">
-                <div className="flex items-center justify-center w-12 h-12 bg-purple-100 rounded-lg mb-4">
-                  <Icon className="h-6 w-6 text-purple-600" />
+                <div 
+                  className="flex items-center justify-center w-12 h-12 rounded-lg mb-4"
+                  style={{ backgroundColor: `${primaryColor}20` }}
+                >
+                  <Icon className="h-6 w-6" style={{ color: primaryColor }} />
                 </div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">
                   {value.title}
@@ -261,39 +332,16 @@ function MissionValuesSection() {
   )
 }
 
-// Product Categories Showcase
-function CategoriesShowcase() {
+function CategoriesShowcase({ storeSettings }: { storeSettings: any }) {
+  const primaryColor = storeSettings?.primaryColor || '#7c3aed'
+
   const categories = [
-    {
-      name: 'Ethnic Clothing',
-      description: 'Traditional sarees, lehengas, and kurtis',
-      icon: '👗'
-    },
-    {
-      name: 'Handcrafted Jewelry',
-      description: 'Authentic silver and traditional designs',
-      icon: '💎'
-    },
-    {
-      name: 'Natural Cosmetics',
-      description: 'Ayurvedic and herbal beauty products',
-      icon: '🌿'
-    },
-    {
-      name: 'Artisan Soaps',
-      description: 'Handmade natural and organic soaps',
-      icon: '🧼'
-    },
-    {
-      name: 'Home Decor',
-      description: 'Traditional decorative items and crafts',
-      icon: '🏺'
-    },
-    {
-      name: 'Accessories',
-      description: 'Bags, scarves, and ethnic accessories',
-      icon: '👜'
-    }
+    { name: 'Ethnic Clothing', description: 'Traditional sarees, lehengas, and kurtis', icon: '👗' },
+    { name: 'Handcrafted Jewelry', description: 'Authentic silver and traditional designs', icon: '💎' },
+    { name: 'Natural Cosmetics', description: 'Ayurvedic and herbal beauty products', icon: '🌿' },
+    { name: 'Artisan Soaps', description: 'Handmade natural and organic soaps', icon: '🧼' },
+    { name: 'Home Decor', description: 'Traditional decorative items and crafts', icon: '🏺' },
+    { name: 'Accessories', description: 'Bags, scarves, and ethnic accessories', icon: '👜' }
   ]
 
   return (
@@ -312,7 +360,12 @@ function CategoriesShowcase() {
           {categories.map((category, index) => (
             <div key={index} className="group bg-gray-50 rounded-xl p-6 hover:bg-purple-50 transition-colors">
               <div className="text-4xl mb-4">{category.icon}</div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2 group-hover:text-purple-700">
+              <h3 
+                className="text-lg font-semibold text-gray-900 mb-2 group-hover:transition-colors"
+                style={{ color: 'inherit' }}
+                onMouseEnter={(e) => e.currentTarget.style.color = primaryColor}
+                onMouseLeave={(e) => e.currentTarget.style.color = 'inherit'}
+              >
                 {category.name}
               </h3>
               <p className="text-gray-600 text-sm">
@@ -325,7 +378,10 @@ function CategoriesShowcase() {
         <div className="text-center mt-12">
           <Link
             href="/products"
-            className="inline-flex items-center gap-2 bg-purple-600 text-white px-8 py-3 rounded-full font-semibold hover:bg-purple-700 transition-colors"
+            className="inline-flex items-center gap-2 text-white px-8 py-3 rounded-full font-semibold transition-colors"
+            style={{ 
+              background: `linear-gradient(to right, ${primaryColor}, ${storeSettings?.accentColor || '#f59e0b'})` 
+            }}
           >
             <ShoppingBag className="h-5 w-5" />
             Explore Our Products
@@ -337,8 +393,9 @@ function CategoriesShowcase() {
   )
 }
 
-// Why Choose Us Section
-function WhyChooseUsSection() {
+function WhyChooseUsSection({ storeSettings }: { storeSettings: any }) {
+  const primaryColor = storeSettings?.primaryColor || '#7c3aed'
+
   const reasons = [
     {
       icon: CheckCircle,
@@ -367,7 +424,7 @@ function WhyChooseUsSection() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-12">
           <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
-            Why Choose Hita&Co?
+            Why Choose Us?
           </h2>
           <p className="text-xl text-gray-600">
             Experience the difference of authentic craftsmanship and exceptional service
@@ -380,7 +437,7 @@ function WhyChooseUsSection() {
             return (
               <div key={index} className="text-center">
                 <div className="inline-flex items-center justify-center w-16 h-16 bg-white rounded-full shadow-lg mb-4">
-                  <Icon className="h-8 w-8 text-purple-600" />
+                  <Icon className="h-8 w-8" style={{ color: primaryColor }} />
                 </div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">
                   {reason.title}
@@ -391,38 +448,6 @@ function WhyChooseUsSection() {
               </div>
             )
           })}
-        </div>
-      </div>
-    </section>
-  )
-}
-
-// Call to Action Section
-function CallToActionSection() {
-  return (
-    <section className="py-16 bg-gray-900 text-white">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-        <h2 className="text-3xl md:text-4xl font-bold mb-4">
-          Ready to Explore Authentic Indian Craftsmanship?
-        </h2>
-        <p className="text-xl text-gray-300 mb-8 max-w-2xl mx-auto">
-          Join thousands of customers worldwide who trust us for authentic, handcrafted Indian products.
-        </p>
-        <div className="flex flex-col sm:flex-row gap-4 justify-center">
-          <Link
-            href="/products"
-            className="inline-flex items-center gap-2 bg-purple-600 text-white px-8 py-3 rounded-full font-semibold hover:bg-purple-700 transition-colors"
-          >
-            <ShoppingBag className="h-5 w-5" />
-            Shop Now
-          </Link>
-          <Link
-            href="/contact"
-            className="inline-flex items-center gap-2 border border-white text-white px-8 py-3 rounded-full font-semibold hover:bg-white hover:text-gray-900 transition-colors"
-          >
-            <Heart className="h-5 w-5" />
-            Get in Touch
-          </Link>
         </div>
       </div>
     </section>
@@ -465,17 +490,17 @@ export default async function AboutPage() {
         }}
       />
 
-      {/* Navigation - Server Component */}
-      <SimpleNavigation storeSettings={storeSettings} />
+      {/* Dynamic Navigation */}
+      <DynamicNavigation storeSettings={storeSettings} />
 
       {/* Page Content */}
       <main>
         <AboutHero storeSettings={storeSettings} />
         <OurStorySection />
-        <MissionValuesSection />
-        <CategoriesShowcase />
-        <WhyChooseUsSection />
-        <CallToActionSection />
+        <MissionValuesSection storeSettings={storeSettings} />
+        <CategoriesShowcase storeSettings={storeSettings} />
+        <WhyChooseUsSection storeSettings={storeSettings} />
+        <CallToActionSection storeSettings={storeSettings} />
       </main>
     </>
   )
