@@ -81,7 +81,7 @@ export default function StoreSettingsForm({ storeSettings }: StoreSettingsFormPr
 
   const handleInputChange = (field: string, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }))
-    
+
     // Clear error when user starts typing
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: '' }))
@@ -105,7 +105,7 @@ export default function StoreSettingsForm({ storeSettings }: StoreSettingsFormPr
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     if (!validateForm()) return
 
     setLoading(true)
@@ -148,7 +148,8 @@ export default function StoreSettingsForm({ storeSettings }: StoreSettingsFormPr
     { value: 'openai', label: 'OpenAI (ChatGPT)' },
     { value: 'gemini', label: 'Google Gemini' },
     { value: 'claude', label: 'Anthropic Claude' },
-    { value: 'mistral', label: 'Mistral AI' }
+    { value: 'mistral', label: 'Mistral AI' },
+    { value: 'openrouter', label: 'OpenRouter (Multi-Model)' }
   ]
 
   const currencies = [
@@ -180,11 +181,10 @@ export default function StoreSettingsForm({ storeSettings }: StoreSettingsFormPr
                 key={tab.id}
                 type="button"
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-2 py-2 px-1 border-b-2 font-medium text-sm whitespace-nowrap ${
-                  activeTab === tab.id
+                className={`flex items-center gap-2 py-2 px-1 border-b-2 font-medium text-sm whitespace-nowrap ${activeTab === tab.id
                     ? 'border-blue-500 text-blue-600'
                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
+                  }`}
               >
                 <Icon className="h-4 w-4" />
                 {tab.name}
@@ -244,9 +244,9 @@ export default function StoreSettingsForm({ storeSettings }: StoreSettingsFormPr
                   <div className="flex items-center gap-4">
                     {formData.logo && (
                       <div className="relative">
-                        <img 
-                          src={formData.logo} 
-                          alt="Store logo" 
+                        <img
+                          src={formData.logo}
+                          alt="Store logo"
                           className="w-16 h-16 object-contain border border-gray-200 rounded-lg"
                         />
                         <button
@@ -277,9 +277,9 @@ export default function StoreSettingsForm({ storeSettings }: StoreSettingsFormPr
                   <div className="flex items-center gap-4">
                     {formData.favicon && (
                       <div className="relative">
-                        <img 
-                          src={formData.favicon} 
-                          alt="Favicon" 
+                        <img
+                          src={formData.favicon}
+                          alt="Favicon"
                           className="w-8 h-8 object-contain border border-gray-200 rounded"
                         />
                         <button
@@ -352,15 +352,15 @@ export default function StoreSettingsForm({ storeSettings }: StoreSettingsFormPr
               <div className="p-4 border border-gray-200 rounded-lg">
                 <h4 className="text-sm font-medium text-gray-700 mb-3">Color Preview</h4>
                 <div className="space-y-2">
-                  <div 
+                  <div
                     className="h-12 rounded-lg flex items-center px-4 text-white font-medium"
                     style={{ backgroundColor: formData.primaryColor }}
                   >
                     Primary Color - {formData.primaryColor}
                   </div>
-                  <div 
+                  <div
                     className="h-8 rounded-lg flex items-center px-4 border"
-                    style={{ 
+                    style={{
                       backgroundColor: formData.secondaryColor,
                       borderColor: formData.primaryColor,
                       color: formData.primaryColor
@@ -368,7 +368,7 @@ export default function StoreSettingsForm({ storeSettings }: StoreSettingsFormPr
                   >
                     Secondary Color - {formData.secondaryColor}
                   </div>
-                  <div 
+                  <div
                     className="h-10 rounded-lg flex items-center px-4 text-white font-medium"
                     style={{ backgroundColor: formData.accentColor }}
                   >
@@ -550,19 +550,62 @@ export default function StoreSettingsForm({ storeSettings }: StoreSettingsFormPr
               </div>
 
               {formData.aiProvider && (
-                <div className="space-y-2">
-                  <Label htmlFor="aiApiKey">API Key</Label>
-                  <Input
-                    id="aiApiKey"
-                    type="password"
-                    value={formData.aiApiKey}
-                    onChange={(e) => handleInputChange('aiApiKey', e.target.value)}
-                    placeholder="Enter your API key"
-                  />
-                  <p className="text-sm text-gray-500">
-                    Your API key is encrypted and stored securely.
-                  </p>
-                </div>
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="aiApiKey">API Key</Label>
+                    <Input
+                      id="aiApiKey"
+                      type="password"
+                      value={formData.aiApiKey}
+                      onChange={(e) => handleInputChange('aiApiKey', e.target.value)}
+                      placeholder="Enter your API key"
+                    />
+                    <p className="text-sm text-gray-500">
+                      Your API key is encrypted and stored securely.
+                    </p>
+                  </div>
+
+                  {/* Provider-specific help text */}
+                  <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                    <div className="text-sm text-gray-700">
+                      {formData.aiProvider === 'openai' && (
+                        <div>
+                          <strong>OpenAI (ChatGPT)</strong><br />
+                          Get your API key from <a href="https://platform.openai.com/api-keys" target="_blank" className="text-blue-600 hover:underline">platform.openai.com</a>.
+                          Uses GPT-4o-mini model for content generation.
+                        </div>
+                      )}
+                      {formData.aiProvider === 'gemini' && (
+                        <div>
+                          <strong>Google Gemini</strong><br />
+                          Get your API key from <a href="https://makersuite.google.com/app/apikey" target="_blank" className="text-blue-600 hover:underline">Google AI Studio</a>.
+                          Uses Gemini 1.5 Flash model for fast content generation.
+                        </div>
+                      )}
+                      {formData.aiProvider === 'claude' && (
+                        <div>
+                          <strong>Anthropic Claude</strong><br />
+                          Get your API key from <a href="https://console.anthropic.com/" target="_blank" className="text-blue-600 hover:underline">Anthropic Console</a>.
+                          Uses Claude 3.5 Sonnet for high-quality content generation.
+                        </div>
+                      )}
+                      {formData.aiProvider === 'mistral' && (
+                        <div>
+                          <strong>Mistral AI</strong><br />
+                          Get your API key from <a href="https://console.mistral.ai/" target="_blank" className="text-blue-600 hover:underline">Mistral Console</a>.
+                          Uses Mistral Small model for efficient content generation.
+                        </div>
+                      )}
+                      {formData.aiProvider === 'openrouter' && (
+                        <div>
+                          <strong>OpenRouter (Multi-Model)</strong><br />
+                          Get your API key from <a href="https://openrouter.ai/keys" target="_blank" className="text-blue-600 hover:underline">OpenRouter</a>.
+                          Access to multiple AI models including free options. Uses Llama 3.1 8B by default.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </>
               )}
             </CardContent>
           </Card>

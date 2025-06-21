@@ -288,7 +288,7 @@ model StoreSetting {
   twitter         String?
   
   // AI Configuration
-  aiProvider      String?  // openai, gemini, claude, mistral
+  aiProvider      String?  // openai, gemini, claude, mistral , openrouter
   aiApiKey        String?
   
   // Other Settings
