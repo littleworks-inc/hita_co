@@ -31,32 +31,29 @@ export const COUNTRY_TO_CURRENCY: Record<string, SupportedCurrency> = {
   EE: 'EUR', LV: 'EUR', LT: 'EUR'
 }
 
-// Exchange rate interface
-export interface ExchangeRate {
-  id: string
-  fromCurrency: string
-  toCurrency: string
-  rate: number
-  lastUpdated: Date
-  createdAt: Date
-  updatedAt: Date
+// Fallback exchange rates (updated periodically)
+const FALLBACK_RATES = {
+  USD: 1,
+  EUR: 0.85,
+  GBP: 0.73,
+  CAD: 1.25,
+  AUD: 1.35,
+  JPY: 110,
+  CNY: 6.45,
+  INR: 83.0,
+  SGD: 1.35,
+  HKD: 7.8,
+  AED: 3.67,
+  CHF: 0.92,
+  NOK: 8.5,
+  SEK: 8.8,
+  DKK: 6.4
 }
 
-// Create exchange rate table in database (add this to your schema)
-/*
-model ExchangeRate {
-  id           String   @id @default(cuid())
-  fromCurrency String   // Always USD as base
-  toCurrency   String   // Target currency
-  rate         Float    // Exchange rate
-  lastUpdated  DateTime @default(now())
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  @@unique([fromCurrency, toCurrency])
-  @@map("exchange_rates")
+// Check if a string is a valid currency
+export function isValidCurrency(currency: string): currency is SupportedCurrency {
+  return currency in SUPPORTED_CURRENCIES
 }
-*/
 
 // Get customer's location based on IP
 export async function getCustomerLocation(request?: Request): Promise<{
@@ -65,115 +62,114 @@ export async function getCustomerLocation(request?: Request): Promise<{
   ip?: string
 }> {
   try {
-    let ip: string | undefined
-
-    // Try to get IP from various headers
+    // Try to get IP from request headers
+    let ip = '127.0.0.1'
+    
     if (request) {
-      ip = request.headers.get('x-forwarded-for')?.split(',')[0] ||
-           request.headers.get('x-real-ip') ||
-           request.headers.get('cf-connecting-ip') ||
-           undefined
+      ip = request.headers.get('x-forwarded-for') || 
+           request.headers.get('x-real-ip') || 
+           '127.0.0.1'
     }
 
-    // Fallback to a public IP detection service for development
-    if (!ip || ip === '127.0.0.1' || ip === '::1') {
-      const response = await fetch('https://api.ipify.org?format=json', { 
-        next: { revalidate: 3600 } // Cache for 1 hour
-      })
-      const data = await response.json()
-      ip = data.ip
+    // For localhost/development, return default
+    if (ip === '127.0.0.1' || ip.startsWith('192.168.') || ip.startsWith('10.')) {
+      return {
+        country: 'US',
+        currency: 'USD',
+        ip
+      }
     }
 
-    // Get location data from IP
-    const locationResponse = await fetch(`http://ip-api.com/json/${ip}?fields=status,countryCode`, {
+    // Try to get location from IP geolocation service
+    const response = await fetch(`http://ip-api.com/json/${ip}`, {
+      timeout: 3000,
       next: { revalidate: 3600 } // Cache for 1 hour
     })
 
-    if (!locationResponse.ok) {
-      throw new Error('Failed to fetch location')
-    }
-
-    const locationData = await locationResponse.json()
-
-    if (locationData.status === 'success') {
-      const countryCode = locationData.countryCode as string
+    if (response.ok) {
+      const data = await response.json()
+      const countryCode = data.countryCode || 'US'
       const currency = COUNTRY_TO_CURRENCY[countryCode] || 'USD'
-
+      
       return {
         country: countryCode,
         currency,
         ip
       }
     }
-
-    throw new Error('Location detection failed')
   } catch (error) {
-    console.error('Error detecting customer location:', error)
-    // Fallback to US/USD
-    return {
-      country: 'US',
-      currency: 'USD'
-    }
+    console.error('Error getting customer location:', error)
+  }
+
+  // Fallback to US/USD
+  return {
+    country: 'US',
+    currency: 'USD'
   }
 }
 
-// Fetch live exchange rates
+// Fetch live exchange rates from external API
 export async function fetchExchangeRates(): Promise<Record<string, number>> {
   try {
     // Using exchangerate-api.com (free tier: 1500 requests/month)
-    // You can also use Fixer.io, CurrencyLayer, or other services
     const response = await fetch('https://api.exchangerate-api.com/v4/latest/USD', {
-      next: { revalidate: 3600 } // Cache for 1 hour
+      next: { revalidate: 3600 }, // Cache for 1 hour
+      signal: AbortSignal.timeout(5000) // 5 second timeout
     })
 
     if (!response.ok) {
-      throw new Error('Failed to fetch exchange rates')
+      throw new Error(`HTTP error! status: ${response.status}`)
     }
 
     const data = await response.json()
-    return data.rates
-  } catch (error) {
-    console.error('Error fetching exchange rates:', error)
     
-    // Fallback to stored rates or default rates
-    const fallbackRates = await getStoredExchangeRates()
-    if (Object.keys(fallbackRates).length > 0) {
-      return fallbackRates
+    if (data.rates && typeof data.rates === 'object') {
+      return data.rates
+    } else {
+      throw new Error('Invalid response format from exchange rate API')
+    }
+  } catch (error) {
+    console.error('Error fetching live exchange rates:', error)
+    
+    // Try to get stored rates as fallback
+    const storedRates = await getStoredExchangeRates()
+    if (Object.keys(storedRates).length > 0) {
+      console.log('Using stored exchange rates as fallback')
+      return storedRates
     }
 
-    // Ultimate fallback - approximate rates (you should update these periodically)
-    return {
-      USD: 1,
-      EUR: 0.85,
-      GBP: 0.73,
-      CAD: 1.25,
-      AUD: 1.35,
-      JPY: 110,
-      CNY: 6.45,
-      INR: 75,
-      SGD: 1.35,
-      HKD: 7.8,
-      AED: 3.67,
-      CHF: 0.92,
-      NOK: 8.5,
-      SEK: 8.8,
-      DKK: 6.4
-    }
+    // Ultimate fallback to static rates
+    console.log('Using static fallback exchange rates')
+    return FALLBACK_RATES
   }
 }
 
-// Get stored exchange rates from database
+// Get stored exchange rates from database with proper error handling
 export async function getStoredExchangeRates(): Promise<Record<string, number>> {
   try {
+    // Check if db and the model are available
+    if (!db) {
+      console.warn('Database client not available')
+      return {}
+    }
+
+    // Test if the exchangeRate model exists and is accessible
     const rates = await db.exchangeRate.findMany({
       where: { fromCurrency: 'USD' }
+    }).catch((error) => {
+      console.warn('ExchangeRate table not accessible:', error.message)
+      return []
     })
 
     const ratesMap: Record<string, number> = { USD: 1 } // Base currency
 
-    rates.forEach(rate => {
-      ratesMap[rate.toCurrency] = rate.rate
-    })
+    if (Array.isArray(rates)) {
+      rates.forEach(rate => {
+        if (rate.toCurrency && typeof rate.rate === 'number') {
+          ratesMap[rate.toCurrency] = rate.rate
+        }
+      })
+    }
 
     return ratesMap
   } catch (error) {
@@ -182,32 +178,49 @@ export async function getStoredExchangeRates(): Promise<Record<string, number>> 
   }
 }
 
-// Update exchange rates in database
+// Update exchange rates in database with proper error handling
 export async function updateExchangeRates(): Promise<void> {
   try {
+    // Check if db is available
+    if (!db) {
+      console.warn('Database client not available, skipping rate update')
+      return
+    }
+
     const rates = await fetchExchangeRates()
+
+    if (!rates || Object.keys(rates).length === 0) {
+      console.warn('No exchange rates to update')
+      return
+    }
 
     for (const [currency, rate] of Object.entries(rates)) {
       if (currency === 'USD') continue // Skip base currency
+      if (typeof rate !== 'number' || rate <= 0) continue // Skip invalid rates
 
-      await db.exchangeRate.upsert({
-        where: {
-          fromCurrency_toCurrency: {
+      try {
+        await db.exchangeRate.upsert({
+          where: {
+            fromCurrency_toCurrency: {
+              fromCurrency: 'USD',
+              toCurrency: currency
+            }
+          },
+          update: {
+            rate,
+            lastUpdated: new Date()
+          },
+          create: {
             fromCurrency: 'USD',
-            toCurrency: currency
+            toCurrency: currency,
+            rate,
+            lastUpdated: new Date()
           }
-        },
-        update: {
-          rate,
-          lastUpdated: new Date()
-        },
-        create: {
-          fromCurrency: 'USD',
-          toCurrency: currency,
-          rate,
-          lastUpdated: new Date()
-        }
-      })
+        })
+      } catch (upsertError) {
+        console.error(`Error updating rate for ${currency}:`, upsertError)
+        // Continue with other currencies even if one fails
+      }
     }
 
     console.log('Exchange rates updated successfully')
@@ -227,8 +240,8 @@ export function convertPrice(
   }
 
   const rate = exchangeRates[targetCurrency]
-  if (!rate) {
-    console.warn(`Exchange rate not found for ${targetCurrency}, falling back to USD`)
+  if (!rate || typeof rate !== 'number' || rate <= 0) {
+    console.warn(`Invalid exchange rate for ${targetCurrency}, falling back to USD`)
     return priceUSD
   }
 
@@ -243,6 +256,11 @@ export function formatPriceWithCurrency(
 ): string {
   const currencyInfo = SUPPORTED_CURRENCIES[currency]
   
+  if (!currencyInfo) {
+    console.warn(`Unknown currency: ${currency}`)
+    return `$${price.toFixed(2)}`
+  }
+  
   try {
     // Use Intl.NumberFormat for proper currency formatting
     const formatter = new Intl.NumberFormat(locale || 'en-US', {
@@ -254,6 +272,7 @@ export function formatPriceWithCurrency(
 
     return formatter.format(price)
   } catch (error) {
+    console.warn('Error formatting currency, using fallback:', error)
     // Fallback to manual formatting
     const symbol = currencyInfo.symbol
     const formattedPrice = currency === 'JPY' 
@@ -295,16 +314,51 @@ export function convertAndFormatPrice(
   locale?: string
 ): string {
   const convertedPrice = convertPrice(priceUSD, targetCurrency, exchangeRates)
-  const userLocale = locale || getLocaleFromCurrency(targetCurrency)
-  return formatPriceWithCurrency(convertedPrice, targetCurrency, userLocale)
+  return formatPriceWithCurrency(convertedPrice, targetCurrency, locale)
+}
+
+// Get all available currencies as an array
+export function getAvailableCurrencies() {
+  return Object.entries(SUPPORTED_CURRENCIES).map(([code, info]) => ({
+    code: code as SupportedCurrency,
+    ...info
+  }))
+}
+
+// Initialize exchange rates (call this when the app starts)
+export async function initializeExchangeRates(): Promise<Record<string, number>> {
+  try {
+    // First try to get stored rates
+    let rates = await getStoredExchangeRates()
+    
+    // If no stored rates, fetch fresh ones
+    if (Object.keys(rates).length <= 1) { // Only USD means no stored rates
+      console.log('No stored rates found, fetching fresh rates...')
+      rates = await fetchExchangeRates()
+      
+      // Update database in background (don't wait for it)
+      updateExchangeRates().catch(error => {
+        console.error('Background rate update failed:', error)
+      })
+    }
+
+    // If still no rates, use fallback
+    if (Object.keys(rates).length <= 1) {
+      console.log('Using fallback exchange rates')
+      rates = FALLBACK_RATES
+    }
+
+    return rates
+  } catch (error) {
+    console.error('Error initializing exchange rates:', error)
+    return FALLBACK_RATES
+  }
 }
 
 // Validate currency code
-export function isValidCurrency(currency: string): currency is SupportedCurrency {
-  return currency in SUPPORTED_CURRENCIES
-}
-
-// Get currency info
-export function getCurrencyInfo(currency: SupportedCurrency) {
-  return SUPPORTED_CURRENCIES[currency]
+export function validateCurrency(currency: unknown): SupportedCurrency {
+  if (typeof currency === 'string' && isValidCurrency(currency)) {
+    return currency
+  }
+  return 'USD' // Default fallback
 }

@@ -1,61 +1,65 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getStoredExchangeRates, fetchExchangeRates, updateExchangeRates } from '@/lib/currency'
+import { 
+  getStoredExchangeRates, 
+  fetchExchangeRates, 
+  updateExchangeRates,
+  initializeExchangeRates
+} from '@/lib/currency'
 
 export async function GET(request: NextRequest) {
   try {
-    // First, try to get stored rates
-    let rates = await getStoredExchangeRates()
+    // Initialize and get exchange rates with proper error handling
+    const rates = await initializeExchangeRates()
 
-    // If no stored rates or they're older than 1 hour, fetch new ones
-    const shouldRefresh = Object.keys(rates).length === 0
-
-    if (shouldRefresh) {
-      try {
-        rates = await fetchExchangeRates()
-        // Update stored rates in background
-        updateExchangeRates().catch(console.error)
-      } catch (error) {
-        console.error('Error fetching live rates:', error)
-        // If live fetch fails and we have no stored rates, return basic fallback
-        if (Object.keys(rates).length === 0) {
-          rates = {
-            USD: 1,
-            EUR: 0.85,
-            GBP: 0.73,
-            CAD: 1.25,
-            AUD: 1.35,
-            JPY: 110,
-            CNY: 6.45,
-            INR: 75
-          }
-        }
-      }
-    }
-
+    // Return the rates (will be fallback rates if database isn't available)
     return NextResponse.json(rates)
   } catch (error) {
     console.error('Currency rates API error:', error)
-    return NextResponse.json(
-      { error: 'Failed to fetch exchange rates' },
-      { status: 500 }
-    )
+    
+    // Return basic fallback rates even if everything else fails
+    const fallbackRates = {
+      USD: 1,
+      EUR: 0.85,
+      GBP: 0.73,
+      CAD: 1.25,
+      AUD: 1.35,
+      JPY: 110,
+      CNY: 6.45,
+      INR: 83.0,
+      SGD: 1.35,
+      HKD: 7.8,
+      AED: 3.67,
+      CHF: 0.92,
+      NOK: 8.5,
+      SEK: 8.8,
+      DKK: 6.4
+    }
+
+    return NextResponse.json(fallbackRates)
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
     // Force refresh exchange rates
+    console.log('Force refreshing exchange rates...')
     await updateExchangeRates()
+    
+    // Get the updated rates
     const rates = await getStoredExchangeRates()
     
     return NextResponse.json({ 
       message: 'Exchange rates updated successfully',
-      rates 
+      rates,
+      timestamp: new Date().toISOString()
     })
   } catch (error) {
     console.error('Currency rates update error:', error)
     return NextResponse.json(
-      { error: 'Failed to update exchange rates' },
+      { 
+        error: 'Failed to update exchange rates',
+        message: error instanceof Error ? error.message : 'Unknown error'
+      },
       { status: 500 }
     )
   }
