@@ -17,7 +17,8 @@ import {
   Users,
   Palette,
   Building2,
-  FolderTree
+  FolderTree,
+  Share2
 } from 'lucide-react'
 
 const navigation = [
@@ -27,6 +28,7 @@ const navigation = [
   { name: 'Suppliers', href: '/admin/suppliers', icon: Building2 },
   { name: 'Orders', href: '/admin/orders', icon: ShoppingCart },
   { name: 'Exhibitions', href: '/admin/exhibitions', icon: Calendar },
+  { name: 'Social Media', href: '/admin/social', icon: Share2 }, // NEW
   { name: 'Analytics', href: '/admin/analytics', icon: BarChart3 },
   { name: 'Customers', href: '/admin/customers', icon: Users },
   { name: 'Branding', href: '/admin/branding', icon: Palette },
@@ -148,22 +150,16 @@ export default function AdminNavigation() {
                             : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                         }`}
                       >
-                        <Icon className="mr-4 h-6 w-6 flex-shrink-0" />
+                        <Icon
+                          className={`mr-3 h-5 w-5 flex-shrink-0 ${
+                            isActive ? 'text-gray-500' : 'text-gray-400 group-hover:text-gray-500'
+                          }`}
+                        />
                         {item.name}
                       </Link>
                     )
                   })}
                 </nav>
-              </div>
-              <div className="flex flex-shrink-0 border-t border-gray-200 p-4">
-                <Button
-                  onClick={handleLogout}
-                  variant="ghost"
-                  className="w-full justify-start"
-                >
-                  <LogOut className="mr-3 h-5 w-5" />
-                  Sign out
-                </Button>
               </div>
             </div>
           </div>
