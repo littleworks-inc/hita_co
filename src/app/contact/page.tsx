@@ -1,9 +1,5 @@
-import { Suspense } from 'react'
 import Link from 'next/link'
 import { db } from '@/lib/db'
-import CustomerNavigation from '@/components/customer/CustomerNavigation'
-import ContactForm from '@/components/customer/ContactForm'
-import LoadingSpinner from '@/components/customer/LoadingSpinner'
 import {
   Mail,
   Phone,
@@ -21,17 +17,24 @@ import {
   CheckCircle,
   Headphones,
   Package,
-  CreditCard
+  CreditCard,
+  Search,
+  User
 } from 'lucide-react'
 
-// Get store settings for contact information
+// Get store settings for dynamic content
 async function getStoreSettings() {
-  return await db.storeSetting.findFirst({
-    where: { id: 'default' }
-  })
+  try {
+    return await db.storeSetting.findFirst({
+      where: { id: 'default' }
+    })
+  } catch (error) {
+    console.error('Error fetching store settings:', error)
+    return null
+  }
 }
 
-// Generate metadata for SEO
+// Generate dynamic metadata
 export async function generateMetadata() {
   const storeSettings = await getStoreSettings()
   const storeName = storeSettings?.storeName || 'Hita&Co'
@@ -47,16 +50,123 @@ export async function generateMetadata() {
   }
 }
 
-// Hero Section Component
+// Dynamic Navigation Component
+function DynamicNavigation({ storeSettings }: { storeSettings: any }) {
+  const storeName = storeSettings?.storeName || 'Hita&Co'
+  const tagline = storeSettings?.tagline || 'Authentic Indian Ethnic Wear'
+  const primaryColor = storeSettings?.primaryColor || '#7c3aed'
+  const logo = storeSettings?.logo
+
+  return (
+    <>
+      {/* Dynamic Top Banner */}
+      <div 
+        className="text-white text-center py-2 px-4"
+        style={{ 
+          background: `linear-gradient(to right, ${primaryColor}, ${storeSettings?.accentColor || '#f59e0b'})` 
+        }}
+      >
+        <p className="text-sm font-medium">
+          ✨ Free shipping on orders over $100 | Authentic handcrafted products
+        </p>
+      </div>
+
+      <nav className="bg-white shadow-lg sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-16">
+            <div className="flex items-center">
+              <Link href="/" className="flex items-center space-x-3">
+                {logo ? (
+                  <img 
+                    src={logo} 
+                    alt={storeName} 
+                    className="w-10 h-10 object-contain rounded-full"
+                  />
+                ) : (
+                  <div 
+                    className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-lg"
+                    style={{ backgroundColor: primaryColor }}
+                  >
+                    {storeName.charAt(0)}
+                  </div>
+                )}
+                <div>
+                  <h1 className="text-xl font-bold text-gray-900">{storeName}</h1>
+                  <p className="text-xs text-gray-500">{tagline}</p>
+                </div>
+              </Link>
+            </div>
+
+            <div className="hidden md:flex items-center space-x-8">
+              <Link href="/" className="text-sm font-medium text-gray-700 hover:text-purple-600">
+                Home
+              </Link>
+              <Link href="/products" className="text-sm font-medium text-gray-700 hover:text-purple-600">
+                Products
+              </Link>
+              <Link href="/categories" className="text-sm font-medium text-gray-700 hover:text-purple-600">
+                Categories
+              </Link>
+              <Link href="/about" className="text-sm font-medium text-gray-700 hover:text-purple-600">
+                About
+              </Link>
+              <Link 
+                href="/contact" 
+                className="text-sm font-medium border-b-2"
+                style={{ 
+                  color: primaryColor, 
+                  borderColor: primaryColor 
+                }}
+              >
+                Contact
+              </Link>
+            </div>
+
+            <div className="flex items-center space-x-4">
+              <Search className="h-6 w-6 text-gray-700 hover:text-purple-600 cursor-pointer" />
+              <div className="relative">
+                <Heart className="h-6 w-6 text-gray-700 hover:text-red-500 cursor-pointer" />
+                <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                  0
+                </span>
+              </div>
+              <div className="relative">
+                <Package className="h-6 w-6 text-gray-700 hover:text-purple-600 cursor-pointer" />
+                <span 
+                  className="absolute -top-2 -right-2 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center"
+                  style={{ backgroundColor: primaryColor }}
+                >
+                  0
+                </span>
+              </div>
+              <User className="h-6 w-6 text-gray-700 hover:text-purple-600 cursor-pointer" />
+            </div>
+          </div>
+        </div>
+      </nav>
+    </>
+  )
+}
+
+// Dynamic Hero Section
 function ContactHero({ storeSettings }: { storeSettings: any }) {
   const storeName = storeSettings?.storeName || 'Hita&Co'
+  const primaryColor = storeSettings?.primaryColor || '#7c3aed'
+  const accentColor = storeSettings?.accentColor || '#f59e0b'
 
   return (
     <section className="bg-gradient-to-br from-purple-50 to-pink-50 py-16">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
         <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-6">
           Contact{' '}
-          <span className="bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
+          <span 
+            className="bg-clip-text text-transparent"
+            style={{ 
+              background: `linear-gradient(to right, ${primaryColor}, ${accentColor})`,
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent'
+            }}
+          >
             {storeName}
           </span>
         </h1>
@@ -64,7 +174,10 @@ function ContactHero({ storeSettings }: { storeSettings: any }) {
           We'd love to hear from you! Reach out with any questions about our products, 
           orders, or just to say hello.
         </p>
-        <div className="flex items-center justify-center gap-2 text-purple-600">
+        <div 
+          className="flex items-center justify-center gap-2"
+          style={{ color: primaryColor }}
+        >
           <Heart className="h-5 w-5" />
           <span className="text-sm font-medium">We typically respond within 24 hours</span>
           <Heart className="h-5 w-5" />
@@ -74,8 +187,10 @@ function ContactHero({ storeSettings }: { storeSettings: any }) {
   )
 }
 
-// Contact Information Component
+// Dynamic Contact Information Component
 function ContactInformation({ storeSettings }: { storeSettings: any }) {
+  const primaryColor = storeSettings?.primaryColor || '#7c3aed'
+
   const contactMethods = [
     {
       icon: Mail,
@@ -111,6 +226,13 @@ function ContactInformation({ storeSettings }: { storeSettings: any }) {
     }
   ]
 
+  const colorClasses = {
+    blue: 'border-blue-200 hover:bg-blue-50',
+    green: 'border-green-200 hover:bg-green-50', 
+    purple: 'border-purple-200 hover:bg-purple-50',
+    red: 'border-red-200 hover:bg-red-50'
+  }
+
   return (
     <section className="py-16 bg-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -126,21 +248,17 @@ function ContactInformation({ storeSettings }: { storeSettings: any }) {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {contactMethods.map((method, index) => {
             const Icon = method.icon
-            const colorClasses = {
-              blue: 'bg-blue-100 text-blue-600 border-blue-200 hover:bg-blue-50',
-              green: 'bg-green-100 text-green-600 border-green-200 hover:bg-green-50',
-              purple: 'bg-purple-100 text-purple-600 border-purple-200 hover:bg-purple-50',
-              red: 'bg-red-100 text-red-600 border-red-200 hover:bg-red-50'
-            }
-
             return (
               <div key={index} className="group">
                 <a
                   href={method.action}
                   className={`block p-6 rounded-xl border-2 transition-all duration-300 ${colorClasses[method.color as keyof typeof colorClasses]}`}
                 >
-                  <div className="flex items-center justify-center w-12 h-12 rounded-lg mb-4 mx-auto">
-                    <Icon className="h-6 w-6" />
+                  <div 
+                    className="flex items-center justify-center w-12 h-12 rounded-lg mb-4 mx-auto"
+                    style={{ backgroundColor: `${primaryColor}20` }}
+                  >
+                    <Icon className="h-6 w-6" style={{ color: primaryColor }} />
                   </div>
                   <h3 className="text-lg font-semibold text-gray-900 mb-2 text-center">
                     {method.title}
@@ -161,8 +279,10 @@ function ContactInformation({ storeSettings }: { storeSettings: any }) {
   )
 }
 
-// Contact Form Section
-function ContactFormSection() {
+// Simple Contact Form Component
+function ContactFormSection({ storeSettings }: { storeSettings: any }) {
+  const primaryColor = storeSettings?.primaryColor || '#7c3aed'
+
   return (
     <section className="py-16 bg-gray-50">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -176,7 +296,99 @@ function ContactFormSection() {
         </div>
 
         <div className="bg-white rounded-2xl shadow-lg p-8">
-          <ContactForm />
+          <form className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-gray-700">
+                  Full Name *
+                </label>
+                <input
+                  type="text"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent outline-none transition-colors"
+                  style={{ 
+                    '--tw-ring-color': primaryColor,
+                    '--tw-ring-opacity': '0.5'
+                  } as React.CSSProperties}
+                  placeholder="Enter your full name"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-gray-700">
+                  Email Address *
+                </label>
+                <input
+                  type="email"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent outline-none transition-colors"
+                  style={{ 
+                    '--tw-ring-color': primaryColor,
+                    '--tw-ring-opacity': '0.5'
+                  } as React.CSSProperties}
+                  placeholder="Enter your email address"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-gray-700">
+                  Phone Number (Optional)
+                </label>
+                <input
+                  type="tel"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent outline-none transition-colors"
+                  placeholder="Enter your phone number"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-gray-700">
+                  Inquiry Type
+                </label>
+                <select className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent outline-none">
+                  <option>General Inquiry</option>
+                  <option>Product Question</option>
+                  <option>Order Support</option>
+                  <option>Shipping Question</option>
+                  <option>Return/Exchange</option>
+                  <option>Wholesale Inquiry</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">
+                Subject *
+              </label>
+              <input
+                type="text"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent outline-none transition-colors"
+                placeholder="What is your message about?"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">
+                Message *
+              </label>
+              <textarea
+                rows={6}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent outline-none transition-colors resize-none"
+                placeholder="Tell us more about your inquiry..."
+              />
+            </div>
+
+            <div className="pt-4">
+              <button
+                type="submit"
+                className="w-full md:w-auto px-8 py-3 text-white font-semibold rounded-lg transition-colors flex items-center justify-center gap-2"
+                style={{ backgroundColor: primaryColor }}
+              >
+                <Send className="h-4 w-4" />
+                Send Message
+              </button>
+            </div>
+          </form>
         </div>
       </div>
     </section>
@@ -184,7 +396,9 @@ function ContactFormSection() {
 }
 
 // FAQ Section
-function FAQSection() {
+function FAQSection({ storeSettings }: { storeSettings: any }) {
+  const primaryColor = storeSettings?.primaryColor || '#7c3aed'
+
   const faqs = [
     {
       icon: Package,
@@ -227,8 +441,11 @@ function FAQSection() {
               <div key={index} className="bg-gray-50 rounded-xl p-6">
                 <div className="flex items-start gap-4">
                   <div className="flex-shrink-0">
-                    <div className="flex items-center justify-center w-10 h-10 bg-purple-100 rounded-lg">
-                      <Icon className="h-5 w-5 text-purple-600" />
+                    <div 
+                      className="flex items-center justify-center w-10 h-10 rounded-lg"
+                      style={{ backgroundColor: `${primaryColor}20` }}
+                    >
+                      <Icon className="h-5 w-5" style={{ color: primaryColor }} />
                     </div>
                   </div>
                   <div>
@@ -249,8 +466,11 @@ function FAQSection() {
   )
 }
 
-// Social Media & Hours Section
+// Dynamic Social Media & Hours Section
 function SocialMediaSection({ storeSettings }: { storeSettings: any }) {
+  const primaryColor = storeSettings?.primaryColor || '#7c3aed'
+  const accentColor = storeSettings?.accentColor || '#f59e0b'
+
   const socialLinks = [
     {
       name: 'Instagram',
@@ -341,8 +561,11 @@ function SocialMediaSection({ storeSettings }: { storeSettings: any }) {
   )
 }
 
-// Call to Action Section
-function CallToActionSection() {
+// Dynamic Call to Action Section
+function CallToActionSection({ storeSettings }: { storeSettings: any }) {
+  const primaryColor = storeSettings?.primaryColor || '#7c3aed'
+  const accentColor = storeSettings?.accentColor || '#f59e0b'
+
   return (
     <section className="py-16 bg-gray-900 text-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
@@ -355,7 +578,10 @@ function CallToActionSection() {
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
           <Link
             href="/products"
-            className="inline-flex items-center gap-2 bg-purple-600 text-white px-8 py-3 rounded-full font-semibold hover:bg-purple-700 transition-colors"
+            className="inline-flex items-center gap-2 text-white px-8 py-3 rounded-full font-semibold transition-colors"
+            style={{ 
+              background: `linear-gradient(to right, ${primaryColor}, ${accentColor})` 
+            }}
           >
             <Heart className="h-5 w-5" />
             Browse Products
@@ -430,17 +656,17 @@ export default async function ContactPage() {
         }}
       />
 
-      {/* Navigation */}
-      <CustomerNavigation storeSettings={storeSettings} />
+      {/* Dynamic Navigation */}
+      <DynamicNavigation storeSettings={storeSettings} />
 
       {/* Page Content */}
       <main>
         <ContactHero storeSettings={storeSettings} />
         <ContactInformation storeSettings={storeSettings} />
-        <ContactFormSection />
-        <FAQSection />
+        <ContactFormSection storeSettings={storeSettings} />
+        <FAQSection storeSettings={storeSettings} />
         <SocialMediaSection storeSettings={storeSettings} />
-        <CallToActionSection />
+        <CallToActionSection storeSettings={storeSettings} />
       </main>
     </>
   )
