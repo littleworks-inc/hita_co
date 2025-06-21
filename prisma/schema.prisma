@@ -331,3 +331,17 @@ enum OrderStatus {
   DELIVERED
   CANCELLED
 }
+
+// Exchange Rates Table
+model ExchangeRate {
+  id           String   @id @default(cuid())
+  fromCurrency String   // Always USD as base
+  toCurrency   String   // Target currency
+  rate         Float    // Exchange rate
+  lastUpdated  DateTime @default(now())
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([fromCurrency, toCurrency])
+  @@map("exchange_rates")
+}
