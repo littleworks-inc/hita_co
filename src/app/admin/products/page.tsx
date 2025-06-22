@@ -3,130 +3,135 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { getSession } from '@/lib/auth'
 import { db } from '@/lib/db'
-import { formatPrice, formatDate } from '@/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle, Button } from '@/components/ui'
 import AdminNavigation from '@/components/admin/AdminNavigation'
 import ProductsSearchFilter from '@/components/admin/ProductsSearchFilter'
-import ProductsTable from '@/components/admin/ProductsTable'
+import ProductsData from '@/components/admin/ProductsData'
 import {
   Package,
   Plus,
   CheckCircle,
-  AlertTriangle
+  AlertTriangle,
+  XCircle,
+  Star
 } from 'lucide-react'
 
-// Quick Stats Component
+// Enhanced Product Stats Component
 async function ProductStats() {
-  const [
-    totalProducts,
-    activeProducts,
-    lowStockProducts,
-    featuredProducts
-  ] = await Promise.all([
-    db.product.count(),
-    db.product.count({ where: { isActive: true } }),
-    db.product.count({
-      where: {
-        stockQuantity: {
-          lte: db.product.fields.lowStockAlert
+  try {
+    const [
+      totalProducts,
+      activeProducts,
+      inactiveProducts,
+      featuredProducts,
+      lowStockProducts,
+      outOfStockProducts
+    ] = await Promise.all([
+      db.product.count(),
+      db.product.count({ where: { isActive: true } }),
+      db.product.count({ where: { isActive: false } }),
+      db.product.count({ where: { isFeatured: true, isActive: true } }),
+      // Low stock: using a simple threshold for now, could be made more sophisticated
+      db.product.count({
+        where: {
+          isActive: true,
+          stockQuantity: { gt: 0, lte: 10 } // Products with 1-10 items
         }
+      }),
+      db.product.count({
+        where: {
+          stockQuantity: { lte: 0 }
+        }
+      })
+    ])
+
+    const stats = [
+      {
+        title: 'Total Products',
+        value: totalProducts,
+        icon: Package,
+        color: 'blue',
+        description: `${activeProducts} active, ${inactiveProducts} inactive`
+      },
+      {
+        title: 'Active Products',
+        value: activeProducts,
+        icon: CheckCircle,
+        color: 'green',
+        description: 'Ready for sale'
+      },
+      {
+        title: 'Featured Products',
+        value: featuredProducts,
+        icon: Star,
+        color: 'purple',
+        description: 'Highlighted products'
+      },
+      {
+        title: 'Stock Alerts',
+        value: lowStockProducts + outOfStockProducts,
+        icon: AlertTriangle,
+        color: outOfStockProducts > 0 ? 'red' : lowStockProducts > 0 ? 'orange' : 'green',
+        description: `${lowStockProducts} low, ${outOfStockProducts} out`
       }
-    }),
-    db.product.count({ where: { isFeatured: true } })
-  ])
-
-  const stats = [
-    {
-      title: 'Total Products',
-      value: totalProducts,
-      icon: Package,
-      color: 'blue'
-    },
-    {
-      title: 'Active Products',
-      value: activeProducts,
-      icon: CheckCircle,
-      color: 'green'
-    },
-    {
-      title: 'Low Stock',
-      value: lowStockProducts,
-      icon: AlertTriangle,
-      color: 'orange'
-    },
-    {
-      title: 'Featured',
-      value: featuredProducts,
-      icon: Package,
-      color: 'purple'
-    }
-  ]
-
-  return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-6">
-      {stats.map((stat) => {
-        const Icon = stat.icon
-        return (
-          <Card key={stat.title}>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
-                {stat.title}
-              </CardTitle>
-              <Icon className={`h-4 w-4 text-${stat.color}-600`} />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stat.value}</div>
-            </CardContent>
-          </Card>
-        )
-      })}
-    </div>
-  )
-}
-
-// Products Data Component
-async function ProductsData({ searchQuery, categoryFilter }: { 
-  searchQuery?: string
-  categoryFilter?: string 
-}) {
-  const whereClause: any = {}
-  
-  if (searchQuery) {
-    whereClause.OR = [
-      { name: { contains: searchQuery, mode: 'insensitive' } },
-      { sku: { contains: searchQuery, mode: 'insensitive' } },
-      { description: { contains: searchQuery, mode: 'insensitive' } }
     ]
-  }
-  
-  if (categoryFilter) {
-    whereClause.categoryId = categoryFilter
-  }
 
-  const products = await db.product.findMany({
-    where: whereClause,
-    include: {
-      category: true,
-      country: true
-    },
-    orderBy: {
-      createdAt: 'desc'
-    }
-  })
-
-  return (
-    <ProductsTable 
-      products={products}
-      searchQuery={searchQuery}
-      categoryFilter={categoryFilter}
-    />
-  )
+    return (
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-6">
+        {stats.map((stat) => {
+          const Icon = stat.icon
+          return (
+            <Card key={stat.title}>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-gray-600">
+                  {stat.title}
+                </CardTitle>
+                <div className={`p-2 rounded-lg ${
+                  stat.color === 'blue' ? 'bg-blue-50' :
+                  stat.color === 'green' ? 'bg-green-50' :
+                  stat.color === 'purple' ? 'bg-purple-50' :
+                  stat.color === 'orange' ? 'bg-orange-50' :
+                  stat.color === 'red' ? 'bg-red-50' : 'bg-gray-50'
+                }`}>
+                  <Icon className={`h-4 w-4 ${
+                    stat.color === 'blue' ? 'text-blue-600' :
+                    stat.color === 'green' ? 'text-green-600' :
+                    stat.color === 'purple' ? 'text-purple-600' :
+                    stat.color === 'orange' ? 'text-orange-600' :
+                    stat.color === 'red' ? 'text-red-600' : 'text-gray-600'
+                  }`} />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-gray-900">{stat.value}</div>
+                <p className="text-xs text-gray-500 mt-1">{stat.description}</p>
+              </CardContent>
+            </Card>
+          )
+        })}
+      </div>
+    )
+  } catch (error) {
+    console.error('Error fetching product stats:', error)
+    return (
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-6">
+        <Card>
+          <CardContent className="p-6 text-center">
+            <AlertTriangle className="h-8 w-8 text-red-500 mx-auto mb-2" />
+            <p className="text-red-600 text-sm">Error loading stats</p>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
 }
 
 interface ProductsPageProps {
   searchParams: {
     search?: string
     category?: string
+    status?: string
+    stock?: string
   }
 }
 
@@ -137,10 +142,20 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
     redirect('/admin/login')
   }
 
-  // Get categories for the search filter
+  // Get categories with product counts for the search filter
   const categories = await db.category.findMany({
+    include: {
+      _count: {
+        select: {
+          products: true
+        }
+      }
+    },
     orderBy: { name: 'asc' }
   })
+
+  // Get total product count for the search component
+  const totalProducts = await db.product.count()
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -160,18 +175,21 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                     Manage your product inventory, pricing, and stock levels.
                   </p>
                 </div>
-                
-                <Link href="/admin/products/new">
-                  <Button className="flex items-center gap-2">
-                    <Plus className="h-4 w-4" />
-                    Add Product
-                  </Button>
-                </Link>
               </div>
             </div>
 
-            {/* Stats */}
-            <Suspense fallback={<div>Loading stats...</div>}>
+            {/* Quick Stats */}
+            <Suspense fallback={
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-6">
+                {[...Array(4)].map((_, i) => (
+                  <Card key={i} className="animate-pulse">
+                    <CardContent className="p-6">
+                      <div className="h-16 bg-gray-200 rounded"></div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            }>
               <ProductStats />
             </Suspense>
 
@@ -179,16 +197,27 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
             <div className="mb-6">
               <ProductsSearchFilter 
                 categories={categories}
-                initialSearch={searchParams.search}
-                initialCategory={searchParams.category}
+                totalProducts={totalProducts}
               />
             </div>
 
             {/* Products Table */}
-            <Suspense fallback={<div>Loading products...</div>}>
+            <Suspense fallback={
+              <Card>
+                <CardContent className="p-6">
+                  <div className="space-y-4">
+                    {[...Array(5)].map((_, i) => (
+                      <div key={i} className="h-16 bg-gray-200 rounded animate-pulse"></div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            }>
               <ProductsData 
                 searchQuery={searchParams.search}
                 categoryFilter={searchParams.category}
+                statusFilter={searchParams.status}
+                stockFilter={searchParams.stock}
               />
             </Suspense>
           </div>
