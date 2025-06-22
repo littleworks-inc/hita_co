@@ -1,4 +1,9 @@
 // Hita&Co Database Schema
+
+// 1. npx prisma db push
+// 2. npx prisma generate
+
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -288,8 +293,9 @@ model StoreSetting {
   twitter         String?
   
   // AI Configuration
-  aiProvider      String?  // openai, gemini, claude, mistral , openrouter
+  aiProvider      String?  // openai, gemini, claude, mistral
   aiApiKey        String?
+  aiModel         String?  // 👈 ADD THIS NEW FIELD
   
   // Other Settings
   currency        String   @default("USD")
