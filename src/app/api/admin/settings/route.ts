@@ -1,44 +1,7 @@
+// /src/app/api/admin/settings/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth'
 import { db } from '@/lib/db'
-
-export async function GET(request: NextRequest) {
-  try {
-    const session = await getSession()
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    // Get store settings (create default if doesn't exist)
-    let storeSettings = await db.storeSetting.findFirst({
-      where: { id: 'default' }
-    })
-
-    if (!storeSettings) {
-      storeSettings = await db.storeSetting.create({
-        data: {
-          id: 'default',
-          storeName: 'Hita&Co',
-          tagline: 'Authentic Indian Ethnic Wear & Lifestyle',
-          primaryColor: '#1f2937',
-          secondaryColor: '#ffffff',
-          accentColor: '#f59e0b',
-          email: 'thehitanco@gmail.com',
-          currency: 'USD',
-          timezone: 'America/New_York',
-        }
-      })
-    }
-
-    return NextResponse.json(storeSettings)
-  } catch (error) {
-    console.error('Store settings GET error:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
-  }
-}
 
 export async function PUT(request: NextRequest) {
   try {
@@ -50,7 +13,7 @@ export async function PUT(request: NextRequest) {
     const data = await request.json()
 
     // Validate required fields
-    if (!data.storeName || !data.storeName.trim()) {
+    if (!data.storeName?.trim()) {
       return NextResponse.json(
         { error: 'Store name is required' },
         { status: 400 }
@@ -113,6 +76,7 @@ export async function PUT(request: NextRequest) {
       twitter: data.twitter?.trim() || null,
       aiProvider: data.aiProvider?.trim() || null,
       aiApiKey: data.aiApiKey?.trim() || null,
+      aiModel: data.aiModel?.trim() || null,  // 👈 ADD THIS LINE
       currency: data.currency || 'USD',
       timezone: data.timezone || 'America/New_York'
     }
