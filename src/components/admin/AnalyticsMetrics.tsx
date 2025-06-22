@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui'
+import Link from 'next/link'
+import { Card, CardContent, CardHeader, CardTitle, Button } from '@/components/ui'
 import {
   DollarSign,
   ShoppingCart,
@@ -13,10 +14,18 @@ import {
   AlertTriangle,
   ArrowUpRight,
   ArrowDownRight,
-  Minus
+  Minus,
+  Plus,
+  Store,
+  ExternalLink
 } from 'lucide-react'
 
 interface MetricsData {
+  isEmpty?: boolean
+  emptyStateType?: 'no_products' | 'no_orders'
+  message?: string
+  actionText?: string
+  actionLink?: string
   revenue: {
     current: number
     previous: number
@@ -71,33 +80,6 @@ export default function AnalyticsMetrics({ period, currency }: AnalyticsMetricsP
       setError(null)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load metrics')
-      // Set mock data for development
-      setData({
-        revenue: {
-          current: 45230.50,
-          previous: 38150.25,
-          change: 18.5,
-          changeType: 'increase'
-        },
-        orders: {
-          current: 324,
-          previous: 289,
-          change: 12.1,
-          changeType: 'increase'
-        },
-        products: {
-          total: 156,
-          active: 142,
-          lowStock: 12,
-          outOfStock: 2
-        },
-        performance: {
-          conversionRate: 3.2,
-          averageOrderValue: 139.60,
-          topCategory: 'Traditional Jewelry',
-          topCountry: 'United States'
-        }
-      })
     } finally {
       setLoading(false)
     }
@@ -132,6 +114,91 @@ export default function AnalyticsMetrics({ period, currency }: AnalyticsMetricsP
     return null
   }
 
+  // Show empty state for fresh systems
+  if (data.isEmpty) {
+    return (
+      <div className="space-y-6">
+        {/* Empty State Card */}
+        <Card className="border-2 border-dashed border-blue-200 bg-blue-50/50">
+          <CardContent className="p-8 text-center">
+            {data.emptyStateType === 'no_products' ? (
+              <>
+                <Package className="h-12 w-12 text-blue-600 mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                  Welcome to Your Analytics Dashboard!
+                </h3>
+                <p className="text-gray-600 mb-4 max-w-md mx-auto">
+                  {data.message}
+                </p>
+                <Link href={data.actionLink || '/admin/products/new'}>
+                  <Button className="flex items-center gap-2">
+                    <Plus className="h-4 w-4" />
+                    {data.actionText || 'Add Your First Product'}
+                  </Button>
+                </Link>
+              </>
+            ) : (
+              <>
+                <ShoppingCart className="h-12 w-12 text-green-600 mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                  Products Ready! Waiting for Orders
+                </h3>
+                <p className="text-gray-600 mb-4 max-w-md mx-auto">
+                  {data.message}
+                </p>
+                <div className="flex items-center justify-center gap-3">
+                  <Link href={data.actionLink || '/'}>
+                    <Button className="flex items-center gap-2">
+                      <Store className="h-4 w-4" />
+                      {data.actionText || 'View Your Store'}
+                      <ExternalLink className="h-3 w-3" />
+                    </Button>
+                  </Link>
+                  <Link href="/admin/products">
+                    <Button variant="outline" className="flex items-center gap-2">
+                      <Package className="h-4 w-4" />
+                      Manage Products
+                    </Button>
+                  </Link>
+                </div>
+              </>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Show current product metrics even in empty state */}
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          {getEmptyStateMetrics(data).map((metric, index) => {
+            const Icon = metric.icon
+            return (
+              <Card key={index} className="relative overflow-hidden">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium text-gray-600">
+                    {metric.title}
+                  </CardTitle>
+                  <div className={`p-2 rounded-lg ${metric.bgColor}`}>
+                    <Icon className={`h-4 w-4 ${metric.color}`} />
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    <div className="text-2xl font-bold text-gray-900">
+                      {metric.value}
+                    </div>
+                    <p className="text-xs text-gray-500">
+                      {metric.description}
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            )
+          })}
+        </div>
+      </div>
+    )
+  }
+
+  // Show real analytics data
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -244,4 +311,41 @@ export default function AnalyticsMetrics({ period, currency }: AnalyticsMetricsP
       })}
     </div>
   )
+}
+
+function getEmptyStateMetrics(data: MetricsData) {
+  return [
+    {
+      title: 'Revenue',
+      value: '$0.00',
+      description: 'Waiting for first order',
+      icon: DollarSign,
+      color: 'text-gray-500',
+      bgColor: 'bg-gray-50'
+    },
+    {
+      title: 'Orders',
+      value: '0',
+      description: 'Share your store to get started',
+      icon: ShoppingCart,
+      color: 'text-gray-500',
+      bgColor: 'bg-gray-50'
+    },
+    {
+      title: 'Products',
+      value: data.products.total.toString(),
+      description: data.products.total > 0 ? 'Products ready for sale' : 'Add your first product',
+      icon: Package,
+      color: data.products.total > 0 ? 'text-green-600' : 'text-orange-600',
+      bgColor: data.products.total > 0 ? 'bg-green-50' : 'bg-orange-50'
+    },
+    {
+      title: 'Conversion',
+      value: '0%',
+      description: 'Will show after first visits',
+      icon: TrendingUp,
+      color: 'text-gray-500',
+      bgColor: 'bg-gray-50'
+    }
+  ]
 }
