@@ -15,7 +15,6 @@ import {
   X,
   BarChart3,
   Users,
-  Palette,
   Building2,
   FolderTree,
   Share2
@@ -28,10 +27,9 @@ const navigation = [
   { name: 'Suppliers', href: '/admin/suppliers', icon: Building2 },
   { name: 'Orders', href: '/admin/orders', icon: ShoppingCart },
   { name: 'Exhibitions', href: '/admin/exhibitions', icon: Calendar },
-  { name: 'Social Media', href: '/admin/social', icon: Share2 }, // NEW
+  { name: 'Social Media', href: '/admin/social', icon: Share2 },
   { name: 'Analytics', href: '/admin/analytics', icon: BarChart3 },
   { name: 'Customers', href: '/admin/customers', icon: Users },
-  { name: 'Branding', href: '/admin/branding', icon: Palette },
   { name: 'Settings', href: '/admin/settings', icon: Settings },
 ]
 
