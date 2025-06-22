@@ -2,314 +2,369 @@
 
 import { useState } from 'react'
 import { Button } from '@/components/ui'
-import {
-  Sparkles,
-  Loader2,
-  CheckCircle,
-  AlertTriangle,
+import { 
+  Sparkles, 
+  RefreshCw, 
+  Wand2, 
+  FileText, 
+  Hash, 
+  MessageSquare,
   Settings,
-  Wand2
+  ChevronDown,
+  CheckCircle,
+  AlertCircle
 } from 'lucide-react'
 
 interface AIGenerateButtonProps {
-  contentType: 'product_description' | 'seo_meta' | 'social_caption' | 'category_description'
-  productContext?: {
-    name: string
+  type: 'product_description' | 'seo_content' | 'social_caption' | 'category_description'
+  context: {
+    productName?: string
     category?: string
-    materials?: string[]
-    colors?: string[]
-    description?: string
     price?: number
-    currency?: string
-    origin?: string
+    features?: string[]
   }
-  options?: {
-    tone?: 'professional' | 'casual' | 'elegant' | 'playful' | 'informative'
-    length?: 'short' | 'medium' | 'long'
-    platform?: 'instagram' | 'facebook' | 'twitter'
-    maxTokens?: number
-    temperature?: number
-  }
-  onSuccess: (content: string) => void
-  onError?: (error: string) => void
+  onGenerated: (content: any) => void
   disabled?: boolean
-  size?: 'sm' | 'md' | 'lg'
-  variant?: 'primary' | 'secondary' | 'ghost'
-  className?: string
-  children?: React.ReactNode
+  size?: 'sm' | 'default' | 'lg'
+  variant?: 'default' | 'outline' | 'ghost'
 }
 
+interface AIBulkGenerateButtonProps {
+  productIds: string[]
+  type: 'product_description' | 'seo_content'
+  onComplete: (results: any) => void
+  disabled?: boolean
+}
+
+interface AIConfigModalProps {
+  isOpen: boolean
+  onClose: () => void
+  onGenerate: (config: any) => void
+  type: string
+}
+
+// Main AI Generate Button
 export default function AIGenerateButton({
-  contentType,
-  productContext,
-  options = {},
-  onSuccess,
-  onError,
+  type,
+  context,
+  onGenerated,
   disabled = false,
-  size = 'md',
-  variant = 'secondary',
-  className = '',
-  children
+  size = 'default',
+  variant = 'outline'
 }: AIGenerateButtonProps) {
-  const [isLoading, setIsLoading] = useState(false)
-  const [lastResult, setLastResult] = useState<'success' | 'error' | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [showConfig, setShowConfig] = useState(false)
+  const [success, setSuccess] = useState(false)
 
-  const handleGenerate = async () => {
-    // Validate required context
-    if (!productContext?.name) {
-      const error = 'Product name is required for AI generation'
-      onError?.(error)
-      return
+  const getButtonConfig = () => {
+    switch (type) {
+      case 'product_description':
+        return {
+          icon: FileText,
+          label: 'Generate Description',
+          color: 'text-blue-600'
+        }
+      case 'seo_content':
+        return {
+          icon: Hash,
+          label: 'Generate SEO',
+          color: 'text-green-600'
+        }
+      case 'social_caption':
+        return {
+          icon: MessageSquare,
+          label: 'Generate Caption',
+          color: 'text-purple-600'
+        }
+      case 'category_description':
+        return {
+          icon: FileText,
+          label: 'Generate Description',
+          color: 'text-orange-600'
+        }
+      default:
+        return {
+          icon: Sparkles,
+          label: 'Generate with AI',
+          color: 'text-gray-600'
+        }
     }
+  }
 
-    setIsLoading(true)
-    setLastResult(null)
+  const buttonConfig = getButtonConfig()
+  const Icon = loading ? RefreshCw : success ? CheckCircle : buttonConfig.icon
+
+  const handleGenerate = async (customConfig?: any) => {
+    setLoading(true)
+    setSuccess(false)
 
     try {
-      const response = await fetch('/api/ai/generate', {
+      const response = await fetch('/api/admin/ai/generate', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          contentType,
-          productContext,
-          options: {
-            tone: 'elegant',
-            length: 'medium',
-            ...options
+          type,
+          context: {
+            ...context,
+            ...customConfig
           }
-        }),
+        })
       })
 
       const data = await response.json()
 
-      if (!response.ok) {
+      if (data.success && data.content) {
+        onGenerated(data.content)
+        setSuccess(true)
+        setTimeout(() => setSuccess(false), 2000)
+      } else {
         throw new Error(data.error || 'Failed to generate content')
       }
-
-      if (data.success && data.content) {
-        onSuccess(data.content)
-        setLastResult('success')
-        
-        // Clear success indicator after 3 seconds
-        setTimeout(() => setLastResult(null), 3000)
-      } else {
-        throw new Error(data.error || 'No content generated')
-      }
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'AI generation failed'
-      onError?.(errorMessage)
-      setLastResult('error')
-      
-      // Clear error indicator after 5 seconds
-      setTimeout(() => setLastResult(null), 5000)
+      console.error('Generation error:', error)
+      alert(error instanceof Error ? error.message : 'Failed to generate content')
     } finally {
-      setIsLoading(false)
+      setLoading(false)
+      setShowConfig(false)
     }
   }
-
-  const getButtonIcon = () => {
-    if (isLoading) return Loader2
-    if (lastResult === 'success') return CheckCircle
-    if (lastResult === 'error') return AlertTriangle
-    return Sparkles
-  }
-
-  const getButtonText = () => {
-    if (isLoading) {
-      switch (contentType) {
-        case 'product_description': return 'Generating Description...'
-        case 'seo_meta': return 'Generating SEO...'
-        case 'social_caption': return 'Generating Caption...'
-        case 'category_description': return 'Generating Description...'
-        default: return 'Generating...'
-      }
-    }
-    
-    if (lastResult === 'success') return 'Generated!'
-    if (lastResult === 'error') return 'Failed'
-    
-    if (children) return children
-    
-    switch (contentType) {
-      case 'product_description': return 'Generate Description'
-      case 'seo_meta': return 'Generate SEO'
-      case 'social_caption': return 'Generate Caption'
-      case 'category_description': return 'Generate Description'
-      default: return 'Generate with AI'
-    }
-  }
-
-  const getButtonStyles = () => {
-    const baseStyles = 'transition-all duration-200'
-    
-    if (lastResult === 'success') {
-      return `${baseStyles} bg-green-600 hover:bg-green-700 text-white border-green-600`
-    }
-    
-    if (lastResult === 'error') {
-      return `${baseStyles} bg-red-600 hover:bg-red-700 text-white border-red-600`
-    }
-    
-    if (variant === 'primary') {
-      return `${baseStyles} bg-purple-600 hover:bg-purple-700 text-white border-purple-600`
-    }
-    
-    return baseStyles
-  }
-
-  const Icon = getButtonIcon()
-  const buttonSize = size === 'sm' ? 'sm' : size === 'lg' ? 'lg' : 'md'
 
   return (
-    <div className="relative">
-      <Button
-        type="button"
-        variant={lastResult ? undefined as any : variant}
-        size={buttonSize}
-        onClick={handleGenerate}
-        disabled={disabled || isLoading}
-        className={`${getButtonStyles()} ${className}`}
-      >
-        <Icon className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
-        {getButtonText()}
-      </Button>
-      
-      {/* Tooltip for configuration */}
-      {!productContext?.name && (
-        <div className="absolute top-full left-0 mt-1 text-xs text-red-600 whitespace-nowrap">
-          Requires product name
-        </div>
+    <>
+      <div className="flex items-center gap-1">
+        <Button
+          variant={variant}
+          size={size}
+          onClick={() => handleGenerate()}
+          disabled={disabled || loading}
+          className={`${buttonConfig.color} ${success ? 'border-green-500 bg-green-50' : ''}`}
+        >
+          <Icon className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+          {success ? 'Generated!' : buttonConfig.label}
+        </Button>
+        
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setShowConfig(true)}
+          disabled={disabled || loading}
+          className="px-2"
+        >
+          <Settings className="h-3 w-3" />
+        </Button>
+      </div>
+
+      {/* Configuration Modal */}
+      {showConfig && (
+        <AIConfigModal
+          isOpen={showConfig}
+          onClose={() => setShowConfig(false)}
+          onGenerate={handleGenerate}
+          type={type}
+        />
       )}
+    </>
+  )
+}
+
+// AI Configuration Modal
+function AIConfigModal({ isOpen, onClose, onGenerate, type }: AIConfigModalProps) {
+  const [tone, setTone] = useState<'professional' | 'casual' | 'elegant' | 'playful' | 'informative'>('elegant')
+  const [maxLength, setMaxLength] = useState(150)
+  const [keywords, setKeywords] = useState('')
+  const [customPrompt, setCustomPrompt] = useState('')
+  const [useCustomPrompt, setUseCustomPrompt] = useState(false)
+
+  if (!isOpen) return null
+
+  const handleGenerate = () => {
+    const config = {
+      tone,
+      maxLength,
+      includeKeywords: keywords.split(',').map(k => k.trim()).filter(k => k),
+      ...(useCustomPrompt && customPrompt ? { customPrompt } : {})
+    }
+    onGenerate(config)
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+      <div className="bg-white rounded-lg p-6 w-full max-w-md">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-medium">AI Generation Settings</h3>
+          <Button variant="ghost" size="sm" onClick={onClose}>×</Button>
+        </div>
+
+        <div className="space-y-4">
+          {/* Tone Selection */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Tone
+            </label>
+            <select
+              value={tone}
+              onChange={(e) => setTone(e.target.value as any)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="elegant">Elegant & Sophisticated</option>
+              <option value="professional">Professional</option>
+              <option value="casual">Casual & Friendly</option>
+              <option value="playful">Playful & Fun</option>
+              <option value="informative">Informative & Detailed</option>
+            </select>
+          </div>
+
+          {/* Max Length */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Max Length (words)
+            </label>
+            <input
+              type="number"
+              value={maxLength}
+              onChange={(e) => setMaxLength(parseInt(e.target.value))}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              min="50"
+              max="500"
+            />
+          </div>
+
+          {/* Keywords */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Include Keywords (comma-separated)
+            </label>
+            <input
+              type="text"
+              value={keywords}
+              onChange={(e) => setKeywords(e.target.value)}
+              placeholder="traditional, handmade, ethnic"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
+          {/* Custom Prompt Toggle */}
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="useCustomPrompt"
+              checked={useCustomPrompt}
+              onChange={(e) => setUseCustomPrompt(e.target.checked)}
+              className="rounded border-gray-300"
+            />
+            <label htmlFor="useCustomPrompt" className="text-sm text-gray-700">
+              Use custom prompt
+            </label>
+          </div>
+
+          {/* Custom Prompt */}
+          {useCustomPrompt && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Custom Prompt
+              </label>
+              <textarea
+                value={customPrompt}
+                onChange={(e) => setCustomPrompt(e.target.value)}
+                placeholder="Write your custom prompt here..."
+                rows={3}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+          )}
+        </div>
+
+        <div className="flex justify-end gap-2 mt-6">
+          <Button variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button onClick={handleGenerate}>
+            <Sparkles className="h-4 w-4 mr-2" />
+            Generate
+          </Button>
+        </div>
+      </div>
     </div>
   )
 }
 
-// Specialized button variants for common use cases
-export function AIProductDescriptionButton(props: Omit<AIGenerateButtonProps, 'contentType'>) {
-  return (
-    <AIGenerateButton
-      {...props}
-      contentType="product_description"
-      options={{ tone: 'elegant', length: 'medium', ...props.options }}
-    >
-      <Wand2 className="h-4 w-4 mr-2" />
-      Generate Description
-    </AIGenerateButton>
-  )
-}
-
-export function AISEOButton(props: Omit<AIGenerateButtonProps, 'contentType'>) {
-  return (
-    <AIGenerateButton
-      {...props}
-      contentType="seo_meta"
-      options={{ tone: 'professional', length: 'short', ...props.options }}
-      size="sm"
-    >
-      Generate SEO
-    </AIGenerateButton>
-  )
-}
-
-export function AISocialButton(props: Omit<AIGenerateButtonProps, 'contentType'> & { platform?: 'instagram' | 'facebook' | 'twitter' }) {
-  return (
-    <AIGenerateButton
-      {...props}
-      contentType="social_caption"
-      options={{ tone: 'playful', platform: props.platform || 'instagram', ...props.options }}
-      size="sm"
-    >
-      Generate Caption
-    </AIGenerateButton>
-  )
-}
-
-// Bulk generation button for admin tables
-interface AIBulkGenerateButtonProps {
-  contentType: 'product_description' | 'seo_meta'
-  products: any[]
-  onSuccess: (results: any[]) => void
-  onError?: (error: string) => void
-  disabled?: boolean
-}
-
+// Bulk AI Generation Button
 export function AIBulkGenerateButton({
-  contentType,
-  products,
-  onSuccess,
-  onError,
+  productIds,
+  type,
+  onComplete,
   disabled = false
 }: AIBulkGenerateButtonProps) {
-  const [isLoading, setIsLoading] = useState(false)
+  const [loading, setLoading] = useState(false)
   const [progress, setProgress] = useState(0)
 
   const handleBulkGenerate = async () => {
-    if (!products.length) {
-      onError?.('No products selected for bulk generation')
+    if (productIds.length === 0) {
+      alert('No products selected')
       return
     }
 
-    setIsLoading(true)
+    setLoading(true)
     setProgress(0)
 
     try {
-      const response = await fetch('/api/ai/generate', {
+      const response = await fetch('/api/admin/ai/generate', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          contentType,
+          type,
           bulk: true,
-          products,
-          options: {
-            tone: 'elegant',
-            length: 'medium'
-          }
-        }),
+          productIds
+        })
       })
 
       const data = await response.json()
 
-      if (!response.ok) {
+      if (data.success) {
+        onComplete(data.results)
+      } else {
         throw new Error(data.error || 'Bulk generation failed')
       }
-
-      if (data.success) {
-        onSuccess(data.results)
-      } else {
-        throw new Error('Bulk generation failed')
-      }
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Bulk generation failed'
-      onError?.(errorMessage)
+      console.error('Bulk generation error:', error)
+      alert(error instanceof Error ? error.message : 'Bulk generation failed')
     } finally {
-      setIsLoading(false)
+      setLoading(false)
       setProgress(0)
     }
   }
 
   return (
     <Button
-      type="button"
       variant="outline"
       onClick={handleBulkGenerate}
-      disabled={disabled || isLoading || !products.length}
-      className="relative"
+      disabled={disabled || loading || productIds.length === 0}
+      className="text-purple-600"
     >
-      {isLoading ? (
-        <>
-          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-          Generating... ({products.length} items)
-        </>
-      ) : (
-        <>
-          <Sparkles className="h-4 w-4 mr-2" />
-          Bulk Generate ({products.length} items)
-        </>
-      )}
+      <Wand2 className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+      {loading ? `Generating... (${productIds.length} products)` : `Bulk Generate (${productIds.length})`}
     </Button>
+  )
+}
+
+// SEO-specific AI Generate Button
+export function AISEOButton({
+  context,
+  onGenerated,
+  disabled = false
+}: Omit<AIGenerateButtonProps, 'type'>) {
+  return (
+    <AIGenerateButton
+      type="seo_content"
+      context={context}
+      onGenerated={onGenerated}
+      disabled={disabled}
+      variant="outline"
+      size="sm"
+    />
   )
 }
