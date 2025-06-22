@@ -26,6 +26,7 @@ import {
   Sparkles,
   X,
   Eye,
+  EyeOff,
   Monitor,
   Smartphone,
   ExternalLink,
@@ -35,7 +36,12 @@ import {
   ShoppingBag,
   Heart,
   User,
-  Search
+  Search,
+  Settings,
+  Key,
+  Shield,
+  Info,
+  Lightbulb
 } from 'lucide-react'
 
 interface StoreSettings {
@@ -56,6 +62,7 @@ interface StoreSettings {
   twitter: string | null
   aiProvider: string | null
   aiApiKey: string | null
+  aiModel?: string | null
   currency: string
   timezone: string
 }
@@ -321,6 +328,13 @@ export default function StoreSettingsForm({ storeSettings }: StoreSettingsFormPr
   const [activeTab, setActiveTab] = useState('branding')
   const [saveSuccess, setSaveSuccess] = useState(false)
 
+  // Enhanced AI state variables
+  const [showApiKey, setShowApiKey] = useState(false)
+  const [testingConnection, setTestingConnection] = useState(false)
+  const [connectionStatus, setConnectionStatus] = useState<{success: boolean; message: string} | null>(null)
+  const [availableModels, setAvailableModels] = useState<Array<{value: string, label: string, recommended?: boolean}>>([])
+  const [loadingModels, setLoadingModels] = useState(false)
+
   // Form state
   const [formData, setFormData] = useState({
     storeName: storeSettings.storeName || '',
@@ -339,9 +353,208 @@ export default function StoreSettingsForm({ storeSettings }: StoreSettingsFormPr
     twitter: storeSettings.twitter || '',
     aiProvider: storeSettings.aiProvider || '',
     aiApiKey: storeSettings.aiApiKey || '',
+    aiModel: storeSettings.aiModel || '',
     currency: storeSettings.currency || DEFAULT_VALUES.CURRENCY,
     timezone: storeSettings.timezone || DEFAULT_VALUES.TIMEZONE
   })
+
+  // Dynamic model fetching
+  const fetchAvailableModels = async (provider: string, apiKey: string) => {
+    if (!provider || !apiKey) {
+      setAvailableModels([])
+      return
+    }
+
+    setLoadingModels(true)
+    try {
+      const response = await fetch('/api/admin/ai/models', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ provider, apiKey })
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setAvailableModels(data.models || [])
+        
+        // Auto-select recommended model if no model is currently selected
+        if (!formData.aiModel && data.models.length > 0) {
+          const recommendedModel = data.models.find((m: any) => m.recommended)
+          const defaultModel = recommendedModel || data.models[0]
+          if (defaultModel) {
+            handleInputChange('aiModel', defaultModel.value)
+          }
+        }
+      } else {
+        setAvailableModels([])
+        console.error('Failed to fetch models')
+      }
+    } catch (error) {
+      setAvailableModels([])
+      console.error('Error fetching models:', error)
+    } finally {
+      setLoadingModels(false)
+    }
+  }
+
+  // Static fallback models (in case API fails)
+  const getStaticModels = (provider: string) => {
+    const staticModels: Record<string, Array<{value: string, label: string, recommended?: boolean}>> = {
+      openai: [
+        { value: 'gpt-4o-mini', label: 'GPT-4o Mini', recommended: true },
+        { value: 'gpt-4o', label: 'GPT-4o' },
+        { value: 'gpt-3.5-turbo', label: 'GPT-3.5 Turbo' }
+      ],
+      gemini: [
+        { value: 'gemini-1.5-flash', label: 'Gemini 1.5 Flash', recommended: true },
+        { value: 'gemini-1.5-pro', label: 'Gemini 1.5 Pro' },
+        { value: 'gemini-pro', label: 'Gemini Pro' }
+      ],
+      claude: [
+        { value: 'claude-3-haiku-20240307', label: 'Claude 3 Haiku', recommended: true },
+        { value: 'claude-3-sonnet-20240229', label: 'Claude 3 Sonnet' },
+        { value: 'claude-3-opus-20240229', label: 'Claude 3 Opus' }
+      ],
+      mistral: [
+        { value: 'mistral-small-latest', label: 'Mistral Small', recommended: true },
+        { value: 'mistral-medium-latest', label: 'Mistral Medium' },
+        { value: 'mistral-large-latest', label: 'Mistral Large' }
+      ],
+      openrouter: [
+        { value: 'meta-llama/llama-3.2-3b-instruct:free', label: 'Llama 3.2 3B (Free)', recommended: true },
+        { value: 'microsoft/phi-3-mini-128k-instruct:free', label: 'Phi-3 Mini (Free)' },
+        { value: 'openai/gpt-4o-mini', label: 'GPT-4o Mini' },
+        { value: 'google/gemini-flash-1.5', label: 'Gemini Flash 1.5' },
+        { value: 'anthropic/claude-3-haiku', label: 'Claude 3 Haiku' }
+      ]
+    }
+    return staticModels[provider] || []
+  }
+
+  const getModelDescription = (provider: string, model: string) => {
+    const descriptions: Record<string, Record<string, string>> = {
+      openai: {
+        'gpt-4o-mini': 'Fast and cost-effective, perfect for most content generation tasks',
+        'gpt-4o': 'Most capable model, best for complex content creation',
+        'gpt-3.5-turbo': 'Balanced performance and cost'
+      },
+      gemini: {
+        'gemini-1.5-flash': 'Fast and efficient, great for bulk content generation',
+        'gemini-1.5-pro': 'High quality content with better reasoning',
+        'gemini-pro': 'Balanced model for general content creation'
+      },
+      claude: {
+        'claude-3-haiku-20240307': 'Fast and affordable, excellent for product descriptions',
+        'claude-3-sonnet-20240229': 'Balanced performance for most content types',
+        'claude-3-opus-20240229': 'Highest quality, best for complex content'
+      },
+      mistral: {
+        'mistral-small-latest': 'Cost-effective with good performance',
+        'mistral-medium-latest': 'Balanced model for general use',
+        'mistral-large-latest': 'High performance for complex tasks'
+      },
+      openrouter: {
+        'meta-llama/llama-3.2-3b-instruct:free': 'Free tier model, good for basic content generation',
+        'microsoft/phi-3-mini-128k-instruct:free': 'Free Microsoft model, efficient for simple tasks',
+        'openai/gpt-4o-mini': 'OpenAI via OpenRouter, reliable and fast',
+        'google/gemini-flash-1.5': 'Google Gemini via OpenRouter, very fast',
+        'anthropic/claude-3-haiku': 'Claude via OpenRouter, high quality',
+        'mistralai/mistral-7b-instruct:free': 'Free Mistral model, European provider'
+      }
+    }
+    return descriptions[provider]?.[model] || 'Good for general content generation'
+  }
+
+  const getProviderInfo = (provider: string) => {
+    const info: Record<string, any> = {
+      openai: {
+        name: 'OpenAI (ChatGPT)',
+        description: 'Industry-leading AI with excellent content quality and reliability.',
+        pricing: 'Pay per token',
+        speed: 'Fast',
+        quality: 'Excellent',
+        apiUrl: 'https://platform.openai.com/api-keys'
+      },
+      gemini: {
+        name: 'Google Gemini',
+        description: 'Google\'s advanced AI model with competitive pricing and good performance.',
+        pricing: 'Very affordable',
+        speed: 'Very fast',
+        quality: 'Very good',
+        apiUrl: 'https://makersuite.google.com/app/apikey'
+      },
+      claude: {
+        name: 'Anthropic Claude',
+        description: 'High-quality AI focused on helpful, harmless, and honest content.',
+        pricing: 'Premium pricing',
+        speed: 'Fast',
+        quality: 'Excellent',
+        apiUrl: 'https://console.anthropic.com/account/keys'
+      },
+      mistral: {
+        name: 'Mistral AI',
+        description: 'European AI provider with good performance and competitive pricing.',
+        pricing: 'Competitive',
+        speed: 'Fast',
+        quality: 'Good',
+        apiUrl: 'https://console.mistral.ai/api-keys/'
+      },
+      openrouter: {
+        name: 'OpenRouter (Multi-Model)',
+        description: 'Access multiple AI providers through one API. Includes free models and premium options.',
+        pricing: 'Free & paid options',
+        speed: 'Variable',
+        quality: 'Variable by model',
+        apiUrl: 'https://openrouter.ai/keys'
+      }
+    }
+    return info[provider] || {}
+  }
+
+  const testAIConnection = async () => {
+    if (!formData.aiProvider || !formData.aiApiKey) {
+      setConnectionStatus({
+        success: false,
+        message: 'Please select a provider and enter an API key first.'
+      })
+      return
+    }
+
+    setTestingConnection(true)
+    setConnectionStatus(null)
+
+    try {
+      const response = await fetch('/api/admin/ai/test-connection', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          provider: formData.aiProvider,
+          apiKey: formData.aiApiKey,
+          model: formData.aiModel || (availableModels.find(m => m.recommended)?.value || availableModels[0]?.value)
+        })
+      })
+
+      const data = await response.json()
+
+      setConnectionStatus({
+        success: data.success,
+        message: data.success 
+          ? `✅ Connection successful! AI is ready to generate content.`
+          : `❌ Connection failed: ${data.error}`
+      })
+    } catch (error) {
+      setConnectionStatus({
+        success: false,
+        message: '❌ Failed to test connection. Please check your settings.'
+      })
+    } finally {
+      setTestingConnection(false)
+    }
+  }
 
   // Input change handler
   const handleInputChange = useCallback((field: string, value: any) => {
@@ -352,7 +565,23 @@ export default function StoreSettingsForm({ storeSettings }: StoreSettingsFormPr
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: '' }))
     }
-  }, [errors])
+
+    // Fetch models when provider or API key changes
+    if (field === 'aiProvider') {
+      setAvailableModels([])
+      setFormData(prev => ({ ...prev, aiModel: '' }))
+      if (value && formData.aiApiKey) {
+        fetchAvailableModels(value, formData.aiApiKey)
+      } else if (value) {
+        // Show static models if no API key yet
+        setAvailableModels(getStaticModels(value))
+      }
+    }
+
+    if (field === 'aiApiKey' && formData.aiProvider && value) {
+      fetchAvailableModels(formData.aiProvider, value)
+    }
+  }, [errors, formData.aiApiKey, formData.aiProvider])
 
   // Validation function
   const validateForm = useCallback(() => {
@@ -364,6 +593,10 @@ export default function StoreSettingsForm({ storeSettings }: StoreSettingsFormPr
 
     if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
       newErrors.email = 'Please enter a valid email address'
+    }
+
+    if (formData.aiProvider && !formData.aiApiKey.trim()) {
+      newErrors.aiApiKey = 'API key is required when AI provider is selected'
     }
 
     setErrors(newErrors)
@@ -808,87 +1041,273 @@ export default function StoreSettingsForm({ storeSettings }: StoreSettingsFormPr
           </Card>
         )}
 
-        {/* AI Settings Tab */}
+        {/* Enhanced AI Settings Tab */}
         {activeTab === 'ai' && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Brain className="h-5 w-5" />
-                AI Content Generation
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                <div className="flex items-start gap-2">
-                  <Sparkles className="h-5 w-5 text-blue-500 mt-0.5" />
-                  <div>
-                    <h4 className="text-sm font-medium text-blue-900">AI-Powered Content Generation</h4>
-                    <p className="text-sm text-blue-700 mt-1">
-                      Configure AI services to automatically generate product descriptions, SEO content, and social media captions.
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="aiProvider" className="flex items-center gap-2">
-                  <Zap className="h-4 w-4" />
-                  AI Provider
-                </Label>
-                <select
-                  id="aiProvider"
-                  value={formData.aiProvider}
-                  onChange={(e) => handleInputChange('aiProvider', e.target.value)}
-                  disabled={loading}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {AI_PROVIDERS.map((provider) => (
-                    <option key={provider.value} value={provider.value}>
-                      {provider.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {formData.aiProvider && aiProviderInfo && (
-                <>
-                  <div className="space-y-2">
-                    <Label htmlFor="aiApiKey">API Key</Label>
-                    <Input
-                      id="aiApiKey"
-                      type="password"
-                      value={formData.aiApiKey}
-                      onChange={(e) => handleInputChange('aiApiKey', e.target.value)}
-                      placeholder="Enter your API key"
-                      disabled={loading}
-                    />
-                    <p className="text-sm text-gray-500">
-                      Your API key is encrypted and stored securely.
-                    </p>
-                  </div>
-
-                  {/* Provider-specific help text */}
-                  <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg">
-                    <div className="text-sm text-gray-700">
-                      <div>
-                        <strong>{aiProviderInfo.name}</strong><br />
-                        Get your API key from{' '}
-                        <a 
-                          href={aiProviderInfo.url} 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          className="text-blue-600 hover:text-blue-800 underline"
-                        >
-                          {aiProviderInfo.url.replace('https://', '')}
-                        </a>.<br />
-                        {aiProviderInfo.description}
+          <div className="space-y-6">
+            {/* AI Status Overview */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Sparkles className="h-5 w-5" />
+                  AI Content Generation
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <div className="flex items-start gap-3">
+                    <Brain className="h-5 w-5 text-blue-600 mt-0.5" />
+                    <div>
+                      <h3 className="font-medium text-blue-900">AI-Powered Content</h3>
+                      <p className="text-sm text-blue-700 mt-1">
+                        Generate professional product descriptions, SEO content, and marketing copy automatically using AI.
+                      </p>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
+                          Product Descriptions
+                        </span>
+                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
+                          SEO Meta Tags
+                        </span>
+                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
+                          Social Media Captions
+                        </span>
+                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
+                          Bulk Processing
+                        </span>
                       </div>
                     </div>
                   </div>
-                </>
-              )}
-            </CardContent>
-          </Card>
+                </div>
+
+                {/* Provider Selection */}
+                <div className="space-y-2">
+                  <Label htmlFor="aiProvider" className="flex items-center gap-2">
+                    <Zap className="h-4 w-4" />
+                    AI Provider *
+                  </Label>
+                  <select
+                    id="aiProvider"
+                    value={formData.aiProvider || ''}
+                    onChange={(e) => handleInputChange('aiProvider', e.target.value)}
+                    disabled={loading}
+                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed ${
+                      errors.aiProvider ? 'border-red-500' : 'border-gray-300'
+                    }`}
+                  >
+                    <option value="">Select AI Provider</option>
+                    <option value="openai">OpenAI (ChatGPT) - Recommended</option>
+                    <option value="gemini">Google Gemini - Fast & Cost-Effective</option>
+                    <option value="claude">Anthropic Claude - High Quality</option>
+                    <option value="mistral">Mistral AI - European Alternative</option>
+                    <option value="openrouter">OpenRouter - Multi-Model & Free Options</option>
+                  </select>
+                  {errors.aiProvider && (
+                    <p className="text-sm text-red-600">{errors.aiProvider}</p>
+                  )}
+                </div>
+
+                {/* Model Selection (when provider is selected) */}
+                {formData.aiProvider && (
+                  <div className="space-y-2">
+                    <Label htmlFor="aiModel" className="flex items-center gap-2">
+                      <Settings className="h-4 w-4" />
+                      Model Selection
+                      {loadingModels && (
+                        <RefreshCw className="h-3 w-3 animate-spin text-blue-500" />
+                      )}
+                    </Label>
+                    <select
+                      id="aiModel"
+                      value={formData.aiModel || ''}
+                      onChange={(e) => handleInputChange('aiModel', e.target.value)}
+                      disabled={loading || loadingModels}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+                    >
+                      {loadingModels ? (
+                        <option value="">Loading models...</option>
+                      ) : availableModels.length > 0 ? (
+                        <>
+                          <option value="">Select a model</option>
+                          {availableModels.map((model) => (
+                            <option key={model.value} value={model.value}>
+                              {model.label} {model.recommended && '(Recommended)'}
+                            </option>
+                          ))}
+                        </>
+                      ) : formData.aiApiKey ? (
+                        <option value="">No models available</option>
+                      ) : (
+                        <option value="">Enter API key to load models</option>
+                      )}
+                    </select>
+                    {availableModels.length > 0 && formData.aiModel && (
+                      <p className="text-xs text-gray-500">
+                        {getModelDescription(formData.aiProvider, formData.aiModel)}
+                      </p>
+                    )}
+                    {!formData.aiApiKey && (
+                      <p className="text-xs text-amber-600">
+                        💡 Enter your API key above to load the latest available models
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {/* API Key Input */}
+                {formData.aiProvider && (
+                  <div className="space-y-2">
+                    <Label htmlFor="aiApiKey" className="flex items-center gap-2">
+                      <Key className="h-4 w-4" />
+                      API Key *
+                    </Label>
+                    <div className="relative">
+                      <Input
+                        id="aiApiKey"
+                        type={showApiKey ? 'text' : 'password'}
+                        value={formData.aiApiKey || ''}
+                        onChange={(e) => handleInputChange('aiApiKey', e.target.value)}
+                        placeholder={`Enter your ${getProviderInfo(formData.aiProvider).name} API key`}
+                        disabled={loading}
+                        className={errors.aiApiKey ? 'border-red-500 pr-20' : 'pr-20'}
+                      />
+                      <div className="absolute inset-y-0 right-0 flex items-center gap-1 pr-3">
+                        <button
+                          type="button"
+                          onClick={() => setShowApiKey(!showApiKey)}
+                          className="text-gray-400 hover:text-gray-600 p-1"
+                        >
+                          {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </button>
+                        <a
+                          href={getProviderInfo(formData.aiProvider).apiUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-500 hover:text-blue-700 p-1"
+                          title="Get API Key"
+                        >
+                          <ExternalLink className="h-4 w-4" />
+                        </a>
+                      </div>
+                    </div>
+                    {errors.aiApiKey && (
+                      <p className="text-sm text-red-600">{errors.aiApiKey}</p>
+                    )}
+                    <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                      <div className="flex items-start gap-2">
+                        <Shield className="h-4 w-4 text-green-600 mt-0.5" />
+                        <div className="text-xs text-gray-600">
+                          <p className="font-medium">Your API key is secure:</p>
+                          <ul className="mt-1 space-y-1">
+                            <li>• Encrypted in database</li>
+                            <li>• Never logged or exposed</li>
+                            <li>• Only used for content generation</li>
+                          </ul>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Provider Information */}
+                {formData.aiProvider && (
+                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                    <div className="flex items-start gap-3">
+                      <Info className="h-5 w-5 text-blue-600 mt-0.5" />
+                      <div>
+                        <h4 className="font-medium text-gray-900">
+                          {getProviderInfo(formData.aiProvider).name}
+                        </h4>
+                        <p className="text-sm text-gray-600 mt-1">
+                          {getProviderInfo(formData.aiProvider).description}
+                        </p>
+                        <div className="mt-2 flex items-center gap-4 text-xs text-gray-500">
+                          <span>• {getProviderInfo(formData.aiProvider).pricing}</span>
+                          <span>• {getProviderInfo(formData.aiProvider).speed}</span>
+                          <span>• {getProviderInfo(formData.aiProvider).quality}</span>
+                        </div>
+                        <div className="mt-3">
+                          <a
+                            href={getProviderInfo(formData.aiProvider).apiUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 text-sm"
+                          >
+                            Get API Key <ExternalLink className="h-3 w-3" />
+                          </a>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Test AI Connection */}
+                {formData.aiProvider && formData.aiApiKey && (
+                  <div className="pt-4 border-t">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={testAIConnection}
+                      disabled={loading || testingConnection}
+                      className="w-full"
+                    >
+                      {testingConnection ? (
+                        <>
+                          <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                          Testing Connection...
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle className="h-4 w-4 mr-2" />
+                          Test AI Connection
+                        </>
+                      )}
+                    </Button>
+                    {connectionStatus && (
+                      <div className={`mt-2 p-2 rounded text-sm ${
+                        connectionStatus.success 
+                          ? 'bg-green-50 text-green-700 border border-green-200' 
+                          : 'bg-red-50 text-red-700 border border-red-200'
+                      }`}>
+                        {connectionStatus.message}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* AI Usage Guidelines */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Lightbulb className="h-5 w-5" />
+                  AI Usage Guidelines
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="grid gap-3 md:grid-cols-2">
+                  <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+                    <h4 className="font-medium text-green-900 mb-2">Best Practices</h4>
+                    <ul className="text-sm text-green-700 space-y-1">
+                      <li>• Review all generated content before publishing</li>
+                      <li>• Use specific product information for better results</li>
+                      <li>• Generate content in batches to save costs</li>
+                      <li>• Customize tone settings for your brand voice</li>
+                    </ul>
+                  </div>
+                  <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <h4 className="font-medium text-blue-900 mb-2">Features Available</h4>
+                    <ul className="text-sm text-blue-700 space-y-1">
+                      <li>• Product descriptions & summaries</li>
+                      <li>• SEO titles & meta descriptions</li>
+                      <li>• Social media captions</li>
+                      <li>• Bulk processing (up to 50 products)</li>
+                    </ul>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         )}
 
         {/* General Tab */}
