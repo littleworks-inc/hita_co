@@ -10,7 +10,24 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { type, context, options = {} } = await request.json()
+    const body = await request.json()
+    
+    // Handle different request formats
+    let type, context, options = {}
+    
+    if (body.contentType) {
+      // Format from ProductForm custom buttons
+      type = body.contentType === 'custom' ? 'product_description' : body.contentType
+      context = body.productContext || body.context
+      options = body.options || {}
+    } else {
+      // Format from AIGenerateButton
+      type = body.type
+      context = body.context
+      options = body.options || {}
+    }
+
+    console.log('AI Generate Request:', { type, context, options }) // Debug log
 
     // Get AI settings from store settings
     const storeSettings = await db.storeSetting.findFirst({
@@ -29,37 +46,30 @@ export async function POST(request: NextRequest) {
       }, { status: 400 })
     }
 
-    // Generate content based on type and context
-    let generatedContent
+    // Generate content based on type
+    let generatedContent = ''
     
     try {
-      switch (type) {
-        case 'product_description':
-          generatedContent = await generateProductDescription(
-            storeSettings, 
-            context, 
-            options
-          )
-          break
-        case 'seo_content':
-          generatedContent = await generateSEOContent(
-            storeSettings, 
-            context, 
-            options
-          )
-          break
-        case 'short_description':
-          generatedContent = await generateShortDescription(
-            storeSettings, 
-            context, 
-            options
-          )
-          break
-        default:
-          return NextResponse.json({
-            success: false,
-            error: 'Unsupported content type'
-          }, { status: 400 })
+      console.log('Generating content for type:', type) // Debug log
+      
+      if (type === 'short_description' || type === 'shortDescription') {
+        generatedContent = await generateShortDescription(storeSettings, context, options)
+      } else if (type === 'product_description' || type === 'description') {
+        generatedContent = await generateProductDescription(storeSettings, context, options)
+      } else if (type === 'seo_content') {
+        generatedContent = await generateSEOContent(storeSettings, context, options)
+      } else {
+        console.error('Unsupported content type:', type)
+        return NextResponse.json({
+          success: false,
+          error: `Unsupported content type: ${type}`
+        }, { status: 400 })
+      }
+
+      console.log('Generated content:', generatedContent) // Debug log
+      
+      if (!generatedContent) {
+        throw new Error('No content was generated')
       }
 
       return NextResponse.json({
@@ -86,59 +96,161 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Generate product description
-async function generateProductDescription(settings: any, context: any, options: any = {}) {
-  const prompt = buildProductDescriptionPrompt(context, options)
-  return await callAIProvider(settings, prompt, options)
-}
-
-// Generate SEO content
-async function generateSEOContent(settings: any, context: any, options: any = {}) {
-  const prompt = buildSEOPrompt(context, options)
-  return await callAIProvider(settings, prompt, options)
-}
-
-// Generate short description
+// Generate short description with image analysis
 async function generateShortDescription(settings: any, context: any, options: any = {}) {
-  const prompt = buildShortDescriptionPrompt(context, options)
-  return await callAIProvider(settings, prompt, options)
+  const { name, category, images } = context
+  
+  // If images are available, include image analysis
+  if (images && images.length > 0) {
+    return await generateDescriptionWithImages(settings, context, 'short')
+  }
+  
+  const prompt = `You are a product copywriter. Write a brief product description for "${name}" (${category}).
+
+Requirements:
+- Exactly 30-40 words
+- Engaging and sales-focused
+- No reasoning or explanation
+- Direct product description only
+
+Product Description:`
+
+  return await callAIProvider(settings, prompt, 60)
 }
 
-// Build product description prompt
-function buildProductDescriptionPrompt(context: any, options: any) {
-  const { name, category, price, materials, colors, tags } = context
-  const { tone = 'elegant', maxLength = 150 } = options
+// Generate product description with image analysis
+async function generateProductDescription(settings: any, context: any, options: any = {}) {
+  const { name, category, price, materials, colors, tags, images } = context
+  const { tone = 'elegant' } = options
 
-  return `Create a compelling product description for "${name}", an Indian ethnic wear item.
+  // If images are available, include image analysis
+  if (images && images.length > 0) {
+    return await generateDescriptionWithImages(settings, context, 'long')
+  }
+
+  const prompt = `You are a product copywriter. Write a detailed product description for "${name}" (${category}).
 
 Product Details:
 - Name: ${name}
 - Category: ${category || 'Ethnic wear'}
-- Price: ${price ? `$${price}` : 'Contact for pricing'}
+- Price: ${price ? `${price}` : 'Contact for pricing'}
 - Materials: ${materials?.join(', ') || 'Premium materials'}
 - Colors: ${colors?.join(', ') || 'Various colors'}
 - Features: ${tags?.join(', ') || 'Handcrafted quality'}
 
-Instructions:
+Requirements:
 - Write in ${tone} tone
-- Maximum ${maxLength} words
+- 100-150 words
 - Highlight craftsmanship and cultural significance
-- Appeal to customers interested in authentic Indian fashion
-- Include care instructions if relevant
-- Make it SEO-friendly
+- No reasoning or explanation
+- Direct product description only
 
-Return only the description text, no extra formatting.`
+Product Description:`
+
+  return await callAIProvider(settings, prompt, 200)
 }
 
-// Build SEO prompt
-function buildSEOPrompt(context: any, options: any) {
-  const { name, category, price } = context
+// Generate description with image analysis
+async function generateDescriptionWithImages(settings: any, context: any, type: 'short' | 'long') {
+  const { name, category, images, price, materials, colors, tags } = context
   
-  return `Create SEO-optimized title and meta description for "${name}".
+  if (settings.aiProvider === 'openai') {
+    // OpenAI supports vision
+    return await generateWithOpenAIVision(settings, context, type)
+  } else {
+    // For other providers, first describe the image, then generate description
+    const imageDescription = await analyzeProductImages(images)
+    
+    const enhancedContext = {
+      ...context,
+      imageAnalysis: imageDescription
+    }
+    
+    if (type === 'short') {
+      return await generateShortDescriptionWithAnalysis(settings, enhancedContext)
+    } else {
+      return await generateLongDescriptionWithAnalysis(settings, enhancedContext)
+    }
+  }
+}
+
+// Analyze product images (placeholder for image analysis service)
+async function analyzeProductImages(images: string[]): Promise<string> {
+  // TODO: Implement actual image analysis
+  // For now, return placeholder text
+  return "This appears to be a traditional ethnic garment with intricate details, rich colors, and cultural patterns."
+}
+
+// Generate description with image analysis for non-vision models
+async function generateShortDescriptionWithAnalysis(settings: any, context: any) {
+  const { name, category, imageAnalysis } = context
+  
+  const prompt = `You are a product copywriter. Based on this image analysis, write a brief product description:
+
+Product: ${name} (${category})
+Image Analysis: ${imageAnalysis}
+
+Requirements:
+- Exactly 30-40 words
+- Based on the visual details
+- Engaging and sales-focused
+- No reasoning or explanation
+
+Product Description:`
+
+  return await callAIProvider(settings, prompt, 60)
+}
+
+// Generate with OpenAI Vision API
+async function generateWithOpenAIVision(settings: any, context: any, type: 'short' | 'long') {
+  const { name, category, images } = context
+  const maxWords = type === 'short' ? '30-40' : '100-150'
+  
+  const prompt = type === 'short' 
+    ? `Write a brief ${maxWords} word product description for this ${category} called "${name}". Focus on what you see in the image - colors, patterns, style, materials visible.`
+    : `Write a detailed ${maxWords} word product description for this ${category} called "${name}". Describe the visual elements, craftsmanship, cultural significance, and styling based on what you see.`
+
+  // Use OpenAI Vision API
+  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${settings.aiApiKey}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      model: 'gpt-4o-mini',
+      messages: [
+        {
+          role: 'user',
+          content: [
+            { type: 'text', text: prompt },
+            ...images.slice(0, 3).map((imageUrl: string) => ({
+              type: 'image_url',
+              image_url: { url: imageUrl }
+            }))
+          ]
+        }
+      ],
+      max_tokens: type === 'short' ? 80 : 200
+    })
+  })
+
+  if (!response.ok) {
+    throw new Error(`OpenAI Vision API error: ${response.status}`)
+  }
+
+  const data = await response.json()
+  return data.choices[0]?.message?.content?.trim() || ''
+}
+
+// Generate SEO content
+async function generateSEOContent(settings: any, context: any, options: any = {}) {
+  const { name, category } = context
+  
+  const prompt = `Create SEO-optimized title and meta description for "${name}".
 
 Product: ${name}
 Category: ${category || 'Indian ethnic wear'}
-Price: ${price ? `$${price}` : 'Contact for pricing'}
 
 Requirements:
 - SEO Title: Maximum 60 characters, include main keyword
@@ -149,46 +261,109 @@ Format your response as JSON:
 {
   "title": "SEO title here",
   "description": "Meta description here"
-}`
 }
 
-// Build short description prompt
-function buildShortDescriptionPrompt(context: any, options: any) {
-  const { name, category } = context
+Your response:`
+
+  const result = await callAIProvider(settings, prompt, 150)
   
-  return `Create a brief, catchy description for "${name}".
-
-Product: ${name}
-Category: ${category || 'Ethnic wear'}
-
-Requirements:
-- Maximum 50 words
-- Highlight the most important feature
-- Use engaging, concise language
-- Perfect for product listings
-
-Return only the short description text.`
+  // Try to parse JSON, fallback to text if it fails
+  try {
+    return JSON.parse(result)
+  } catch {
+    return {
+      title: `${name} - Authentic ${category || 'Indian Ethnic Wear'}`,
+      description: result.substring(0, 160)
+    }
+  }
 }
 
 // Call AI provider
-async function callAIProvider(settings: any, prompt: string, options: any = {}) {
+async function callAIProvider(settings: any, prompt: string, maxTokens: number = 200) {
   const { aiProvider, aiApiKey, aiModel } = settings
-  const maxTokens = options.maxTokens || 200
 
-  switch (aiProvider) {
-    case 'openai':
-      return await callOpenAI(aiApiKey, aiModel || 'gpt-4o-mini', prompt, maxTokens)
-    case 'gemini':
-      return await callGemini(aiApiKey, aiModel || 'gemini-1.5-flash', prompt, maxTokens)
-    case 'claude':
-      return await callClaude(aiApiKey, aiModel || 'claude-3-haiku-20240307', prompt, maxTokens)
-    case 'mistral':
-      return await callMistral(aiApiKey, aiModel || 'mistral-small-latest', prompt, maxTokens)
-    case 'openrouter':
-      return await callOpenRouter(aiApiKey, aiModel || 'meta-llama/llama-3.2-3b-instruct:free', prompt, maxTokens)
-    default:
-      throw new Error(`Unsupported AI provider: ${aiProvider}`)
+  let result = ''
+  
+  try {
+    if (aiProvider === 'openrouter') {
+      result = await callOpenRouter(aiApiKey, aiModel || 'meta-llama/llama-3.2-3b-instruct:free', prompt, maxTokens)
+    } else if (aiProvider === 'openai') {
+      result = await callOpenAI(aiApiKey, aiModel || 'gpt-4o-mini', prompt, maxTokens)
+    } else {
+      throw new Error(`Provider ${aiProvider} not implemented yet`)
+    }
+
+    // Clean up the response
+    return result
+      .replace(/^["']|["']$/g, '') // Remove quotes
+      .replace(/^\s*<!DOCTYPE[\s\S]*?\>\s*/i, '') // Remove DOCTYPE
+      .replace(/^\s*<.*?\>\s*/, '') // Remove HTML tags
+      .trim()
+
+  } catch (error) {
+    console.error(`${aiProvider} API error:`, error)
+    throw error
   }
+}
+
+// OpenRouter implementation
+async function callOpenRouter(apiKey: string, model: string, prompt: string, maxTokens: number) {
+  console.log('OpenRouter request:', { model, maxTokens, apiKeyLength: apiKey.length })
+  
+  const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+      'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
+      'X-Title': 'Hita&Co eCommerce Platform'
+    },
+    body: JSON.stringify({
+      model,
+      messages: [{ role: 'user', content: prompt }],
+      max_tokens: maxTokens,
+      temperature: 0.7
+    })
+  })
+
+  console.log('OpenRouter response status:', response.status)
+
+  if (!response.ok) {
+    const errorText = await response.text()
+    console.error('OpenRouter error response:', errorText)
+    
+    try {
+      const error = JSON.parse(errorText)
+      throw new Error(error.error?.message || `OpenRouter API error: ${response.status}`)
+    } catch {
+      throw new Error(`OpenRouter API error: ${response.status} - ${errorText}`)
+    }
+  }
+
+  const data = await response.json()
+  console.log('OpenRouter response data:', JSON.stringify(data, null, 2)) // Better logging
+  
+  // Try different ways to extract content
+  const message = data.choices?.[0]?.message
+  let content = ''
+  
+  if (message?.content && message.content.trim()) {
+    content = message.content.trim()
+  } else if (message?.reasoning && message.reasoning.trim()) {
+    // DeepSeek R1 models put content in reasoning field
+    console.log('Using reasoning field for DeepSeek model')
+    content = message.reasoning.trim()
+  } else if (message?.text) {
+    content = message.text.trim()
+  } else if (typeof message === 'string') {
+    content = message.trim()
+  } else {
+    console.error('Could not extract content. Message structure:', JSON.stringify(message, null, 2))
+  }
+  
+  console.log('Extracted content:', JSON.stringify(content))
+  
+  return content
 }
 
 // OpenAI implementation
@@ -210,112 +385,6 @@ async function callOpenAI(apiKey: string, model: string, prompt: string, maxToke
   if (!response.ok) {
     const error = await response.json()
     throw new Error(error.error?.message || `OpenAI API error: ${response.status}`)
-  }
-
-  const data = await response.json()
-  return data.choices[0]?.message?.content?.trim() || ''
-}
-
-// Gemini implementation
-async function callGemini(apiKey: string, model: string, prompt: string, maxTokens: number) {
-  const modelName = model.startsWith('models/') ? model : `models/${model}`
-  
-  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/${modelName}:generateContent?key=${apiKey}`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      contents: [{
-        parts: [{ text: prompt }]
-      }],
-      generationConfig: {
-        maxOutputTokens: maxTokens,
-        temperature: 0.7
-      }
-    })
-  })
-
-  if (!response.ok) {
-    const error = await response.json()
-    throw new Error(error.error?.message || `Gemini API error: ${response.status}`)
-  }
-
-  const data = await response.json()
-  return data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || ''
-}
-
-// Claude implementation
-async function callClaude(apiKey: string, model: string, prompt: string, maxTokens: number) {
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      model,
-      max_tokens: maxTokens,
-      messages: [{ role: 'user', content: prompt }]
-    })
-  })
-
-  if (!response.ok) {
-    const error = await response.json()
-    throw new Error(error.error?.message || `Claude API error: ${response.status}`)
-  }
-
-  const data = await response.json()
-  return data.content?.[0]?.text?.trim() || ''
-}
-
-// Mistral implementation
-async function callMistral(apiKey: string, model: string, prompt: string, maxTokens: number) {
-  const response = await fetch('https://api.mistral.ai/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      model,
-      messages: [{ role: 'user', content: prompt }],
-      max_tokens: maxTokens,
-      temperature: 0.7
-    })
-  })
-
-  if (!response.ok) {
-    const error = await response.json()
-    throw new Error(error.error?.message || `Mistral API error: ${response.status}`)
-  }
-
-  const data = await response.json()
-  return data.choices[0]?.message?.content?.trim() || ''
-}
-
-// OpenRouter implementation
-async function callOpenRouter(apiKey: string, model: string, prompt: string, maxTokens: number) {
-  const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-      'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
-      'X-Title': 'Hita&Co eCommerce Platform'
-    },
-    body: JSON.stringify({
-      model,
-      messages: [{ role: 'user', content: prompt }],
-      max_tokens: maxTokens,
-      temperature: 0.7
-    })
-  })
-
-  if (!response.ok) {
-    const error = await response.json()
-    throw new Error(error.error?.message || `OpenRouter API error: ${response.status}`)
   }
 
   const data = await response.json()

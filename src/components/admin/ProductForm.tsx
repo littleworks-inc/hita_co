@@ -1,4 +1,4 @@
-'use client' 
+'use client'
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
@@ -61,16 +61,16 @@ interface Product {
   shortDescription: string
   categoryId: string
   countryId: string
-  
+
   // Barcode Information
   barcode: string
   barcodeType: string
-  
+
   // Supplier Information
   supplierId: string
   purchaseDate: string
   invoiceNumber: string
-  
+
   originalPrice: number
   originalCurrency: string
   quantity: number
@@ -89,7 +89,7 @@ interface Product {
   isFeatured: boolean
   tags: string[]
   images: string[]
-  
+
   // SEO fields
   seoTitle?: string
   seoDescription?: string
@@ -106,23 +106,23 @@ interface ProductFormProps {
 // Enhanced barcode generation function
 const generateBarcodeFromSKU = (sku: string, format: string) => {
   if (!sku) return { isValid: false, error: 'SKU required' }
-  
+
   const cleanSKU = sku.replace(/[^A-Z0-9]/g, '').toUpperCase()
   const timestamp = Date.now().toString().slice(-6)
-  
+
   switch (format) {
     case 'UPC':
       const upcBase = (cleanSKU + timestamp).replace(/[^0-9]/g, '').slice(0, 11).padStart(11, '0')
       return { isValid: true, correctedCode: upcBase }
-      
+
     case 'EAN13':
       const eanBase = (cleanSKU + timestamp).replace(/[^0-9]/g, '').slice(0, 12).padStart(12, '0')
       return { isValid: true, correctedCode: eanBase }
-      
+
     case 'CODE39':
       const code39Data = cleanSKU.slice(0, 20)
       return { isValid: true, correctedCode: code39Data }
-      
+
     case 'CODE128':
     default:
       const code128Data = `${cleanSKU}${timestamp}`.slice(0, 40)
@@ -158,7 +158,7 @@ const getBarcodeFormatRecommendation = (format: string) => {
       useCase: 'Simple tracking, legacy systems'
     }
   }
-  
+
   return recommendations[format as keyof typeof recommendations] || recommendations.CODE128
 }
 
@@ -169,13 +169,13 @@ export default function ProductForm({ categories, countries, suppliers, product,
   const [isGeneratingBarcode, setIsGeneratingBarcode] = useState(false)
   const [barcodeRecommendation, setBarcodeRecommendation] = useState<any>(null)
   const [successMessage, setSuccessMessage] = useState('')
-  
+
   // AI Configuration State
   const [selectedTone, setSelectedTone] = useState<'professional' | 'casual' | 'elegant' | 'playful' | 'informative'>('elegant')
   const [customPrompt, setCustomPrompt] = useState('')
   const [useCustomPrompt, setUseCustomPrompt] = useState(false)
   const [showAIConfig, setShowAIConfig] = useState(false)
-  
+
   // Form state - Removed social media fields from initialization
   const [formData, setFormData] = useState<Product>({
     sku: product?.sku || '',
@@ -184,16 +184,16 @@ export default function ProductForm({ categories, countries, suppliers, product,
     shortDescription: product?.shortDescription || '',
     categoryId: product?.categoryId || '',
     countryId: product?.countryId || countries.find(c => c.isDefault)?.id || '',
-    
+
     // Barcode Information
     barcode: product?.barcode || '',
     barcodeType: product?.barcodeType || 'CODE128',
-    
+
     // Supplier Information
     supplierId: product?.supplierId || '',
     purchaseDate: product?.purchaseDate || new Date().toISOString().split('T')[0],
     invoiceNumber: product?.invoiceNumber || '',
-    
+
     originalPrice: product?.originalPrice || 0,
     originalCurrency: product?.originalCurrency || 'INR',
     quantity: product?.quantity || 1,
@@ -212,7 +212,7 @@ export default function ProductForm({ categories, countries, suppliers, product,
     isFeatured: product?.isFeatured ?? false,
     tags: product?.tags || [],
     images: product?.images || [],
-    
+
     // SEO fields - Keep these
     seoTitle: product?.seoTitle || '',
     seoDescription: product?.seoDescription || ''
@@ -256,20 +256,20 @@ export default function ProductForm({ categories, countries, suppliers, product,
    */
   const extractMaterialsFromForm = (): string[] => {
     const materials = new Set<string>()
-    
+
     const materialKeywords = [
       // Fabrics
-      'silk', 'cotton', 'chiffon', 'georgette', 'crepe', 'satin', 'velvet', 'linen', 
-      'khadi', 'handloom', 'organic cotton', 'bamboo', 'jute', 'wool', 'cashmere', 
+      'silk', 'cotton', 'chiffon', 'georgette', 'crepe', 'satin', 'velvet', 'linen',
+      'khadi', 'handloom', 'organic cotton', 'bamboo', 'jute', 'wool', 'cashmere',
       'modal', 'rayon', 'net', 'tulle', 'organza', 'taffeta', 'brocade', 'jacquard',
       'denim', 'canvas', 'muslin', 'voile', 'lawn', 'poplin', 'twill', 'corduroy',
-      
+
       // Metals & Stones
       'silver', 'gold', 'rose gold', 'white gold', 'brass', 'copper', 'bronze',
       'platinum', 'steel', 'stainless steel', 'pearl', 'diamond', 'ruby', 'emerald',
       'sapphire', 'amethyst', 'turquoise', 'coral', 'jade', 'onyx', 'quartz',
       'crystal', 'glass', 'ceramic', 'wood', 'bamboo', 'bone', 'horn',
-      
+
       // Traditional materials
       'kundan', 'meenakari', 'zardozi', 'gota', 'sequin', 'mirror work', 'embroidery',
       'block print', 'hand painted', 'tie dye', 'bandhani', 'ikat', 'ajrakh'
@@ -296,22 +296,22 @@ export default function ProductForm({ categories, countries, suppliers, product,
    */
   const extractColorsFromForm = (): string[] => {
     const colors = new Set<string>()
-    
+
     const colorKeywords = [
       // Basic colors
       'red', 'blue', 'green', 'yellow', 'orange', 'purple', 'pink', 'black', 'white',
       'grey', 'gray', 'brown', 'beige', 'cream', 'ivory', 'off-white', 'pearl',
-      
+
       // Metallic colors
       'gold', 'silver', 'rose gold', 'copper', 'bronze', 'champagne', 'platinum',
-      
+
       // Specific shades
-      'maroon', 'burgundy', 'wine', 'navy', 'royal blue', 'sky blue', 'teal', 
+      'maroon', 'burgundy', 'wine', 'navy', 'royal blue', 'sky blue', 'teal',
       'turquoise', 'mint', 'sage', 'olive', 'forest green', 'lime', 'coral',
       'salmon', 'peach', 'apricot', 'lavender', 'lilac', 'violet', 'indigo',
       'magenta', 'fuchsia', 'crimson', 'scarlet', 'ruby', 'emerald', 'sapphire',
       'mustard', 'ochre', 'rust', 'tan', 'khaki', 'taupe', 'charcoal', 'slate',
-      
+
       // Traditional Indian colors
       'saffron', 'turmeric', 'henna', 'mehendi', 'vermillion', 'sindoor'
     ]
@@ -355,31 +355,39 @@ export default function ProductForm({ categories, countries, suppliers, product,
     if (!isReadyForAI()) return
 
     const context = buildProductContext()
-    
-    let prompt = customPrompt
-    
-    if (!useCustomPrompt) {
-      prompt = buildContextualPrompt(targetField, context)
-    }
 
     try {
-      const response = await fetch('/api/ai/generate', {
+      // Determine the type based on target field
+      let type = 'product_description'
+      if (targetField === 'shortDescription') {
+        type = 'short_description'
+      } else if (targetField === 'seoTitle' || targetField === 'seoDescription') {
+        type = 'seo_content'
+      }
+
+      const response = await fetch('/api/admin/ai/generate', {  // ✅ Correct endpoint
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          contentType: 'custom',
-          productContext: context,
+          type: type,  // ✅ Correct format
+          context: {
+            name: context.name,
+            category: context.category,
+            price: context.price,
+            materials: context.materials,
+            colors: context.colors,
+            tags: context.tags
+          },
           options: {
-            customPrompt: prompt,
             tone: selectedTone,
-            length: getOptimalLength(targetField),
+            maxLength: getOptimalLength(targetField),
             maxTokens: getMaxTokensForField(targetField)
           }
         })
       })
 
       const data = await response.json()
-      
+
       if (data.success) {
         handleInputChange(targetField, data.content)
         setSuccessMessage(`${getFieldLabel(targetField)} generated successfully!`)
@@ -388,8 +396,8 @@ export default function ProductForm({ categories, countries, suppliers, product,
         setErrors(prev => ({ ...prev, aiGeneration: data.error }))
       }
     } catch (error) {
-      setErrors(prev => ({ 
-        ...prev, 
+      setErrors(prev => ({
+        ...prev,
         aiGeneration: `Failed to generate ${getFieldLabel(targetField)}: ${error instanceof Error ? error.message : 'Unknown error'}`
       }))
     }
@@ -406,7 +414,7 @@ export default function ProductForm({ categories, countries, suppliers, product,
     const hasTags = context.tags?.length > 0
 
     let prompt = `Create compelling content for "${context.name}"`
-    
+
     if (context.category) {
       prompt += `, a ${context.category.toLowerCase()}`
     }
@@ -455,30 +463,23 @@ export default function ProductForm({ categories, countries, suppliers, product,
   /**
    * Get optimal content length for field
    */
-  const getOptimalLength = (field: string): 'short' | 'medium' | 'long' => {
+  const getOptimalLength = (field: string): number => {
     switch (field) {
-      case 'shortDescription':
-      case 'seoTitle':
-        return 'short'
-      case 'seoDescription':
-        return 'medium'
-      case 'description':
-        return 'long'
-      default:
-        return 'medium'
+      case 'shortDescription': return 50
+      case 'description': return 200
+      case 'seoTitle': return 60
+      case 'seoDescription': return 160
+      default: return 100
     }
   }
 
-  /**
-   * Get max tokens for field
-   */
   const getMaxTokensForField = (field: string): number => {
     switch (field) {
-      case 'shortDescription': return 100
-      case 'seoTitle': return 50
-      case 'seoDescription': return 200
-      case 'description': return 500
-      default: return 300
+      case 'shortDescription': return 80
+      case 'description': return 300
+      case 'seoTitle': return 100
+      case 'seoDescription': return 250
+      default: return 150
     }
   }
 
@@ -486,13 +487,13 @@ export default function ProductForm({ categories, countries, suppliers, product,
    * Get user-friendly field label
    */
   const getFieldLabel = (field: string): string => {
-    const labels: Record<string, string> = {
-      'description': 'Product Description',
-      'shortDescription': 'Short Description',
-      'seoTitle': 'SEO Title',
-      'seoDescription': 'SEO Description'
+    switch (field) {
+      case 'shortDescription': return 'Short Description'
+      case 'description': return 'Full Description'
+      case 'seoTitle': return 'SEO Title'
+      case 'seoDescription': return 'SEO Description'
+      default: return field
     }
-    return labels[field] || field
   }
 
   // Auto-calculate costs when relevant fields change
@@ -566,7 +567,7 @@ export default function ProductForm({ categories, countries, suppliers, product,
 
   const handleInputChange = (field: keyof Product, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }))
-    
+
     // Clear error when user starts typing
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: '' }))
@@ -575,7 +576,7 @@ export default function ProductForm({ categories, countries, suppliers, product,
 
   const handleBarcodeFormatChange = (newFormat: string) => {
     handleInputChange('barcodeType', newFormat)
-    
+
     // Regenerate barcode with new format if SKU exists
     if (formData.sku) {
       const result = generateBarcodeFromSKU(formData.sku, newFormat)
@@ -587,9 +588,9 @@ export default function ProductForm({ categories, countries, suppliers, product,
 
   const generateNewBarcode = async () => {
     if (!formData.sku) return
-    
+
     setIsGeneratingBarcode(true)
-    
+
     try {
       const result = generateBarcodeFromSKU(formData.sku, formData.barcodeType)
       if (result.isValid && result.correctedCode) {
@@ -636,16 +637,16 @@ export default function ProductForm({ categories, countries, suppliers, product,
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     if (!validateForm()) return
 
     setLoading(true)
 
     try {
-      const url = mode === 'create' 
+      const url = mode === 'create'
         ? '/api/admin/products'
         : `/api/admin/products/${product?.id}`
-      
+
       const method = mode === 'create' ? 'POST' : 'PUT'
 
       const response = await fetch(url, {
@@ -738,20 +739,20 @@ export default function ProductForm({ categories, countries, suppliers, product,
         </CardHeader>
         <CardContent className="space-y-4">
           {/* AI Readiness Status */}
-          <div className={`p-3 rounded-lg border ${isReadyForAI() 
-            ? 'bg-green-50 border-green-200' 
+          <div className={`p-3 rounded-lg border ${isReadyForAI()
+            ? 'bg-green-50 border-green-200'
             : 'bg-yellow-50 border-yellow-200'
-          }`}>
+            }`}>
             <div className="flex items-center gap-2">
               {isReadyForAI() ? (
                 <CheckCircle className="h-4 w-4 text-green-600" />
               ) : (
                 <AlertTriangle className="h-4 w-4 text-yellow-600" />
               )}
-              <span className={`text-sm font-medium ${isReadyForAI() 
-                ? 'text-green-800' 
+              <span className={`text-sm font-medium ${isReadyForAI()
+                ? 'text-green-800'
                 : 'text-yellow-800'
-              }`}>
+                }`}>
                 {getAIReadinessMessage()}
               </span>
             </div>
@@ -787,7 +788,7 @@ export default function ProductForm({ categories, countries, suppliers, product,
                   />
                   <Label htmlFor="useCustomPrompt">Use custom prompt</Label>
                 </div>
-                
+
                 {useCustomPrompt && (
                   <textarea
                     value={customPrompt}
@@ -964,9 +965,8 @@ export default function ProductForm({ categories, countries, suppliers, product,
                 id="categoryId"
                 value={formData.categoryId}
                 onChange={(e) => handleInputChange('categoryId', e.target.value)}
-                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                  errors.categoryId ? 'border-red-500' : 'border-gray-300'
-                }`}
+                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.categoryId ? 'border-red-500' : 'border-gray-300'
+                  }`}
               >
                 <option value="">Select Category</option>
                 {categories.map((category) => (
@@ -984,9 +984,8 @@ export default function ProductForm({ categories, countries, suppliers, product,
                 id="countryId"
                 value={formData.countryId}
                 onChange={(e) => handleInputChange('countryId', e.target.value)}
-                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                  errors.countryId ? 'border-red-500' : 'border-gray-300'
-                }`}
+                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.countryId ? 'border-red-500' : 'border-gray-300'
+                  }`}
               >
                 <option value="">Select Country</option>
                 {countries.map((country) => (
@@ -1073,7 +1072,7 @@ export default function ProductForm({ categories, countries, suppliers, product,
               <div className="text-sm">
                 <p className="font-medium text-blue-900">AI Content Generation</p>
                 <p className="text-blue-700 mt-1">
-                  Fill in the product name and category first, then use AI to generate compelling descriptions and SEO content. 
+                  Fill in the product name and category first, then use AI to generate compelling descriptions and SEO content.
                   For social media content, use the dedicated Social Media section in the admin menu.
                 </p>
               </div>
@@ -1093,7 +1092,7 @@ export default function ProductForm({ categories, countries, suppliers, product,
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
-          
+
           {/* Barcode Type Selection */}
           <div className="space-y-3">
             <Label className="text-base font-medium">Barcode Format</Label>
@@ -1101,11 +1100,10 @@ export default function ProductForm({ categories, countries, suppliers, product,
               {formatOptions.map((option) => (
                 <div
                   key={option.value}
-                  className={`p-3 border rounded-lg cursor-pointer transition-all ${
-                    formData.barcodeType === option.value
+                  className={`p-3 border rounded-lg cursor-pointer transition-all ${formData.barcodeType === option.value
                       ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-200'
                       : 'border-gray-200 hover:border-gray-300'
-                  }`}
+                    }`}
                   onClick={() => handleBarcodeFormatChange(option.value)}
                 >
                   <div className="flex items-start gap-3">
@@ -1240,9 +1238,8 @@ export default function ProductForm({ categories, countries, suppliers, product,
                   id="supplierId"
                   value={formData.supplierId}
                   onChange={(e) => handleInputChange('supplierId', e.target.value)}
-                  className={`flex-1 px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                    errors.supplierId ? 'border-red-500' : 'border-gray-300'
-                  }`}
+                  className={`flex-1 px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.supplierId ? 'border-red-500' : 'border-gray-300'
+                    }`}
                 >
                   <option value="">Select Supplier</option>
                   {suppliers.map((supplier) => (
@@ -1462,7 +1459,7 @@ export default function ProductForm({ categories, countries, suppliers, product,
               ${formData.sellingPriceUSD.toFixed(2)}
             </div>
             <p className="text-sm text-gray-600 mt-1">
-              Profit: ${(formData.sellingPriceUSD - formData.costPriceUSD).toFixed(2)} 
+              Profit: ${(formData.sellingPriceUSD - formData.costPriceUSD).toFixed(2)}
               ({((formData.sellingPriceUSD - formData.costPriceUSD) / formData.costPriceUSD * 100).toFixed(1)}%)
             </p>
           </div>
@@ -1609,7 +1606,7 @@ export default function ProductForm({ categories, countries, suppliers, product,
         >
           Cancel
         </Button>
-        
+
         {mode === 'edit' && (
           <Link href={`/products/${product?.id}`} target="_blank">
             <Button
@@ -1623,7 +1620,7 @@ export default function ProductForm({ categories, countries, suppliers, product,
             </Button>
           </Link>
         )}
-        
+
         <Button
           type="submit"
           disabled={loading}
