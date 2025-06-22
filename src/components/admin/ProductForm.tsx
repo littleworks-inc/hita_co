@@ -176,16 +176,7 @@ export default function ProductForm({ categories, countries, suppliers, product,
   const [useCustomPrompt, setUseCustomPrompt] = useState(false)
   const [showAIConfig, setShowAIConfig] = useState(false)
 
-  // NEW: AI Enhancement Inputs State
-  const [aiInputs, setAiInputs] = useState({
-    userNotes: product?.userNotes || '',
-    occasion: product?.occasion || '',
-    careInstructions: product?.careInstructions || '',
-    specialFeatures: product?.specialFeatures || '',
-    culturalSignificance: product?.culturalSignificance || ''
-  })
-
-  // Form state
+  // Form state - Removed social media fields from initialization
   const [formData, setFormData] = useState<Product>({
     sku: product?.sku || '',
     name: product?.name || '',
@@ -222,7 +213,7 @@ export default function ProductForm({ categories, countries, suppliers, product,
     tags: product?.tags || [],
     images: product?.images || [],
 
-    // SEO fields
+    // SEO fields - Keep these
     seoTitle: product?.seoTitle || '',
     seoDescription: product?.seoDescription || ''
   })
@@ -235,7 +226,7 @@ export default function ProductForm({ categories, countries, suppliers, product,
   const exchangeRate = selectedCountry?.exchangeRate || 1
 
   /**
-   * ENHANCED: Build dynamic product context with user insights
+   * Build dynamic product context from current form data
    */
   const buildProductContext = () => {
     const selectedCategory = categories.find(c => c.id === formData.categoryId)
@@ -256,14 +247,7 @@ export default function ProductForm({ categories, countries, suppliers, product,
       supplier: selectedSupplier?.name,
       tags: formData.tags,
       stockQuantity: formData.stockQuantity,
-      targetAudience: 'customers who appreciate authentic Indian ethnic wear and traditional craftsmanship',
-      
-      // NEW: User insights for better AI generation
-      userNotes: aiInputs.userNotes,
-      occasion: aiInputs.occasion,
-      careInstructions: aiInputs.careInstructions,
-      specialFeatures: aiInputs.specialFeatures,
-      culturalSignificance: aiInputs.culturalSignificance
+      targetAudience: 'customers who appreciate authentic Indian ethnic wear and traditional craftsmanship'
     }
   }
 
@@ -295,9 +279,7 @@ export default function ProductForm({ categories, countries, suppliers, product,
       formData.name,
       formData.description,
       formData.shortDescription,
-      ...formData.tags,
-      aiInputs.userNotes,
-      aiInputs.specialFeatures
+      ...formData.tags
     ].join(' ').toLowerCase()
 
     materialKeywords.forEach(material => {
@@ -338,8 +320,7 @@ export default function ProductForm({ categories, countries, suppliers, product,
       formData.name,
       formData.description,
       formData.shortDescription,
-      ...formData.tags,
-      aiInputs.userNotes
+      ...formData.tags
     ].join(' ').toLowerCase()
 
     colorKeywords.forEach(color => {
@@ -368,7 +349,7 @@ export default function ProductForm({ categories, countries, suppliers, product,
   }
 
   /**
-   * ENHANCED: Handle AI generation with user insights
+   * Handle AI generation with custom prompts
    */
   const handleCustomAIGeneration = async (targetField: string) => {
     if (!isReadyForAI()) return
@@ -384,32 +365,23 @@ export default function ProductForm({ categories, countries, suppliers, product,
         type = 'seo_content'
       }
 
-      const response = await fetch('/api/admin/ai/generate', {
+      const response = await fetch('/api/admin/ai/generate', {  // ✅ Correct endpoint
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          type: type,
+          type: type,  // ✅ Correct format
           context: {
             name: context.name,
             category: context.category,
             price: context.price,
             materials: context.materials,
             colors: context.colors,
-            tags: context.tags,
-            images: formData.images || [],
-            
-            // ENHANCED: Include user insights
-            userNotes: context.userNotes,
-            occasion: context.occasion,
-            careInstructions: context.careInstructions,
-            specialFeatures: context.specialFeatures,
-            culturalSignificance: context.culturalSignificance
+            tags: context.tags
           },
           options: {
             tone: selectedTone,
             maxLength: getOptimalLength(targetField),
-            maxTokens: getMaxTokensForField(targetField),
-            customPrompt: useCustomPrompt ? customPrompt : undefined
+            maxTokens: getMaxTokensForField(targetField)
           }
         })
       })
@@ -429,6 +401,63 @@ export default function ProductForm({ categories, countries, suppliers, product,
         aiGeneration: `Failed to generate ${getFieldLabel(targetField)}: ${error instanceof Error ? error.message : 'Unknown error'}`
       }))
     }
+  }
+
+  /**
+   * Build contextual prompt based on available form data
+   */
+  const buildContextualPrompt = (targetField: string, context: any): string => {
+    const hasPrice = context.price > 0
+    const hasMaterials = context.materials?.length > 0
+    const hasColors = context.colors?.length > 0
+    const hasOrigin = !!context.origin
+    const hasTags = context.tags?.length > 0
+
+    let prompt = `Create compelling content for "${context.name}"`
+
+    if (context.category) {
+      prompt += `, a ${context.category.toLowerCase()}`
+    }
+
+    if (hasMaterials) {
+      prompt += ` made with ${context.materials.join(', ')}`
+    }
+
+    if (hasColors) {
+      prompt += ` featuring ${context.colors.join(', ')} colors`
+    }
+
+    if (hasPrice) {
+      prompt += ` priced at $${context.price}`
+    }
+
+    if (hasOrigin) {
+      prompt += ` sourced from ${context.origin}`
+    }
+
+    if (hasTags && context.tags.length > 0) {
+      prompt += `. Key features: ${context.tags.join(', ')}`
+    }
+
+    // Add field-specific instructions
+    switch (targetField) {
+      case 'description':
+        prompt += '. Write a detailed, engaging product description that highlights craftsmanship, cultural significance, and styling suggestions.'
+        break
+      case 'shortDescription':
+        prompt += '. Write a concise, compelling summary in 1-2 sentences that captures the essence and appeal.'
+        break
+      case 'seoTitle':
+        prompt += '. Create an SEO-optimized title under 60 characters with relevant keywords.'
+        break
+      case 'seoDescription':
+        prompt += '. Write an SEO meta description under 160 characters that encourages clicks.'
+        break
+      default:
+        prompt += '. Create engaging, authentic content that resonates with customers who appreciate quality and cultural heritage.'
+    }
+
+    return prompt
   }
 
   /**
@@ -459,8 +488,8 @@ export default function ProductForm({ categories, countries, suppliers, product,
    */
   const getFieldLabel = (field: string): string => {
     switch (field) {
-      case 'shortDescription': return 'Product Title'
-      case 'description': return 'Complete Description'
+      case 'shortDescription': return 'Short Description'
+      case 'description': return 'Full Description'
       case 'seoTitle': return 'SEO Title'
       case 'seoDescription': return 'SEO Description'
       default: return field
@@ -620,18 +649,12 @@ export default function ProductForm({ categories, countries, suppliers, product,
 
       const method = mode === 'create' ? 'POST' : 'PUT'
 
-      // Include AI inputs in the form data
-      const submitData = {
-        ...formData,
-        ...aiInputs
-      }
-
       const response = await fetch(url, {
         method,
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(submitData),
+        body: JSON.stringify(formData),
       })
 
       if (response.ok) {
@@ -678,161 +701,6 @@ export default function ProductForm({ categories, countries, suppliers, product,
       useCase: 'Simple tracking, legacy systems'
     }
   ]
-
-  // NEW: AI Enhancement Inputs Section Component
-  const AIInputsSection = () => (
-    <Card className="mb-6">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Brain className="h-5 w-5" />
-          AI Enhancement Inputs
-          <span className="text-sm font-normal text-gray-500">(Optional - helps AI generate better content)</span>
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {/* User Notes */}
-        <div className="space-y-2">
-          <Label htmlFor="userNotes">Special Details & Features</Label>
-          <textarea
-            id="userNotes"
-            value={aiInputs.userNotes}
-            onChange={(e) => setAiInputs(prev => ({ ...prev, userNotes: e.target.value }))}
-            placeholder="e.g., Hand-embroidered with real gold thread, made by artisans in Banaras, traditional technique passed down 3 generations..."
-            rows={3}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          <p className="text-xs text-gray-500">Add any special details about craftsmanship, origin, techniques, or unique features</p>
-        </div>
-
-        <div className="grid gap-4 md:grid-cols-2">
-          {/* Occasions */}
-          <div className="space-y-2">
-            <Label htmlFor="occasion">Perfect Occasions</Label>
-            <Input
-              id="occasion"
-              value={aiInputs.occasion}
-              onChange={(e) => setAiInputs(prev => ({ ...prev, occasion: e.target.value }))}
-              placeholder="e.g., Weddings, Festivals, Formal events"
-            />
-          </div>
-
-          {/* Cultural Significance */}
-          <div className="space-y-2">
-            <Label htmlFor="culturalSignificance">Cultural Background</Label>
-            <Input
-              id="culturalSignificance"
-              value={aiInputs.culturalSignificance}
-              onChange={(e) => setAiInputs(prev => ({ ...prev, culturalSignificance: e.target.value }))}
-              placeholder="e.g., Traditional Rajasthani style, Mughal influence"
-            />
-          </div>
-        </div>
-
-        <div className="grid gap-4 md:grid-cols-2">
-          {/* Care Instructions */}
-          <div className="space-y-2">
-            <Label htmlFor="careInstructions">Care Instructions</Label>
-            <Input
-              id="careInstructions"
-              value={aiInputs.careInstructions}
-              onChange={(e) => setAiInputs(prev => ({ ...prev, careInstructions: e.target.value }))}
-              placeholder="e.g., Dry clean only, gentle hand wash"
-            />
-          </div>
-
-          {/* Special Features */}
-          <div className="space-y-2">
-            <Label htmlFor="specialFeatures">Key Selling Points</Label>
-            <Input
-              id="specialFeatures"
-              value={aiInputs.specialFeatures}
-              onChange={(e) => setAiInputs(prev => ({ ...prev, specialFeatures: e.target.value }))}
-              placeholder="e.g., Lightweight, wrinkle-resistant, handloom certified"
-            />
-          </div>
-        </div>
-
-        {/* Preview of what AI will use */}
-        {(aiInputs.userNotes || aiInputs.occasion || aiInputs.careInstructions || aiInputs.specialFeatures || aiInputs.culturalSignificance) && (
-          <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-            <p className="text-sm font-medium text-blue-900 mb-2">✨ AI will use this information:</p>
-            <div className="text-xs text-blue-700 space-y-1">
-              {aiInputs.userNotes && <div><strong>Special Details:</strong> {aiInputs.userNotes.substring(0, 100)}...</div>}
-              {aiInputs.occasion && <div><strong>Occasions:</strong> {aiInputs.occasion}</div>}
-              {aiInputs.culturalSignificance && <div><strong>Cultural:</strong> {aiInputs.culturalSignificance}</div>}
-              {aiInputs.careInstructions && <div><strong>Care:</strong> {aiInputs.careInstructions}</div>}
-              {aiInputs.specialFeatures && <div><strong>Features:</strong> {aiInputs.specialFeatures}</div>}
-            </div>
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  )
-
-  // NEW: Enhanced AI Generation Section Component
-  const AIGenerationSection = () => (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Sparkles className="h-5 w-5" />
-          AI Content Generation
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {/* Short Description - Product Title */}
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <Label htmlFor="shortDescription">Product Title/Tagline</Label>
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              onClick={() => handleCustomAIGeneration('shortDescription')}
-              disabled={!isReadyForAI()}
-              className="text-blue-600"
-            >
-              <Wand2 className="h-4 w-4 mr-1" />
-              Generate Title
-            </Button>
-          </div>
-          <Input
-            id="shortDescription"
-            value={formData.shortDescription}
-            onChange={(e) => handleInputChange('shortDescription', e.target.value)}
-            placeholder="e.g., Handwoven Banarasi Silk Saree with Gold Zari Work"
-          />
-          <p className="text-xs text-gray-500">Specific, SEO-friendly title perfect for listings and social media</p>
-        </div>
-
-        {/* Full Description */}
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <Label htmlFor="description">Complete Product Description</Label>
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              onClick={() => handleCustomAIGeneration('description')}
-              disabled={!isReadyForAI()}
-              className="text-purple-600"
-            >
-              <Wand2 className="h-4 w-4 mr-1" />
-              Generate Description
-            </Button>
-          </div>
-          <textarea
-            id="description"
-            value={formData.description}
-            onChange={(e) => handleInputChange('description', e.target.value)}
-            placeholder="Detailed product description with materials, craftsmanship, cultural significance, styling tips, and care instructions..."
-            rows={6}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          <p className="text-xs text-gray-500">Comprehensive description for product pages, detailed social posts, and marketing</p>
-        </div>
-      </CardContent>
-    </Card>
-  )
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
@@ -959,9 +827,6 @@ export default function ProductForm({ categories, countries, suppliers, product,
         </CardContent>
       </Card>
 
-      {/* NEW: AI Enhancement Inputs Section */}
-      <AIInputsSection />
-
       {/* Product Images & Videos */}
       <Card>
         <CardHeader>
@@ -1016,6 +881,83 @@ export default function ProductForm({ categories, countries, suppliers, product,
             </div>
           </div>
 
+          {/* AI-Enhanced Short Description */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label htmlFor="shortDescription">Short Description</Label>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => handleCustomAIGeneration('shortDescription')}
+                disabled={!isReadyForAI()}
+              >
+                <Wand2 className="h-4 w-4 mr-1" />
+                Generate Short
+              </Button>
+            </div>
+            <Input
+              id="shortDescription"
+              value={formData.shortDescription}
+              onChange={(e) => handleInputChange('shortDescription', e.target.value)}
+              placeholder="Brief description for listings (or use AI to generate)"
+            />
+          </div>
+
+          {/* AI-Enhanced Full Description */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label htmlFor="description">Full Description</Label>
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleCustomAIGeneration('description')}
+                  disabled={!isReadyForAI()}
+                >
+                  <Wand2 className="h-4 w-4 mr-1" />
+                  Smart Generate
+                </Button>
+                <AIGenerateButton
+                  contentType="product_description"
+                  productContext={buildProductContext()}
+                  options={{
+                    tone: selectedTone,
+                    length: 'long'
+                  }}
+                  onSuccess={(content) => {
+                    handleInputChange('description', content)
+                    setSuccessMessage('Product description generated successfully!')
+                  }}
+                  onError={(error) => {
+                    setErrors(prev => ({ ...prev, aiGeneration: error }))
+                  }}
+                  disabled={!isReadyForAI()}
+                  size="sm"
+                  variant="ghost"
+                >
+                  <Sparkles className="h-3 w-3 mr-1" />
+                  Alternative
+                </AIGenerateButton>
+              </div>
+            </div>
+            <textarea
+              id="description"
+              rows={6}
+              value={formData.description}
+              onChange={(e) => handleInputChange('description', e.target.value)}
+              placeholder="Detailed product description (or use Smart Generate based on your inputs)"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            {errors.aiGeneration && (
+              <div className="flex items-center gap-2 text-sm text-red-600">
+                <AlertTriangle className="h-4 w-4" />
+                {errors.aiGeneration}
+              </div>
+            )}
+          </div>
+
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="categoryId">Category *</Label>
@@ -1058,10 +1000,7 @@ export default function ProductForm({ categories, countries, suppliers, product,
         </CardContent>
       </Card>
 
-      {/* NEW: Enhanced AI Generation Section */}
-      <AIGenerationSection />
-
-      {/* SEO & Marketing Section */}
+      {/* SEO & Marketing Section - REMOVED SOCIAL MEDIA CAPTIONS */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -1100,16 +1039,17 @@ export default function ProductForm({ categories, countries, suppliers, product,
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <Label htmlFor="seoDescription">Meta Description</Label>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                onClick={() => handleCustomAIGeneration('seoDescription')}
+              <AISEOButton
+                productContext={buildProductContext()}
+                onSuccess={(content) => {
+                  handleInputChange('seoDescription', content)
+                  setSuccessMessage('SEO description generated successfully!')
+                }}
+                onError={(error) => {
+                  setErrors(prev => ({ ...prev, seoGeneration: error }))
+                }}
                 disabled={!isReadyForAI()}
-              >
-                <Sparkles className="h-3 w-3 mr-1" />
-                Generate
-              </Button>
+              />
             </div>
             <textarea
               id="seoDescription"
@@ -1125,7 +1065,7 @@ export default function ProductForm({ categories, countries, suppliers, product,
             </p>
           </div>
 
-          {/* AI Content Generation Status */}
+          {/* AI Content Generation Status - Updated without social media reference */}
           <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
             <div className="flex items-start gap-2">
               <Sparkles className="h-4 w-4 text-blue-500 mt-0.5" />
@@ -1133,7 +1073,7 @@ export default function ProductForm({ categories, countries, suppliers, product,
                 <p className="font-medium text-blue-900">AI Content Generation</p>
                 <p className="text-blue-700 mt-1">
                   Fill in the product name and category first, then use AI to generate compelling descriptions and SEO content.
-                  Add special details above for even better AI-generated content.
+                  For social media content, use the dedicated Social Media section in the admin menu.
                 </p>
               </div>
             </div>
@@ -1152,6 +1092,7 @@ export default function ProductForm({ categories, countries, suppliers, product,
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
+
           {/* Barcode Type Selection */}
           <div className="space-y-3">
             <Label className="text-base font-medium">Barcode Format</Label>
@@ -1276,6 +1217,7 @@ export default function ProductForm({ categories, countries, suppliers, product,
               <div>• <strong>Size:</strong> Minimum 1.5x width multiplier for reliable scanning</div>
             </div>
           </div>
+
         </CardContent>
       </Card>
 
@@ -1631,34 +1573,22 @@ export default function ProductForm({ categories, countries, suppliers, product,
             </div>
           </div>
 
-          {/* AI Content Summary */}
-          {(formData.description || formData.seoTitle || formData.seoDescription || Object.values(aiInputs).some(v => v)) && (
+          {/* AI Content Summary - Updated to remove social media references */}
+          {(formData.description || formData.seoTitle || formData.seoDescription) && (
             <div className="bg-gradient-to-r from-purple-50 to-blue-50 p-4 rounded-lg border border-purple-200">
               <div className="flex items-center gap-2 mb-2">
                 <Brain className="h-4 w-4 text-purple-600" />
-                <span className="text-sm font-medium text-purple-900">AI Content & Enhancement Summary</span>
+                <span className="text-sm font-medium text-purple-900">AI Generated Content Summary</span>
               </div>
               <div className="space-y-2 text-xs text-purple-700">
                 {formData.description && (
                   <div>✓ Product description ({formData.description.length} characters)</div>
-                )}
-                {formData.shortDescription && (
-                  <div>✓ Product title ({formData.shortDescription.length} characters)</div>
                 )}
                 {formData.seoTitle && (
                   <div>✓ SEO title ({formData.seoTitle.length}/60 characters)</div>
                 )}
                 {formData.seoDescription && (
                   <div>✓ SEO description ({formData.seoDescription.length}/160 characters)</div>
-                )}
-                {aiInputs.userNotes && (
-                  <div>✓ Special details provided for AI enhancement</div>
-                )}
-                {aiInputs.occasion && (
-                  <div>✓ Occasion information: {aiInputs.occasion}</div>
-                )}
-                {aiInputs.culturalSignificance && (
-                  <div>✓ Cultural background: {aiInputs.culturalSignificance}</div>
                 )}
               </div>
             </div>
@@ -1722,26 +1652,6 @@ export default function ProductForm({ categories, countries, suppliers, product,
               Please wait while we save your product information and any AI-generated content...
             </div>
           </div>
-        </div>
-      )}
-
-      {/* AI Generation Error Display */}
-      {errors.aiGeneration && (
-        <div className="fixed bottom-4 right-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md shadow-lg max-w-md">
-          <div className="flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4" />
-            <span className="font-medium">AI Generation Error</span>
-          </div>
-          <p className="text-sm mt-1">{errors.aiGeneration}</p>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() => setErrors(prev => ({ ...prev, aiGeneration: '' }))}
-            className="mt-2 text-xs"
-          >
-            Dismiss
-          </Button>
         </div>
       )}
     </form>
