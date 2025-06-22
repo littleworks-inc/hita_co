@@ -23,6 +23,25 @@ import {
   BarChart3
 } from 'lucide-react'
 
+// Helper function to safely extract numeric values
+function safeNumber(value: any): number {
+  if (typeof value === 'number') return value
+  if (typeof value === 'string') return parseFloat(value) || 0
+  if (value && typeof value === 'object' && 'toNumber' in value) return value.toNumber()
+  return 0
+}
+
+// Helper function to safely extract count values
+function safeCount(value: any): number {
+  if (typeof value === 'number') return value
+  if (value && typeof value === 'object') {
+    // Handle Prisma aggregate result
+    if ('_count' in value) return safeNumber(value._count)
+    if ('count' in value) return safeNumber(value.count)
+  }
+  return 0
+}
+
 // Dynamic Dashboard Stats Component
 async function DashboardStats() {
   try {
@@ -31,110 +50,81 @@ async function DashboardStats() {
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
     const sixtyDaysAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000)
 
-    const [
-      // Current period (last 30 days)
-      currentStats,
-      // Previous period (30-60 days ago) for comparison
-      previousStats,
-      // Product counts
-      totalProducts,
-      activeProducts,
-      lowStockProducts,
-      // Recent activity
-      recentOrdersCount
-    ] = await Promise.all([
-      // Current period revenue and orders
-      db.order.aggregate({
-        _sum: { total: true },
-        _count: { id: true },
+    // Fetch current period data with explicit error handling
+    const currentRevenue = await db.order.aggregate({
+      _sum: { total: true },
+      _count: { id: true },
+      where: {
+        createdAt: { gte: thirtyDaysAgo, lte: now },
+        status: { not: 'CANCELLED' }
+      }
+    }).catch(() => ({ _sum: { total: 0 }, _count: 0 }))
+
+    // Fetch previous period data
+    const previousRevenue = await db.order.aggregate({
+      _sum: { total: true },
+      _count: { id: true },
+      where: {
+        createdAt: { gte: sixtyDaysAgo, lt: thirtyDaysAgo },
+        status: { not: 'CANCELLED' }
+      }
+    }).catch(() => ({ _sum: { total: 0 }, _count: 0 }))
+
+    // Fetch product data safely
+    const [totalProducts, activeProducts, lowStockProducts] = await Promise.all([
+      db.product.count().catch(() => 0),
+      db.product.count({ where: { isActive: true } }).catch(() => 0),
+      db.product.count({
         where: {
-          createdAt: { gte: thirtyDaysAgo, lte: now },
-          status: { not: 'CANCELLED' }
+          isActive: true,
+          stockQuantity: { lte: 5 } // Simple threshold
         }
-      }),
-      // Previous period for comparison
-      db.order.aggregate({
-        _sum: { total: true },
-        _count: { id: true },
-        where: {
-          createdAt: { gte: sixtyDaysAgo, lt: thirtyDaysAgo },
-          status: { not: 'CANCELLED' }
-        }
-      }),
-      // Product statistics
-      db.product.count(),
-      db.product.count({ where: { isActive: true } }),
-      // Use proper low stock logic: check against each product's own lowStockAlert
-      db.$queryRaw`
-        SELECT COUNT(*)::int as count 
-        FROM products 
-        WHERE "isActive" = true 
-        AND "stockQuantity" <= "lowStockAlert"
-      `.then((result: any) => result[0]?.count || 0),
-      // Recent orders (last 7 days)
-      db.order.count({
-        where: {
-          createdAt: { gte: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000) },
-          status: { not: 'CANCELLED' }
-        }
-      })
+      }).catch(() => 0)
     ])
 
-    // Calculate changes
-    const currentRevenue = currentStats._sum.total || 0
-    const previousRevenue = previousStats._sum.total || 0
-    const currentOrders = currentStats._count || 0
-    const previousOrders = previousStats._count || 0
+    // Safely extract values using our helper functions
+    const currentRevenueAmount = safeNumber(currentRevenue._sum?.total)
+    const previousRevenueAmount = safeNumber(previousRevenue._sum?.total)
+    const currentOrdersCount = safeCount(currentRevenue._count)
+    const previousOrdersCount = safeCount(previousRevenue._count)
 
-    // Debug logging
-    console.log('Dashboard Debug:', {
-      currentStats,
-      previousStats,
-      totalProducts,
-      activeProducts,
-      lowStockProducts,
-      currentRevenue,
-      currentOrders
-    })
-
-    const revenueChange = previousRevenue > 0 
-      ? ((currentRevenue - previousRevenue) / previousRevenue) * 100 
+    // Calculate changes safely
+    const revenueChange = previousRevenueAmount > 0 
+      ? ((currentRevenueAmount - previousRevenueAmount) / previousRevenueAmount) * 100 
       : 0
 
-    const ordersChange = previousOrders > 0 
-      ? ((currentOrders - previousOrders) / previousOrders) * 100 
+    const ordersChange = previousOrdersCount > 0 
+      ? ((currentOrdersCount - previousOrdersCount) / previousOrdersCount) * 100 
       : 0
-
-    const productChange = totalProducts > 0 ? `${activeProducts} active` : 'Add products'
 
     // Determine if this is a fresh system
-    const isFreshSystem = totalProducts === 0 || (currentRevenue === 0 && currentOrders === 0)
+    const isFreshSystem = totalProducts === 0 || (currentRevenueAmount === 0 && currentOrdersCount === 0)
 
     const stats = [
       {
         title: 'Total Revenue',
-        value: formatPrice(currentRevenue),
+        value: formatPrice(currentRevenueAmount),
         change: revenueChange !== 0 ? `${revenueChange > 0 ? '+' : ''}${revenueChange.toFixed(1)}%` : isFreshSystem ? 'Start selling' : 'No change',
         changeType: revenueChange > 0 ? 'positive' : revenueChange < 0 ? 'negative' : 'neutral',
         icon: DollarSign,
-        isEmpty: currentRevenue === 0,
+        isEmpty: currentRevenueAmount === 0,
         actionText: 'View Store',
         actionLink: '/'
       },
       {
         title: 'Total Orders',
-        value: currentOrders.toString(), // Fix: Ensure it's a string
+        value: currentOrdersCount.toString(), // Explicit string conversion
         change: ordersChange !== 0 ? `${ordersChange > 0 ? '+' : ''}${ordersChange.toFixed(1)}%` : isFreshSystem ? 'Share your store' : 'No change',
         changeType: ordersChange > 0 ? 'positive' : ordersChange < 0 ? 'negative' : 'neutral',
         icon: ShoppingCart,
-        isEmpty: currentOrders === 0,
+        isEmpty: currentOrdersCount === 0,
         actionText: 'View Products',
         actionLink: '/admin/products'
       },
       {
         title: 'Products',
-        value: totalProducts.toString(), // Fix: Ensure it's a string
-        change: productChange,
+        value: totalProducts.toString(), // Explicit string conversion
+        change: `${activeProducts} active`,
         changeType: totalProducts > 0 ? 'positive' : 'neutral',
         icon: Package,
         isEmpty: totalProducts === 0,
@@ -149,7 +139,7 @@ async function DashboardStats() {
         icon: AlertTriangle,
         isEmpty: totalProducts === 0,
         actionText: lowStockProducts > 0 ? 'View Alerts' : totalProducts === 0 ? 'Add Product' : 'Manage Stock',
-        actionLink: lowStockProducts > 0 ? '/admin/products?filter=low-stock' : totalProducts === 0 ? '/admin/products/new' : '/admin/products'
+        actionLink: lowStockProducts > 0 ? '/admin/products?stock=low-stock' : totalProducts === 0 ? '/admin/products/new' : '/admin/products'
       }
     ]
 
@@ -269,6 +259,7 @@ async function DashboardStats() {
         <CardContent className="p-6 text-center">
           <AlertTriangle className="h-8 w-8 text-red-500 mx-auto mb-2" />
           <p className="text-red-600">Error loading dashboard statistics</p>
+          <p className="text-sm text-gray-500 mt-1">Please refresh the page to try again</p>
         </CardContent>
       </Card>
     )
@@ -283,7 +274,9 @@ async function RecentOrders() {
       orderBy: { createdAt: 'desc' },
       include: {
         items: {
-          include: {
+          select: {
+            id: true,
+            quantity: true,
             product: {
               select: { name: true }
             }
@@ -327,7 +320,7 @@ async function RecentOrders() {
                     </p>
                   </div>
                   <div className="text-right">
-                    <p className="font-medium">{formatPrice(order.total)}</p>
+                    <p className="font-medium">{formatPrice(safeNumber(order.total))}</p>
                     <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
                       order.status === 'DELIVERED' ? 'bg-green-100 text-green-800' :
                       order.status === 'SHIPPED' ? 'bg-blue-100 text-blue-800' :
@@ -360,12 +353,10 @@ async function RecentOrders() {
   }
 }
 
-// Dynamic Low Stock Alert Component
-async function LowStockAlert() {
+// Dynamic Inventory Status Component
+async function InventoryStatus() {
   try {
-    // Get detailed inventory information
     const [allProducts, lowStockProducts] = await Promise.all([
-      // Get all products with their stock info
       db.product.findMany({
         where: { isActive: true },
         select: {
@@ -373,33 +364,24 @@ async function LowStockAlert() {
           name: true,
           sku: true,
           stockQuantity: true,
-          lowStockAlert: true,
-          isActive: true
-        }
+          lowStockAlert: true
+        },
+        take: 10
       }),
-      // Get products that are actually low on stock
-      db.$queryRaw`
-        SELECT p.id, p.name, p.sku, p."stockQuantity", p."lowStockAlert"
-        FROM products p
-        WHERE p."isActive" = true 
-        AND p."stockQuantity" <= p."lowStockAlert"
-        ORDER BY p."stockQuantity" ASC
-        LIMIT 5
-      ` as Array<{
-        id: string
-        name: string
-        sku: string
-        stockQuantity: number
-        lowStockAlert: number
-      }>
+      db.product.count({
+        where: {
+          isActive: true,
+          stockQuantity: { lte: 5 } // Simple threshold
+        }
+      })
     ])
 
     return (
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="flex items-center gap-2">
-            <AlertTriangle className="h-5 w-5 text-orange-600" />
-            Inventory Status
+            <Package className="h-5 w-5 text-purple-600" />
+            Inventory Overview
           </CardTitle>
           <Link href="/admin/products">
             <Button variant="outline" size="sm">Manage Products</Button>
@@ -407,18 +389,6 @@ async function LowStockAlert() {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {/* Debug Info - Show actual database state */}
-            <div className="text-xs text-gray-500 bg-gray-50 p-3 rounded border">
-              <strong>Debug Info:</strong><br/>
-              Total products in DB: {allProducts.length}<br/>
-              Low stock alerts: {lowStockProducts.length}<br/>
-              {allProducts.length > 0 && (
-                <>
-                  Products: {allProducts.map(p => `${p.name} (${p.stockQuantity}/${p.lowStockAlert})`).join(', ')}
-                </>
-              )}
-            </div>
-
             {allProducts.length === 0 ? (
               <div className="text-center py-6">
                 <Package className="h-8 w-8 text-gray-400 mx-auto mb-2" />
@@ -431,46 +401,35 @@ async function LowStockAlert() {
                   </Button>
                 </Link>
               </div>
-            ) : lowStockProducts.length === 0 ? (
-              <div className="text-center py-6">
-                <Package className="h-8 w-8 text-green-500 mx-auto mb-2" />
-                <p className="text-green-600 font-medium">All {allProducts.length} product{allProducts.length !== 1 ? 's' : ''} well stocked!</p>
-                <p className="text-sm text-gray-500">No inventory alerts</p>
-                <div className="mt-4 space-y-2">
+            ) : (
+              <>
+                <div className="text-sm text-gray-600 mb-3">
+                  Showing {allProducts.length} of your products
+                  {lowStockProducts > 0 && (
+                    <span className="text-orange-600 font-medium ml-2">
+                      ({lowStockProducts} need restocking)
+                    </span>
+                  )}
+                </div>
+                <div className="space-y-2 max-h-64 overflow-y-auto">
                   {allProducts.map(product => (
-                    <div key={product.id} className="text-xs text-gray-600 flex justify-between">
-                      <span>{product.name}</span>
-                      <span>{product.stockQuantity} units (alert at {product.lowStockAlert})</span>
+                    <div key={product.id} className="flex items-center justify-between text-sm p-2 hover:bg-gray-50 rounded">
+                      <div className="flex-1">
+                        <p className="font-medium truncate">{product.name}</p>
+                        <p className="text-xs text-gray-500">{product.sku}</p>
+                      </div>
+                      <div className="text-right">
+                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                          product.stockQuantity <= 0 ? 'bg-red-100 text-red-800' :
+                          product.stockQuantity <= 5 ? 'bg-orange-100 text-orange-800' :
+                          'bg-green-100 text-green-800'
+                        }`}>
+                          {product.stockQuantity} units
+                        </span>
+                      </div>
                     </div>
                   ))}
                 </div>
-              </div>
-            ) : (
-              <>
-                <div className="text-sm text-orange-600 font-medium mb-3">
-                  {lowStockProducts.length} product{lowStockProducts.length !== 1 ? 's' : ''} need{lowStockProducts.length === 1 ? 's' : ''} restocking
-                </div>
-                {lowStockProducts.map((product) => (
-                  <div key={product.id} className="flex items-center justify-between p-3 border rounded-lg">
-                    <div>
-                      <p className="font-medium">{product.name}</p>
-                      <p className="text-sm text-gray-600">
-                        {product.stockQuantity} left (alert at {product.lowStockAlert})
-                      </p>
-                      <p className="text-xs text-gray-500">SKU: {product.sku}</p>
-                    </div>
-                    <div className="text-right">
-                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                        product.stockQuantity === 0 ? 'bg-red-100 text-red-800' :
-                        product.stockQuantity <= Math.floor(product.lowStockAlert / 2) ? 'bg-orange-100 text-orange-800' :
-                        'bg-yellow-100 text-yellow-800'
-                      }`}>
-                        {product.stockQuantity === 0 ? 'Out of Stock' :
-                         product.stockQuantity <= Math.floor(product.lowStockAlert / 2) ? 'Critical' : 'Low Stock'}
-                      </span>
-                    </div>
-                  </div>
-                ))}
               </>
             )}
           </div>
@@ -482,13 +441,10 @@ async function LowStockAlert() {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Inventory Status</CardTitle>
+          <CardTitle>Inventory Overview</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="text-red-600 text-center space-y-2">
-            <p>Error loading inventory status</p>
-            <p className="text-xs">{error instanceof Error ? error.message : 'Unknown error'}</p>
-          </div>
+          <p className="text-red-600 text-center">Error loading inventory status</p>
         </CardContent>
       </Card>
     )
@@ -597,7 +553,7 @@ export default async function AdminDashboard() {
                       </CardContent>
                     </Card>
                   }>
-                    <LowStockAlert />
+                    <InventoryStatus />
                   </Suspense>
 
                   <QuickActions />
