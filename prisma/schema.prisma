@@ -273,34 +273,23 @@ model StoreSetting {
   id              String   @id @default(cuid())
   storeName       String   @default("Hita&Co")
   tagline         String?
-  logo            String?  // Logo URL
-  favicon         String?  // Favicon URL
-  
-  // Colors
+  logo            String?
+  favicon         String?
   primaryColor    String   @default("#000000")
   secondaryColor  String   @default("#ffffff")
   accentColor     String   @default("#f59e0b")
-  
-  // Contact Information
   email           String?
   phone           String?
   address         Json?
-  
-  // Social Media
   instagram       String?
   facebook        String?
   pinterest       String?
   twitter         String?
-  
-  // AI Configuration
-  aiProvider      String?  // openai, gemini, claude, mistral
+  aiProvider      String?
   aiApiKey        String?
-  aiModel         String?  // 👈 ADD THIS NEW FIELD
-  
-  // Other Settings
+  aiModel         String?  // 👈 ADD THIS LINE IF MISSING
   currency        String   @default("USD")
   timezone        String   @default("America/New_York")
-  
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
