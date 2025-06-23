@@ -23,6 +23,10 @@ interface CartItem {
     currency: string
     currencySymbol: string
   }
+  // Stock validation fields
+  stockValidated?: boolean
+  stockIssue?: string
+  lastStockCheck?: Date
 }
 
 // Cart Context Interface
@@ -33,16 +37,21 @@ interface CartContextType {
   totalPriceUSD: number
   isLoading: boolean
   isClient: boolean
+  hasStockIssues: boolean
 
   // Cart Actions
-  addItem: (product: ProductForCart, quantity?: number) => void
+  addItem: (product: ProductForCart, quantity?: number) => Promise<boolean>
   removeItem: (productId: string) => void
-  updateQuantity: (productId: string, quantity: number) => void
+  updateQuantity: (productId: string, quantity: number) => Promise<boolean>
   clearCart: () => void
   
   // Cart Utilities
   getItemQuantity: (productId: string) => number
   isInCart: (productId: string) => boolean
+  
+  // Stock Management
+  validateCartStock: () => Promise<boolean>
+  refreshItemStock: (productId: string) => Promise<void>
   
   // UI State
   isOpen: boolean
@@ -79,87 +88,129 @@ interface CartProviderProps {
 }
 
 export function CartProvider({ children }: CartProviderProps) {
-  // State initialization with proper hydration handling
   const [items, setItems] = useState<CartItem[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [isClient, setIsClient] = useState(false)
   const [isOpen, setIsOpen] = useState(false)
 
-  // Currency context for price calculations
-  const { convertPrice, formatPrice } = useCurrency()
-
-  // Ensure we're on client side before localStorage access
+  // Initialize client-side state
   useEffect(() => {
     setIsClient(true)
-  }, [])
-
-  // Load cart from localStorage on client-side mount
-  useEffect(() => {
-    if (!isClient) return
-
-    try {
-      const savedCart = localStorage.getItem('hita-cart')
-      if (savedCart) {
+    // Load cart from localStorage
+    const savedCart = localStorage.getItem('hitaco-cart')
+    if (savedCart) {
+      try {
         const parsedCart = JSON.parse(savedCart)
-        if (Array.isArray(parsedCart)) {
-          setItems(parsedCart)
-        }
+        setItems(parsedCart)
+      } catch (error) {
+        console.error('Failed to parse saved cart:', error)
+        localStorage.removeItem('hitaco-cart')
       }
-    } catch (error) {
-      console.warn('Error loading cart from localStorage:', error)
     }
-  }, [isClient])
+  }, [])
 
   // Save cart to localStorage whenever items change
   useEffect(() => {
-    if (!isClient) return
-
-    try {
-      localStorage.setItem('hita-cart', JSON.stringify(items))
-    } catch (error) {
-      console.warn('Error saving cart to localStorage:', error)
+    if (isClient) {
+      localStorage.setItem('hitaco-cart', JSON.stringify(items))
     }
   }, [items, isClient])
 
-  // Add item to cart
-  const addItem = useCallback((product: ProductForCart, quantity: number = 1) => {
+  // Stock validation utility
+  const checkProductStock = async (productId: string, requestedQuantity: number): Promise<{
+    available: boolean
+    maxAllowed: number
+    message: string
+  }> => {
+    try {
+      const response = await fetch(`/api/products/stock?productId=${productId}&quantity=${requestedQuantity}`)
+      
+      if (!response.ok) {
+        return {
+          available: false,
+          maxAllowed: 0,
+          message: 'Unable to verify stock'
+        }
+      }
+      
+      const result = await response.json()
+      return {
+        available: result.available,
+        maxAllowed: result.maxAllowed,
+        message: result.message
+      }
+    } catch (error) {
+      console.error('Stock check failed:', error)
+      return {
+        available: false,
+        maxAllowed: 0,
+        message: 'Stock check failed'
+      }
+    }
+  }
+
+  // Add item to cart with stock validation
+  const addItem = useCallback(async (product: ProductForCart, quantity: number = 1): Promise<boolean> => {
     setIsLoading(true)
 
-    setItems(currentItems => {
-      const existingItem = currentItems.find(item => item.id === product.id)
-      
-      if (existingItem) {
-        // Update quantity if item already exists
-        const newQuantity = Math.min(
-          existingItem.quantity + quantity,
-          product.stockQuantity
-        )
-        
-        return currentItems.map(item =>
-          item.id === product.id
-            ? { ...item, quantity: newQuantity }
-            : item
-        )
-      } else {
-        // Add new item to cart
-        const newItem: CartItem = {
-          id: product.id,
-          sku: product.sku,
-          name: product.name,
-          priceUSD: product.sellingPriceUSD,
-          quantity: Math.min(quantity, product.stockQuantity),
-          maxQuantity: product.stockQuantity,
-          image: product.images?.[0],
-          category: product.category,
-          country: product.country
-        }
-        
-        return [...currentItems, newItem]
-      }
-    })
+    try {
+      // Get current quantity in cart
+      const existingItem = items.find(item => item.id === product.id)
+      const currentQuantity = existingItem?.quantity || 0
+      const totalRequestedQuantity = currentQuantity + quantity
 
-    setIsLoading(false)
-  }, [])
+      // Check stock availability
+      const stockCheck = await checkProductStock(product.id, totalRequestedQuantity)
+      
+      if (!stockCheck.available) {
+        // Show user-friendly error message
+        console.warn(`Cannot add ${quantity} items: ${stockCheck.message}`)
+        return false
+      }
+
+      setItems(currentItems => {
+        if (existingItem) {
+          // Update existing item
+          return currentItems.map(item =>
+            item.id === product.id
+              ? { 
+                  ...item, 
+                  quantity: totalRequestedQuantity,
+                  maxQuantity: stockCheck.maxAllowed,
+                  stockValidated: true,
+                  stockIssue: undefined,
+                  lastStockCheck: new Date()
+                }
+              : item
+          )
+        } else {
+          // Add new item to cart
+          const newItem: CartItem = {
+            id: product.id,
+            sku: product.sku,
+            name: product.name,
+            priceUSD: product.sellingPriceUSD,
+            quantity: Math.min(quantity, stockCheck.maxAllowed),
+            maxQuantity: stockCheck.maxAllowed,
+            image: product.images?.[0],
+            category: product.category,
+            country: product.country,
+            stockValidated: true,
+            lastStockCheck: new Date()
+          }
+          
+          return [...currentItems, newItem]
+        }
+      })
+
+      return true
+    } catch (error) {
+      console.error('Failed to add item to cart:', error)
+      return false
+    } finally {
+      setIsLoading(false)
+    }
+  }, [items])
 
   // Remove item from cart
   const removeItem = useCallback((productId: string) => {
@@ -168,20 +219,46 @@ export function CartProvider({ children }: CartProviderProps) {
     )
   }, [])
 
-  // Update item quantity
-  const updateQuantity = useCallback((productId: string, quantity: number) => {
+  // Update item quantity with stock validation
+  const updateQuantity = useCallback(async (productId: string, quantity: number): Promise<boolean> => {
     if (quantity <= 0) {
       removeItem(productId)
-      return
+      return true
     }
 
-    setItems(currentItems =>
-      currentItems.map(item =>
-        item.id === productId
-          ? { ...item, quantity: Math.min(quantity, item.maxQuantity) }
-          : item
+    setIsLoading(true)
+
+    try {
+      // Check stock availability for new quantity
+      const stockCheck = await checkProductStock(productId, quantity)
+      
+      if (!stockCheck.available) {
+        console.warn(`Cannot update quantity: ${stockCheck.message}`)
+        return false
+      }
+
+      setItems(currentItems =>
+        currentItems.map(item =>
+          item.id === productId
+            ? { 
+                ...item, 
+                quantity: Math.min(quantity, stockCheck.maxAllowed),
+                maxQuantity: stockCheck.maxAllowed,
+                stockValidated: true,
+                stockIssue: undefined,
+                lastStockCheck: new Date()
+              }
+            : item
+        )
       )
-    )
+
+      return true
+    } catch (error) {
+      console.error('Failed to update quantity:', error)
+      return false
+    } finally {
+      setIsLoading(false)
+    }
   }, [removeItem])
 
   // Clear entire cart
@@ -189,6 +266,93 @@ export function CartProvider({ children }: CartProviderProps) {
     setItems([])
     setIsOpen(false)
   }, [])
+
+  // Validate entire cart stock
+  const validateCartStock = useCallback(async (): Promise<boolean> => {
+    if (items.length === 0) return true
+
+    setIsLoading(true)
+
+    try {
+      const stockRequests = items.map(item => ({
+        productId: item.id,
+        requestedQuantity: item.quantity
+      }))
+
+      const response = await fetch('/api/products/stock', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ items: stockRequests }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Stock validation failed')
+      }
+
+      const result = await response.json()
+      
+      // Update cart items with stock validation results
+      setItems(currentItems => 
+        currentItems.map(item => {
+          const stockInfo = result.items.find((si: any) => si.productId === item.id)
+          if (stockInfo) {
+            return {
+              ...item,
+              maxQuantity: stockInfo.maxAllowed,
+              stockValidated: true,
+              stockIssue: stockInfo.available ? undefined : stockInfo.message,
+              lastStockCheck: new Date(),
+              quantity: stockInfo.available ? item.quantity : Math.min(item.quantity, stockInfo.maxAllowed)
+            }
+          }
+          return item
+        })
+      )
+
+      return result.isValid
+    } catch (error) {
+      console.error('Cart stock validation failed:', error)
+      
+      // Mark all items as unvalidated
+      setItems(currentItems => 
+        currentItems.map(item => ({
+          ...item,
+          stockValidated: false,
+          stockIssue: 'Unable to verify stock',
+          lastStockCheck: new Date()
+        }))
+      )
+      
+      return false
+    } finally {
+      setIsLoading(false)
+    }
+  }, [items])
+
+  // Refresh stock for specific item
+  const refreshItemStock = useCallback(async (productId: string) => {
+    const item = items.find(i => i.id === productId)
+    if (!item) return
+
+    const stockCheck = await checkProductStock(productId, item.quantity)
+    
+    setItems(currentItems =>
+      currentItems.map(cartItem =>
+        cartItem.id === productId
+          ? {
+              ...cartItem,
+              maxQuantity: stockCheck.maxAllowed,
+              stockValidated: true,
+              stockIssue: stockCheck.available ? undefined : stockCheck.message,
+              lastStockCheck: new Date(),
+              quantity: stockCheck.available ? cartItem.quantity : Math.min(cartItem.quantity, stockCheck.maxAllowed)
+            }
+          : cartItem
+      )
+    )
+  }, [items])
 
   // Get quantity of specific item
   const getItemQuantity = useCallback((productId: string): number => {
@@ -209,6 +373,18 @@ export function CartProvider({ children }: CartProviderProps) {
   // Calculate totals
   const totalItems = items.reduce((sum, item) => sum + item.quantity, 0)
   const totalPriceUSD = items.reduce((sum, item) => sum + (item.priceUSD * item.quantity), 0)
+  const hasStockIssues = items.some(item => item.stockIssue || !item.stockValidated)
+
+  // Auto-validate cart stock periodically (every 5 minutes)
+  useEffect(() => {
+    if (items.length > 0) {
+      const interval = setInterval(() => {
+        validateCartStock()
+      }, 5 * 60 * 1000) // 5 minutes
+
+      return () => clearInterval(interval)
+    }
+  }, [items.length, validateCartStock])
 
   const value: CartContextType = {
     // Cart State
@@ -217,6 +393,7 @@ export function CartProvider({ children }: CartProviderProps) {
     totalPriceUSD,
     isLoading,
     isClient,
+    hasStockIssues,
 
     // Cart Actions
     addItem,
@@ -227,6 +404,10 @@ export function CartProvider({ children }: CartProviderProps) {
     // Cart Utilities
     getItemQuantity,
     isInCart,
+    
+    // Stock Management
+    validateCartStock,
+    refreshItemStock,
     
     // UI State
     isOpen,
@@ -271,27 +452,5 @@ export function useCartWithCurrency() {
       totalPriceFormatted: formatPrice(item.priceUSD * item.quantity),
       totalPriceConverted: convertPrice(item.priceUSD * item.quantity)
     }))
-  }
-}
-
-// Safe hook that doesn't throw if used outside provider (for edge cases)
-export function useCartSafe() {
-  const context = useContext(CartContext)
-  return context || {
-    items: [],
-    totalItems: 0,
-    totalPriceUSD: 0,
-    isLoading: false,
-    isClient: false,
-    addItem: () => {},
-    removeItem: () => {},
-    updateQuantity: () => {},
-    clearCart: () => {},
-    getItemQuantity: () => 0,
-    isInCart: () => false,
-    isOpen: false,
-    openCart: () => {},
-    closeCart: () => {},
-    toggleCart: () => {}
   }
 }
