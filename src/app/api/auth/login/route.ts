@@ -1,6 +1,7 @@
+// src/app/api/auth/login/route.ts - FIXED VERSION
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { verifyPassword, setSession } from '@/lib/auth'
+import { verifyPassword, encrypt } from '@/lib/auth'
 
 export async function POST(request: NextRequest) {
   try {
@@ -35,10 +36,11 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Set session
-    await setSession(user.id, user.email)
+    // Create JWT token
+    const session = await encrypt({ userId: user.id, email: user.email })
 
-    return NextResponse.json({
+    // Create response
+    const response = NextResponse.json({
       message: 'Login successful',
       user: {
         id: user.id,
@@ -47,6 +49,27 @@ export async function POST(request: NextRequest) {
         role: user.role,
       },
     })
+
+    // Set BOTH cookies to ensure compatibility
+    // session cookie for getSession() function
+    response.cookies.set('session', session, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 60 * 60 * 24 * 7, // 7 days
+      path: '/',
+    })
+
+    // auth-token cookie for middleware
+    response.cookies.set('auth-token', session, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 60 * 60 * 24 * 7, // 7 days
+      path: '/',
+    })
+
+    return response
   } catch (error) {
     console.error('Login error:', error)
     return NextResponse.json(
