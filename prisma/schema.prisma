@@ -1,8 +1,7 @@
-// Hita&Co Database Schema
+// Hita&Co Database Schema - Enhanced with Product Draft System
 
 // 1. npx prisma db push
 // 2. npx prisma generate
-
 
 generator client {
   provider = "prisma-client-js"
@@ -97,7 +96,7 @@ model Supplier {
   @@map("suppliers")
 }
 
-// Main Products Table
+// Main Products Table - ENHANCED WITH DRAFT SYSTEM
 model Product {
   id                String    @id @default(cuid())
   sku               String    @unique
@@ -153,9 +152,12 @@ model Product {
   seoDescription    String?
   tags              String[]  // Array of tags
   
-  // Status
-  isActive          Boolean   @default(true)
-  isFeatured        Boolean   @default(false)
+  // 🚀 ENHANCED STATUS SYSTEM WITH DRAFT WORKFLOW
+  status            ProductStatus @default(DRAFT)    // New: Draft/Published/Archived
+  isActive          Boolean   @default(true)         // Keep for backward compatibility
+  isFeatured        Boolean   @default(false)        // Only applies to published products
+  publishedAt       DateTime? // When product was first published
+  archivedAt        DateTime? // When product was archived
   
   // Tracking
   createdAt         DateTime  @default(now())
@@ -287,7 +289,7 @@ model StoreSetting {
   twitter         String?
   aiProvider      String?
   aiApiKey        String?
-  aiModel         String?  // 👈 ADD THIS LINE IF MISSING
+  aiModel         String?
   currency        String   @default("USD")
   timezone        String   @default("America/New_York")
   createdAt       DateTime @default(now())
@@ -296,7 +298,13 @@ model StoreSetting {
   @@map("store_settings")
 }
 
-// Enums
+// 🚀 ENHANCED ENUMS WITH PRODUCT STATUS
+enum ProductStatus {
+  DRAFT         // Product being created/edited, not visible to customers
+  PUBLISHED     // Live product visible to customers
+  ARCHIVED      // Hidden from customers but preserved in system
+}
+
 enum OrderSource {
   ONLINE
   HOME_VISIT

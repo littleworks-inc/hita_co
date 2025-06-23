@@ -1,7 +1,6 @@
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import { CurrencyProvider } from '@/contexts/CurrencyContext'
-import { getCustomerLocation, getStoredExchangeRates } from '@/lib/currency'
 import './globals.css'
 
 const inter = Inter({ 
@@ -59,7 +58,7 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: 'Hita&Co - Authentic Indian Ethnic Wear & Lifestyle',
     description: 'Discover our curated collection of authentic handcrafted Indian ethnic wear, jewelry, and lifestyle products.',
-    images: ['/og-image.jpg'],
+    images: ['/og-image.jpg']
   },
   robots: {
     index: true,
@@ -72,39 +71,27 @@ export const metadata: Metadata = {
       'max-snippet': -1,
     },
   },
-  icons: {
-    icon: [
-      { url: '/favicon-16x16.png', sizes: '16x16', type: 'image/png' },
-      { url: '/favicon-32x32.png', sizes: '32x32', type: 'image/png' },
-    ],
-    apple: [
-      { url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' },
-    ],
-    other: [
-      { rel: 'mask-icon', url: '/safari-pinned-tab.svg', color: '#7c3aed' },
-    ],
-  },
-  manifest: '/site.webmanifest',
-  category: 'shopping',
-  classification: 'ecommerce',
   verification: {
-    // Add these when you have them
-    // google: 'your-google-verification-code',
-    // yandex: 'your-yandex-verification-code',
-    // yahoo: 'your-yahoo-verification-code',
+    google: process.env.NEXT_PUBLIC_GOOGLE_VERIFICATION,
   },
-  alternates: {
-    canonical: '/',
-  },
-  other: {
-    'mobile-web-app-capable': 'yes',
-    'apple-mobile-web-app-capable': 'yes',
-    'apple-mobile-web-app-status-bar-style': 'default',
-    'apple-mobile-web-app-title': 'Hita&Co',
-    'application-name': 'Hita&Co',
-    'msapplication-TileColor': '#7c3aed',
-    'theme-color': '#7c3aed',
-  },
+}
+
+// Server-side function to get initial currency and rates (optional)
+async function getInitialCurrencyData() {
+  try {
+    // You can fetch exchange rates server-side if needed
+    // For now, we'll let the client handle it
+    return {
+      initialCurrency: 'USD' as const,
+      initialRates: {}
+    }
+  } catch (error) {
+    console.warn('Error fetching initial currency data:', error)
+    return {
+      initialCurrency: 'USD' as const,
+      initialRates: {}
+    }
+  }
 }
 
 export default async function RootLayout({
@@ -112,82 +99,66 @@ export default async function RootLayout({
 }: {
   children: React.ReactNode
 }) {
-  // Get initial currency and exchange rates for the provider
-  const [location, exchangeRates] = await Promise.all([
-    getCustomerLocation(),
-    getStoredExchangeRates()
-  ])
+  // Get initial currency data (optional)
+  const { initialCurrency, initialRates } = await getInitialCurrencyData()
 
   return (
     <html lang="en" className={inter.variable}>
       <head>
-        {/* Preconnect to external domains for performance */}
+        {/* Preload critical resources */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         
-        {/* DNS prefetch for likely external resources */}
-        <link rel="dns-prefetch" href="//www.google-analytics.com" />
-        <link rel="dns-prefetch" href="//www.googletagmanager.com" />
-        <link rel="dns-prefetch" href="//api.exchangerate-api.com" />
-        <link rel="dns-prefetch" href="//ip-api.com" />
-        
-        {/* Schema.org markup for organization */}
+        {/* Prevent FOUC (Flash of Unstyled Content) */}
         <script
-          type="application/ld+json"
           dangerouslySetInnerHTML={{
-            __html: JSON.stringify({
-              '@context': 'https://schema.org',
-              '@type': 'Organization',
-              name: 'Hita&Co',
-              description: 'Authentic Indian Ethnic Wear & Lifestyle',
-              url: process.env.NEXT_PUBLIC_APP_URL || 'https://hitaandco.com',
-              logo: `${process.env.NEXT_PUBLIC_APP_URL || 'https://hitaandco.com'}/logo.png`,
-              contactPoint: {
-                '@type': 'ContactPoint',
-                contactType: 'Customer Service'
-              },
-              sameAs: [
-                'https://www.facebook.com/hitaandco',
-                'https://www.instagram.com/hitaandco',
-                'https://www.pinterest.com/hitaandco'
-              ]
-            })
+            __html: `
+              try {
+                if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                  document.documentElement.classList.add('dark')
+                } else {
+                  document.documentElement.classList.remove('dark')
+                }
+              } catch (_) {}
+            `,
           }}
         />
       </head>
-      <body className={`${inter.className} antialiased`}>
-        {/* Skip to main content for accessibility */}
-        <a 
-          href="#main-content" 
-          className="sr-only focus:not-sr-only focus:absolute focus:top-0 focus:left-0 bg-purple-600 text-white px-4 py-2 z-50"
-        >
-          Skip to main content
-        </a>
-        
+      <body className={`${inter.className} font-sans antialiased`}>
+        {/* Fixed CurrencyProvider wrapper */}
         <CurrencyProvider 
-          initialCurrency={location.currency}
-          initialRates={exchangeRates}
+          initialCurrency={initialCurrency}
+          initialRates={initialRates}
         >
-          {children}
+          <div className="flex min-h-screen flex-col">
+            <main className="flex-1">
+              {children}
+            </main>
+          </div>
         </CurrencyProvider>
         
-        {/* Web Vitals and Analytics can be added here */}
+        {/* Analytics scripts would go here */}
         {process.env.NODE_ENV === 'production' && (
           <>
-            {/* Google Analytics - Add your GA4 tracking ID */}
-            {/*
-            <script async src={`https://www.googletagmanager.com/gtag/js?id=${process.env.NEXT_PUBLIC_GA_ID}`} />
-            <script
-              dangerouslySetInnerHTML={{
-                __html: `
-                  window.dataLayer = window.dataLayer || [];
-                  function gtag(){dataLayer.push(arguments);}
-                  gtag('js', new Date());
-                  gtag('config', '${process.env.NEXT_PUBLIC_GA_ID}');
-                `,
-              }}
-            />
-            */}
+            {/* Google Analytics */}
+            {process.env.NEXT_PUBLIC_GA_ID && (
+              <>
+                <script
+                  async
+                  src={`https://www.googletagmanager.com/gtag/js?id=${process.env.NEXT_PUBLIC_GA_ID}`}
+                />
+                <script
+                  dangerouslySetInnerHTML={{
+                    __html: `
+                      window.dataLayer = window.dataLayer || [];
+                      function gtag(){dataLayer.push(arguments);}
+                      gtag('js', new Date());
+                      gtag('config', '${process.env.NEXT_PUBLIC_GA_ID}');
+                    `,
+                  }}
+                />
+              </>
+            )}
           </>
         )}
       </body>

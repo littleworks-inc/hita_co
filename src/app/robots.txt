@@ -1,0 +1,54 @@
+# Enhanced robots.txt for Hita&Co eCommerce Platform
+# Protects draft system and admin areas from search engines
+
+User-agent: *
+
+# Allow public customer-facing pages
+Allow: /
+Allow: /products
+Allow: /categories
+Allow: /search
+
+# Block all admin pages and draft content
+Disallow: /admin/
+Disallow: /api/admin/
+Disallow: /login
+Disallow: /_next/
+Disallow: /static/
+
+# Block any potential draft or preview URLs
+Disallow: /products/draft/
+Disallow: /preview/
+Disallow: /draft/
+
+# Allow important SEO files
+Allow: /sitemap.xml
+Allow: /robots.txt
+Allow: /favicon.ico
+
+# Sitemap location
+Sitemap: https://your-domain.com/sitemap.xml
+
+# Crawl delay (optional - be respectful to server resources)
+Crawl-delay: 1
+
+# Additional rules for major search engines
+User-agent: Googlebot
+Allow: /
+Disallow: /admin/
+Disallow: /api/admin/
+
+User-agent: Bingbot
+Allow: /
+Disallow: /admin/
+Disallow: /api/admin/
+
+# Block AI training crawlers from admin content (if desired)
+User-agent: GPTBot
+Disallow: /admin/
+
+User-agent: ChatGPT-User
+Disallow: /admin/
+
+User-agent: CCBot
+Disallow: /admin/

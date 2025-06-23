@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
+import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react'
 import { 
   SupportedCurrency, 
   SUPPORTED_CURRENCIES,
@@ -43,63 +43,100 @@ export function CurrencyProvider({
   initialCurrency = 'USD',
   initialRates = {}
 }: CurrencyProviderProps) {
+  // State with proper initialization to prevent hydration issues
   const [currency, setCurrencyState] = useState<SupportedCurrency>(initialCurrency)
   const [exchangeRates, setExchangeRates] = useState<Record<string, number>>(initialRates)
   const [isLoading, setIsLoading] = useState(false)
+  const [isClient, setIsClient] = useState(false)
 
-  // Load currency preference from localStorage
+  // Ensure we're on the client side before accessing localStorage
   useEffect(() => {
-    const saved = localStorage.getItem('preferred-currency')
-    if (saved && isValidCurrency(saved)) {
-      setCurrencyState(saved)
-    }
+    setIsClient(true)
   }, [])
 
+  // Load currency preference from localStorage (only on client)
+  useEffect(() => {
+    if (!isClient) return
+    
+    try {
+      const saved = localStorage.getItem('preferred-currency')
+      if (saved && isValidCurrency(saved)) {
+        setCurrencyState(saved)
+      }
+    } catch (error) {
+      console.warn('Error loading currency preference:', error)
+    }
+  }, [isClient])
+
   // Save currency preference to localStorage
-  const setCurrency = (newCurrency: SupportedCurrency) => {
+  const setCurrency = useCallback((newCurrency: SupportedCurrency) => {
     setCurrencyState(newCurrency)
-    localStorage.setItem('preferred-currency', newCurrency)
-  }
+    
+    if (isClient) {
+      try {
+        localStorage.setItem('preferred-currency', newCurrency)
+      } catch (error) {
+        console.warn('Error saving currency preference:', error)
+      }
+    }
+  }, [isClient])
 
   // Fetch exchange rates
-  const fetchExchangeRates = async () => {
+  const fetchExchangeRates = useCallback(async () => {
     try {
       setIsLoading(true)
       const response = await fetch('/api/currency/rates')
       if (response.ok) {
         const rates = await response.json()
         setExchangeRates(rates)
+      } else {
+        console.warn('Failed to fetch exchange rates:', response.status)
       }
     } catch (error) {
       console.error('Error fetching exchange rates:', error)
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [])
 
   // Refresh rates
-  const refreshRates = async () => {
+  const refreshRates = useCallback(async () => {
     await fetchExchangeRates()
-  }
+  }, [fetchExchangeRates])
 
-  // Load exchange rates on mount
+  // Load exchange rates on mount (only on client)
   useEffect(() => {
+    if (!isClient) return
+    
     if (Object.keys(exchangeRates).length === 0) {
       fetchExchangeRates()
     }
-  }, [])
+  }, [isClient, exchangeRates, fetchExchangeRates])
 
   // Convert price from USD
-  const convertPrice = (priceUSD: number): number => {
+  const convertPrice = useCallback((priceUSD: number): number => {
     if (currency === 'USD') return priceUSD
     const rate = exchangeRates[currency]
     return rate ? priceUSD * rate : priceUSD
-  }
+  }, [currency, exchangeRates])
 
   // Format price with currency
-  const formatPrice = (priceUSD: number): string => {
-    return convertAndFormatPrice(priceUSD, currency, exchangeRates)
-  }
+  const formatPrice = useCallback((priceUSD: number): string => {
+    const convertedPrice = convertPrice(priceUSD)
+    const currencyInfo = SUPPORTED_CURRENCIES[currency]
+    
+    try {
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: currency,
+        minimumFractionDigits: currency === 'JPY' ? 0 : 2,
+        maximumFractionDigits: currency === 'JPY' ? 0 : 2,
+      }).format(convertedPrice)
+    } catch (error) {
+      // Fallback formatting if Intl.NumberFormat fails
+      return `${currencyInfo.symbol}${convertedPrice.toFixed(currency === 'JPY' ? 0 : 2)}`
+    }
+  }, [currency, convertPrice])
 
   // Get current currency info
   const currencyInfo = SUPPORTED_CURRENCIES[currency]
@@ -131,11 +168,11 @@ export function CurrencyProvider({
   )
 }
 
-// Custom hook to use currency context
+// Custom hook to use currency context with better error handling
 export function useCurrency() {
   const context = useContext(CurrencyContext)
   if (context === undefined) {
-    throw new Error('useCurrency must be used within a CurrencyProvider')
+    throw new Error('useCurrency must be used within a CurrencyProvider. Make sure to wrap your component with CurrencyProvider.')
   }
   return context
 }
@@ -149,5 +186,21 @@ export function usePrice(priceUSD: number) {
     convertedPrice: convertPrice(priceUSD),
     formattedPrice: formatPrice(priceUSD),
     currency
+  }
+}
+
+// Safe hook that doesn't throw if used outside provider (for edge cases)
+export function useCurrencySafe() {
+  const context = useContext(CurrencyContext)
+  return context || {
+    currency: 'USD' as SupportedCurrency,
+    exchangeRates: {},
+    isLoading: false,
+    setCurrency: () => {},
+    convertPrice: (price: number) => price,
+    formatPrice: (price: number) => `$${price.toFixed(2)}`,
+    refreshRates: async () => {},
+    currencyInfo: SUPPORTED_CURRENCIES.USD,
+    availableCurrencies: []
   }
 }

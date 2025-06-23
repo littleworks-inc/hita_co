@@ -6,6 +6,8 @@ import { useRouter } from 'next/navigation'
 import { formatPrice, formatDate } from '@/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle, Button } from '@/components/ui'
 import ProductImage from '@/components/admin/ProductImage'
+import ProductStatusBadge, { getProductStatus } from '@/components/admin/ProductStatusBadge'
+import QuickActionButton from '@/components/admin/QuickActionButton'
 import {
   Package,
   Plus,
@@ -14,7 +16,9 @@ import {
   Eye,
   AlertTriangle,
   CheckCircle,
-  XCircle
+  XCircle,
+  FileText,
+  Archive
 } from 'lucide-react'
 
 interface Product {
@@ -22,14 +26,19 @@ interface Product {
   name: string
   sku: string
   images: string[]
+  description?: string
   category: { name: string }
   country: { name: string }
   sellingPriceUSD: number
   costPriceUSD: number
   stockQuantity: number
   lowStockAlert: number
+  // Enhanced with draft system fields
+  status?: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED'
   isActive: boolean
   isFeatured: boolean
+  publishedAt?: Date | null
+  archivedAt?: Date | null
   updatedAt: Date
 }
 
@@ -37,11 +46,18 @@ interface ProductsTableProps {
   products: Product[]
   searchQuery?: string
   categoryFilter?: string
+  statusFilter?: string
 }
 
-export default function ProductsTable({ products, searchQuery, categoryFilter }: ProductsTableProps) {
+export default function ProductsTable({ 
+  products, 
+  searchQuery, 
+  categoryFilter,
+  statusFilter 
+}: ProductsTableProps) {
   const router = useRouter()
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [actioningId, setActioningId] = useState<string | null>(null)
 
   const handleDelete = async (productId: string, productName: string) => {
     if (!confirm(`Are you sure you want to delete "${productName}"? This action cannot be undone.`)) {
@@ -70,21 +86,62 @@ export default function ProductsTable({ products, searchQuery, categoryFilter }:
     }
   }
 
+  const handleStatusChange = (productId: string, newStatus: string) => {
+    // This callback will be called when status changes via QuickActionButton
+    // We can add optimistic updates here if needed
+    setActioningId(null)
+    router.refresh()
+  }
+
+  // Get status filter description
+  const getStatusFilterLabel = () => {
+    if (!statusFilter) return 'All Products'
+    
+    const filterLabels = {
+      'draft': 'Draft Products',
+      'published': 'Published Products', 
+      'archived': 'Archived Products',
+      'featured': 'Featured Products',
+      'active': 'Active Products',
+      'inactive': 'Inactive Products'
+    }
+    
+    return filterLabels[statusFilter as keyof typeof filterLabels] || 'Filtered Products'
+  }
+
   return (
     <Card>
       <CardHeader>
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <CardTitle className="flex items-center gap-2">
             <Package className="h-5 w-5" />
-            All Products ({products.length})
+            {getStatusFilterLabel()} ({products.length})
           </CardTitle>
           
-          <Link href="/admin/products/new">
-            <Button className="flex items-center gap-2">
-              <Plus className="h-4 w-4" />
-              Add Product
-            </Button>
-          </Link>
+          <div className="flex items-center gap-2">
+            {/* Draft Status Legend */}
+            <div className="hidden lg:flex items-center gap-4 text-xs text-gray-500 bg-gray-50 px-3 py-2 rounded-lg">
+              <div className="flex items-center gap-1">
+                <FileText className="h-3 w-3" />
+                <span>Draft</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <Eye className="h-3 w-3" />
+                <span>Published</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <Archive className="h-3 w-3" />
+                <span>Archived</span>
+              </div>
+            </div>
+            
+            <Link href="/admin/products/new">
+              <Button className="flex items-center gap-2">
+                <Plus className="h-4 w-4" />
+                Add Product
+              </Button>
+            </Link>
+          </div>
         </div>
       </CardHeader>
       <CardContent>
@@ -93,7 +150,7 @@ export default function ProductsTable({ products, searchQuery, categoryFilter }:
             <Package className="mx-auto h-12 w-12 text-gray-400" />
             <h3 className="mt-2 text-sm font-medium text-gray-900">No products found</h3>
             <p className="mt-1 text-sm text-gray-500">
-              {searchQuery || categoryFilter 
+              {searchQuery || categoryFilter || statusFilter
                 ? "Try adjusting your search or filter criteria."
                 : "Get started by adding your first product."
               }
@@ -136,113 +193,134 @@ export default function ProductsTable({ products, searchQuery, categoryFilter }:
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {products.map((product) => (
-                  <tr key={product.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <div className="flex-shrink-0">
-                          <ProductImage 
-                            images={product.images}
-                            name={product.name}
-                            className="h-12 w-12"
-                          />
-                        </div>
-                        <div className="ml-4">
-                          <div className="text-sm font-medium text-gray-900">
-                            {product.name}
+                {products.map((product) => {
+                  // Get the current product status (backward compatible)
+                  const currentStatus = getProductStatus(product.isActive, product.status)
+                  const isLowStock = product.stockQuantity <= product.lowStockAlert
+                  const isOutOfStock = product.stockQuantity === 0
+                  
+                  return (
+                    <tr key={product.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <div className="flex-shrink-0">
+                            <ProductImage 
+                              images={product.images}
+                              name={product.name}
+                              className="h-12 w-12"
+                            />
                           </div>
-                          <div className="text-sm text-gray-500">
-                            SKU: {product.sku}
+                          <div className="ml-4">
+                            <div className="text-sm font-medium text-gray-900">
+                              {product.name}
+                            </div>
+                            <div className="text-sm text-gray-500">
+                              SKU: {product.sku}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">{product.category.name}</div>
-                      <div className="text-sm text-gray-500">{product.country.name}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">
-                        {formatPrice(product.sellingPriceUSD)}
-                      </div>
-                      <div className="text-sm text-gray-500">
-                        Cost: {formatPrice(product.costPriceUSD)}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <div className="text-sm text-gray-900">
-                          {product.stockQuantity} units
+                      </td>
+                      
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">{product.category.name}</div>
+                        <div className="text-sm text-gray-500">{product.country.name}</div>
+                      </td>
+                      
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-gray-900">
+                          {formatPrice(product.sellingPriceUSD)}
                         </div>
-                        {product.stockQuantity <= product.lowStockAlert && (
-                          <AlertTriangle className="ml-2 h-4 w-4 text-orange-500" />
-                        )}
-                      </div>
-                      {product.stockQuantity <= product.lowStockAlert && (
-                        <div className="text-xs text-orange-600">
-                          Low stock
+                        <div className="text-sm text-gray-500">
+                          Cost: {formatPrice(product.costPriceUSD)}
                         </div>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        product.isActive 
-                          ? 'bg-green-100 text-green-800' 
-                          : 'bg-red-100 text-red-800'
-                      }`}>
-                        {product.isActive ? (
-                          <>
-                            <CheckCircle className="mr-1 h-3 w-3" />
-                            Active
-                          </>
-                        ) : (
-                          <>
-                            <XCircle className="mr-1 h-3 w-3" />
-                            Inactive
-                          </>
-                        )}
-                      </span>
-                      {product.isFeatured && (
-                        <div className="mt-1">
-                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                            Featured
-                          </span>
-                        </div>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {formatDate(product.updatedAt)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <div className="flex items-center justify-end gap-2">
-                        <Link href={`/admin/products/${product.id}`}>
-                          <Button variant="ghost" size="sm" title="View Product">
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                        </Link>
-                        <Link href={`/admin/products/${product.id}/edit`}>
-                          <Button variant="ghost" size="sm" title="Edit Product">
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                        </Link>
-                        <Button 
-                          variant="ghost" 
-                          size="sm"
-                          className="text-red-600 hover:text-red-700"
-                          onClick={() => handleDelete(product.id, product.name)}
-                          disabled={deletingId === product.id}
-                          title="Delete Product"
-                        >
-                          {deletingId === product.id ? (
-                            <div className="h-4 w-4 animate-spin rounded-full border-2 border-red-600 border-t-transparent" />
-                          ) : (
-                            <Trash2 className="h-4 w-4" />
+                      </td>
+                      
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <div className="text-sm text-gray-900">
+                            {product.stockQuantity} units
+                          </div>
+                          {isLowStock && !isOutOfStock && (
+                            <AlertTriangle className="ml-2 h-4 w-4 text-orange-500" />
                           )}
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                          {isOutOfStock && (
+                            <XCircle className="ml-2 h-4 w-4 text-red-500" />
+                          )}
+                        </div>
+                        {isOutOfStock ? (
+                          <div className="text-xs text-red-600">Out of stock</div>
+                        ) : isLowStock ? (
+                          <div className="text-xs text-orange-600">Low stock</div>
+                        ) : (
+                          <div className="text-xs text-green-600">In stock</div>
+                        )}
+                      </td>
+                      
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <ProductStatusBadge 
+                          status={currentStatus}
+                          isFeatured={product.isFeatured}
+                          size="sm"
+                        />
+                      </td>
+                      
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {formatDate(product.updatedAt)}
+                      </td>
+                      
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <div className="flex items-center justify-end gap-2">
+                          {/* Quick Status Actions */}
+                          <QuickActionButton
+                            product={{
+                              id: product.id,
+                              name: product.name,
+                              status: currentStatus,
+                              description: product.description,
+                              images: product.images,
+                              sellingPriceUSD: product.sellingPriceUSD,
+                              stockQuantity: product.stockQuantity
+                            }}
+                            onStatusChange={handleStatusChange}
+                            disabled={actioningId === product.id}
+                          />
+                          
+                          {/* View Product */}
+                          <Link href={`/admin/products/${product.id}`}>
+                            <Button variant="ghost" size="sm" title="View product">
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                          </Link>
+                          
+                          {/* Edit Product */}
+                          <Link href={`/admin/products/${product.id}/edit`}>
+                            <Button variant="ghost" size="sm" title="Edit product">
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                          </Link>
+                          
+                          {/* Delete Product (only for drafts and archived) */}
+                          {(currentStatus === 'DRAFT' || currentStatus === 'ARCHIVED') && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDelete(product.id, product.name)}
+                              disabled={deletingId === product.id}
+                              className="text-red-600 hover:text-red-700"
+                              title="Delete product"
+                            >
+                              {deletingId === product.id ? (
+                                <div className="h-4 w-4 animate-spin rounded-full border-2 border-red-600 border-t-transparent" />
+                              ) : (
+                                <Trash2 className="h-4 w-4" />
+                              )}
+                            </Button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>

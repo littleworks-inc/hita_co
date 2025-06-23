@@ -1,3 +1,5 @@
+// File: app/page.tsx - Enhanced with Draft System Protection
+
 import { Suspense } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -16,7 +18,8 @@ import {
   Shield,
   Heart,
   ArrowRight,
-  Sparkles
+  Sparkles,
+  Eye
 } from 'lucide-react'
 
 // Get store settings for branding and SEO
@@ -32,11 +35,20 @@ export async function generateMetadata() {
   return generateStoreMetadata(storeSettings)
 }
 
-// Get featured products
+// Enhanced: Get only published featured products
 async function getFeaturedProducts() {
   return await db.product.findMany({
     where: {
-      isActive: true,
+      // CRITICAL: Only show published products to customers
+      OR: [
+        { status: 'PUBLISHED' },
+        { 
+          AND: [
+            { status: null }, // Legacy products without status
+            { isActive: true } // But must be active
+          ]
+        }
+      ],
       isFeatured: true,
       stockQuantity: { gt: 0 }
     },
@@ -45,35 +57,88 @@ async function getFeaturedProducts() {
       country: true
     },
     take: 8,
-    orderBy: { createdAt: 'desc' }
+    orderBy: [
+      { stockQuantity: 'desc' }, // Prioritize in-stock items
+      { createdAt: 'desc' }
+    ]
   })
 }
 
-// Get categories for showcase
+// Enhanced: Get categories with published products only
 async function getCategories() {
   return await db.category.findMany({
-    where: { parentId: null },
+    where: { 
+      parentId: null,
+      // Only categories that have published products
+      products: {
+        some: {
+          OR: [
+            { status: 'PUBLISHED' },
+            { 
+              AND: [
+                { status: null },
+                { isActive: true }
+              ]
+            }
+          ],
+          stockQuantity: { gt: 0 }
+        }
+      }
+    },
     include: {
       products: {
         where: {
-          isActive: true,
+          OR: [
+            { status: 'PUBLISHED' },
+            { 
+              AND: [
+                { status: null },
+                { isActive: true }
+              ]
+            }
+          ],
           stockQuantity: { gt: 0 }
         },
-        take: 1
+        take: 1,
+        orderBy: { createdAt: 'desc' }
       },
       _count: {
-        select: { products: true }
+        select: { 
+          products: {
+            where: {
+              OR: [
+                { status: 'PUBLISHED' },
+                { 
+                  AND: [
+                    { status: null },
+                    { isActive: true }
+                  ]
+                }
+              ],
+              stockQuantity: { gt: 0 }
+            }
+          }
+        }
       }
     },
     orderBy: { name: 'asc' }
   })
 }
 
-// Get recent products
+// Enhanced: Get recent published products only
 async function getRecentProducts() {
   return await db.product.findMany({
     where: {
-      isActive: true,
+      // Only published products for new arrivals
+      OR: [
+        { status: 'PUBLISHED' },
+        { 
+          AND: [
+            { status: null },
+            { isActive: true }
+          ]
+        }
+      ],
       stockQuantity: { gt: 0 }
     },
     include: {
@@ -81,11 +146,14 @@ async function getRecentProducts() {
       country: true
     },
     take: 12,
-    orderBy: { createdAt: 'desc' }
+    orderBy: [
+      { publishedAt: 'desc' }, // Prioritize recently published
+      { createdAt: 'desc' }
+    ]
   })
 }
 
-// Featured Products Component
+// Featured Products Component (Published Only)
 async function FeaturedProducts() {
   const products = await getFeaturedProducts()
 
@@ -105,6 +173,10 @@ async function FeaturedProducts() {
           <p className="text-lg text-gray-600 max-w-2xl mx-auto">
             Handpicked favorites from our collection of authentic Indian ethnic wear and lifestyle products
           </p>
+          <div className="flex items-center justify-center gap-2 mt-2">
+            <Eye className="h-4 w-4 text-green-600" />
+            <span className="text-sm text-green-600 font-medium">All products are currently available</span>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
@@ -115,10 +187,10 @@ async function FeaturedProducts() {
 
         <div className="text-center">
           <Link
-            href="/products"
+            href="/products?featured=true"
             className="inline-flex items-center gap-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white px-8 py-3 rounded-full font-semibold hover:shadow-lg transform hover:-translate-y-1 transition-all duration-300"
           >
-            View All Products
+            View All Featured Products
             <ArrowRight className="h-5 w-5" />
           </Link>
         </div>
@@ -127,7 +199,7 @@ async function FeaturedProducts() {
   )
 }
 
-// Recent Products Component
+// Recent Products Component (Published Only)
 async function RecentProducts() {
   const products = await getRecentProducts()
 
@@ -214,13 +286,40 @@ function TrustIndicators() {
   )
 }
 
+// Newsletter Signup Component
+function NewsletterSignup() {
+  return (
+    <section className="py-16 bg-gradient-to-r from-purple-600 to-pink-600">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+        <h2 className="text-3xl font-bold text-white mb-4">
+          Stay Updated with New Arrivals
+        </h2>
+        <p className="text-purple-100 text-lg mb-8">
+          Be the first to know about our latest published products and exclusive offers
+        </p>
+        <div className="flex flex-col sm:flex-row gap-4 max-w-md mx-auto">
+          <input
+            type="email"
+            placeholder="Enter your email"
+            className="flex-1 px-4 py-3 rounded-lg border-0 focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-purple-600"
+          />
+          <button className="bg-white text-purple-600 px-8 py-3 rounded-lg font-semibold hover:bg-gray-100 transition-colors">
+            Subscribe
+          </button>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+// Main Homepage Component
 export default async function HomePage() {
   const storeSettings = await getStoreSettings()
   const organizationSchema = generateOrganizationJsonLd(storeSettings)
 
   return (
     <>
-      {/* JSON-LD Structured Data */}
+      {/* Organization Structured Data */}
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
@@ -229,56 +328,53 @@ export default async function HomePage() {
       />
       
       <div className="min-h-screen bg-white">
-        <CurrencyNotification />
         <CustomerNavigation storeSettings={storeSettings} />
         
-        {/* Main Content */}
+        {/* Currency Notification for First-Time Visitors */}
+        <CurrencyNotification />
+        
         <main>
           {/* Hero Section */}
-          <Suspense fallback={<LoadingSpinner />}>
-            <HeroSection storeSettings={storeSettings} />
-          </Suspense>
-
-          {/* Category Showcase */}
-          <Suspense fallback={<LoadingSpinner />}>
-            <CategoryShowcase />
-          </Suspense>
-
-          {/* Featured Products */}
-          <Suspense fallback={<LoadingSpinner />}>
+          <HeroSection storeSettings={storeSettings} />
+          
+          {/* Featured Products - Published Only */}
+          <Suspense fallback={
+            <section className="py-16 bg-white">
+              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <LoadingSpinner size="lg" text="Loading featured products..." />
+              </div>
+            </section>
+          }>
             <FeaturedProducts />
           </Suspense>
-
-          {/* Recent Products */}
-          <Suspense fallback={<LoadingSpinner />}>
+          
+          {/* Category Showcase - Categories with Published Products Only */}
+          <Suspense fallback={
+            <section className="py-16 bg-gray-50">
+              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <LoadingSpinner size="lg" text="Loading categories..." />
+              </div>
+            </section>
+          }>
+            <CategoryShowcase />
+          </Suspense>
+          
+          {/* New Arrivals - Published Only */}
+          <Suspense fallback={
+            <section className="py-16 bg-gray-50">
+              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <LoadingSpinner size="lg" text="Loading new arrivals..." />
+              </div>
+            </section>
+          }>
             <RecentProducts />
           </Suspense>
-
+          
           {/* Trust Indicators */}
           <TrustIndicators />
-
-          {/* Newsletter Section */}
-          <section className="py-16 bg-gradient-to-br from-purple-600 to-pink-600">
-            <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-              <h2 className="text-3xl font-bold text-white mb-4">
-                Stay Updated with Our Latest Collections
-              </h2>
-              <p className="text-xl text-purple-100 mb-8">
-                Be the first to know about new arrivals and exclusive offers
-              </p>
-              <div className="flex flex-col sm:flex-row gap-4 max-w-md mx-auto">
-                <input
-                  type="email"
-                  placeholder="Enter your email"
-                  className="flex-1 px-6 py-3 rounded-full border-0 focus:ring-4 focus:ring-white/20 outline-none"
-                  aria-label="Email address for newsletter"
-                />
-                <button className="bg-white text-purple-600 px-8 py-3 rounded-full font-semibold hover:bg-gray-100 transition-colors">
-                  Subscribe
-                </button>
-              </div>
-            </div>
-          </section>
+          
+          {/* Newsletter Signup */}
+          <NewsletterSignup />
         </main>
       </div>
     </>
