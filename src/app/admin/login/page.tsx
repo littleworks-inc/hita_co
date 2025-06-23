@@ -1,4 +1,4 @@
-// src/app/admin/login/page.tsx - Simple fix that bypasses CurrencyContext
+// src/app/admin/login/page.tsx - FIXED VERSION - Completely isolated from CurrencyContext
 'use client'
 
 import { useState } from 'react'
@@ -12,11 +12,26 @@ export default function AdminLogin() {
   })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [successMessage, setSuccessMessage] = useState('')
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setError('')
+    setSuccessMessage('')
+
+    // Basic validation
+    if (!formData.email.trim()) {
+      setError('Email is required')
+      setLoading(false)
+      return
+    }
+
+    if (!formData.password.trim()) {
+      setError('Password is required')
+      setLoading(false)
+      return
+    }
 
     try {
       const response = await fetch('/api/auth/login', {
@@ -30,162 +45,257 @@ export default function AdminLogin() {
       const data = await response.json()
 
       if (response.ok) {
-        // Redirect to products to test Draft System
-        window.location.href = '/admin/products'
+        setSuccessMessage('Login successful! Redirecting...')
+        
+        // Use window.location for reliable redirect (bypasses any context issues)
+        setTimeout(() => {
+          window.location.href = '/admin/dashboard'
+        }, 1000)
       } else {
         setError(data.error || 'Invalid credentials')
       }
     } catch (error) {
-      setError('Something went wrong. Please try again.')
       console.error('Login error:', error)
+      setError('Network error. Please check your connection and try again.')
     } finally {
       setLoading(false)
     }
   }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target
     setFormData(prev => ({
       ...prev,
-      [e.target.name]: e.target.value
+      [name]: value
     }))
     
+    // Clear error when user starts typing
     if (error) {
       setError('')
+    }
+  }
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleSubmit(e as any)
     }
   }
 
   return (
     <div style={{
       minHeight: '100vh',
-      backgroundColor: '#f3f4f6',
+      backgroundColor: '#f8fafc',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
       padding: '1rem',
-      fontFamily: 'system-ui, -apple-system, sans-serif'
+      fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
     }}>
       <div style={{
         width: '100%',
-        maxWidth: '400px',
+        maxWidth: '420px',
         backgroundColor: 'white',
-        borderRadius: '12px',
-        boxShadow: '0 10px 25px rgba(0, 0, 0, 0.1)',
-        padding: '2rem'
+        borderRadius: '16px',
+        boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+        padding: '2.5rem',
+        border: '1px solid #e2e8f0'
       }}>
         {/* Header */}
         <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
           <div style={{
-            width: '64px',
-            height: '64px',
+            width: '80px',
+            height: '80px',
             backgroundColor: '#3b82f6',
-            borderRadius: '16px',
+            borderRadius: '20px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            margin: '0 auto 1rem',
-            background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)'
+            margin: '0 auto 1rem auto',
+            boxShadow: '0 10px 15px -3px rgba(59, 130, 246, 0.4)'
           }}>
-            <span style={{
-              color: 'white',
-              fontSize: '1.5rem',
-              fontWeight: 'bold'
-            }}>H&C</span>
+            <div style={{
+              width: '40px',
+              height: '40px',
+              backgroundColor: 'white',
+              borderRadius: '10px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '20px',
+              fontWeight: 'bold',
+              color: '#3b82f6'
+            }}>
+              H&C
+            </div>
           </div>
           <h1 style={{
             fontSize: '1.875rem',
-            fontWeight: 'bold',
-            color: '#111827',
-            marginBottom: '0.5rem'
+            fontWeight: '700',
+            color: '#1e293b',
+            marginBottom: '0.5rem',
+            letterSpacing: '-0.025em'
           }}>
             Hita&Co Admin
           </h1>
-          <p style={{ color: '#6b7280', fontSize: '0.875rem' }}>
-            Sign in to manage your store
+          <p style={{ 
+            color: '#64748b',
+            fontSize: '0.875rem'
+          }}>
+            Access your admin dashboard
           </p>
         </div>
 
-        <form onSubmit={handleSubmit}>
-          {error && (
+        {/* Success Message */}
+        {successMessage && (
+          <div style={{
+            padding: '0.75rem 1rem',
+            backgroundColor: '#dcfce7',
+            border: '1px solid #bbf7d0',
+            borderRadius: '8px',
+            marginBottom: '1rem',
+            color: '#166534',
+            fontSize: '0.875rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem'
+          }}>
             <div style={{
-              backgroundColor: '#fef2f2',
-              border: '1px solid #fecaca',
-              color: '#dc2626',
-              padding: '0.75rem',
-              borderRadius: '8px',
-              fontSize: '0.875rem',
-              marginBottom: '1rem',
+              width: '16px',
+              height: '16px',
+              backgroundColor: '#22c55e',
+              borderRadius: '50%',
               display: 'flex',
               alignItems: 'center',
-              gap: '0.5rem'
+              justifyContent: 'center',
+              color: 'white',
+              fontSize: '12px'
             }}>
-              <span>⚠️</span>
-              {error}
+              ✓
             </div>
-          )}
+            {successMessage}
+          </div>
+        )}
 
-          <div style={{ marginBottom: '1rem' }}>
-            <label style={{
-              display: 'block',
-              fontSize: '0.875rem',
-              fontWeight: '500',
-              color: '#374151',
-              marginBottom: '0.5rem'
+        {/* Error Message */}
+        {error && (
+          <div style={{
+            padding: '0.75rem 1rem',
+            backgroundColor: '#fef2f2',
+            border: '1px solid #fecaca',
+            borderRadius: '8px',
+            marginBottom: '1rem',
+            color: '#dc2626',
+            fontSize: '0.875rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem'
+          }}>
+            <div style={{
+              width: '16px',
+              height: '16px',
+              backgroundColor: '#ef4444',
+              borderRadius: '50%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'white',
+              fontSize: '12px'
             }}>
+              !
+            </div>
+            {error}
+          </div>
+        )}
+
+        {/* Login Form */}
+        <form onSubmit={handleSubmit}>
+          <div style={{ marginBottom: '1.5rem' }}>
+            <label 
+              htmlFor="email"
+              style={{
+                display: 'block',
+                fontSize: '0.875rem',
+                fontWeight: '500',
+                color: '#374151',
+                marginBottom: '0.5rem'
+              }}
+            >
               Email Address
             </label>
             <input
+              id="email"
               name="email"
               type="email"
+              autoComplete="email"
+              required
               value={formData.email}
               onChange={handleInputChange}
-              placeholder="admin@hitaandco.com"
-              required
+              onKeyPress={handleKeyPress}
               disabled={loading}
               style={{
                 width: '100%',
-                padding: '0.75rem',
-                border: '1px solid #d1d5db',
+                padding: '0.75rem 1rem',
+                border: '2px solid #e5e7eb',
                 borderRadius: '8px',
                 fontSize: '1rem',
-                outline: 'none',
-                transition: 'border-color 0.2s',
-                backgroundColor: loading ? '#f9fafb' : 'white'
+                transition: 'all 0.2s',
+                backgroundColor: loading ? '#f9fafb' : 'white',
+                outline: 'none'
               }}
-              onFocus={(e) => e.target.style.borderColor = '#3b82f6'}
-              onBlur={(e) => e.target.style.borderColor = '#d1d5db'}
+              onFocus={(e) => {
+                e.target.style.borderColor = '#3b82f6'
+                e.target.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)'
+              }}
+              onBlur={(e) => {
+                e.target.style.borderColor = '#e5e7eb'
+                e.target.style.boxShadow = 'none'
+              }}
+              placeholder="Enter your email"
             />
           </div>
 
-          <div style={{ marginBottom: '1.5rem' }}>
-            <label style={{
-              display: 'block',
-              fontSize: '0.875rem',
-              fontWeight: '500',
-              color: '#374151',
-              marginBottom: '0.5rem'
-            }}>
+          <div style={{ marginBottom: '2rem' }}>
+            <label 
+              htmlFor="password"
+              style={{
+                display: 'block',
+                fontSize: '0.875rem',
+                fontWeight: '500',
+                color: '#374151',
+                marginBottom: '0.5rem'
+              }}
+            >
               Password
             </label>
             <input
+              id="password"
               name="password"
               type="password"
+              autoComplete="current-password"
+              required
               value={formData.password}
               onChange={handleInputChange}
-              placeholder="Enter your password"
-              required
+              onKeyPress={handleKeyPress}
               disabled={loading}
               style={{
                 width: '100%',
-                padding: '0.75rem',
-                border: '1px solid #d1d5db',
+                padding: '0.75rem 1rem',
+                border: '2px solid #e5e7eb',
                 borderRadius: '8px',
                 fontSize: '1rem',
-                outline: 'none',
-                transition: 'border-color 0.2s',
-                backgroundColor: loading ? '#f9fafb' : 'white'
+                transition: 'all 0.2s',
+                backgroundColor: loading ? '#f9fafb' : 'white',
+                outline: 'none'
               }}
-              onFocus={(e) => e.target.style.borderColor = '#3b82f6'}
-              onBlur={(e) => e.target.style.borderColor = '#d1d5db'}
+              onFocus={(e) => {
+                e.target.style.borderColor = '#3b82f6'
+                e.target.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)'
+              }}
+              onBlur={(e) => {
+                e.target.style.borderColor = '#e5e7eb'
+                e.target.style.boxShadow = 'none'
+              }}
+              placeholder="Enter your password"
             />
           </div>
 
@@ -194,37 +304,44 @@ export default function AdminLogin() {
             disabled={loading}
             style={{
               width: '100%',
+              padding: '0.875rem 1rem',
               backgroundColor: loading ? '#9ca3af' : '#3b82f6',
               color: 'white',
-              padding: '0.75rem',
+              border: 'none',
               borderRadius: '8px',
               fontSize: '1rem',
-              fontWeight: '500',
-              border: 'none',
+              fontWeight: '600',
               cursor: loading ? 'not-allowed' : 'pointer',
-              transition: 'background-color 0.2s',
+              transition: 'all 0.2s',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: '0.5rem'
+              gap: '0.5rem',
+              boxShadow: loading ? 'none' : '0 4px 6px -1px rgba(59, 130, 246, 0.3)'
             }}
             onMouseOver={(e) => {
-              if (!loading) e.currentTarget.style.backgroundColor = '#2563eb'
+              if (!loading) {
+                e.currentTarget.style.backgroundColor = '#2563eb'
+                e.currentTarget.style.transform = 'translateY(-1px)'
+              }
             }}
             onMouseOut={(e) => {
-              if (!loading) e.currentTarget.style.backgroundColor = '#3b82f6'
+              if (!loading) {
+                e.currentTarget.style.backgroundColor = '#3b82f6'
+                e.currentTarget.style.transform = 'translateY(0)'
+              }
             }}
           >
             {loading ? (
               <>
-                <span style={{
+                <div style={{
                   width: '16px',
                   height: '16px',
-                  border: '2px solid transparent',
-                  borderTop: '2px solid white',
+                  border: '2px solid #ffffff',
+                  borderTop: '2px solid transparent',
                   borderRadius: '50%',
                   animation: 'spin 1s linear infinite'
-                }}></span>
+                }} />
                 Signing in...
               </>
             ) : (
@@ -233,24 +350,23 @@ export default function AdminLogin() {
           </button>
         </form>
 
-        {/* Debug info */}
+        {/* Footer */}
         <div style={{
-          marginTop: '1.5rem',
-          padding: '1rem',
-          backgroundColor: '#f9fafb',
-          borderRadius: '8px',
+          marginTop: '2rem',
+          textAlign: 'center',
           fontSize: '0.75rem',
           color: '#6b7280'
         }}>
-          <strong style={{ color: '#374151' }}>Ready to test:</strong><br/>
-          • Server: http://localhost:3001<br/>
-          • Target: Admin Products (Draft System)<br/>
-          • Email: Pre-filled (from .env)<br/>
-          • Password: Check your .env ADMIN_PASSWORD
+          <p style={{ marginBottom: '0.5rem' }}>
+            🔒 Secure admin access
+          </p>
+          <p>
+            Hita&Co eCommerce Platform v2.0
+          </p>
         </div>
       </div>
 
-      {/* Add CSS animation */}
+      {/* Add spinning animation */}
       <style jsx>{`
         @keyframes spin {
           0% { transform: rotate(0deg); }
