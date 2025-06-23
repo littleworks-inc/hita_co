@@ -36,7 +36,14 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Get current product stock
+    if (quantity <= 0) {
+      return NextResponse.json(
+        { error: 'Quantity must be greater than 0' },
+        { status: 400 }
+      )
+    }
+
+    // Get current product stock with atomic read
     const product = await db.product.findUnique({
       where: { 
         id: productId,
@@ -107,7 +114,7 @@ export async function POST(request: NextRequest) {
     // Get all product IDs
     const productIds = items.map(item => item.productId)
 
-    // Fetch current stock for all products
+    // Fetch current stock for all products in a single query
     const products = await db.product.findMany({
       where: {
         id: { in: productIds },
@@ -197,15 +204,24 @@ export async function PUT(request: NextRequest) {
       )
     }
 
-    // In a production system, you would implement actual stock reservation
-    // For now, we'll do a comprehensive stock check
-    const stockCheck = await POST(new NextRequest(request.url, {
+    // Validate request format
+    for (const item of items) {
+      if (!item.productId || typeof item.requestedQuantity !== 'number' || item.requestedQuantity <= 0) {
+        return NextResponse.json(
+          { error: 'Invalid item format' },
+          { status: 400 }
+        )
+      }
+    }
+
+    // Do a comprehensive stock check first
+    const stockCheckResponse = await POST(new NextRequest(request.url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ items })
     }))
 
-    const stockResult = await stockCheck.json()
+    const stockResult = await stockCheckResponse.json()
 
     if (!stockResult.isValid) {
       return NextResponse.json({
@@ -217,6 +233,7 @@ export async function PUT(request: NextRequest) {
 
     // TODO: Implement actual stock reservation logic
     // This would typically involve creating reservation records with expiry times
+    // For now, we'll return a successful reservation response
     
     return NextResponse.json({
       reserved: true,
@@ -229,6 +246,36 @@ export async function PUT(request: NextRequest) {
     console.error('Stock reservation error:', error)
     return NextResponse.json(
       { error: 'Failed to reserve stock' },
+      { status: 500 }
+    )
+  }
+}
+
+// DELETE: Cancel stock reservation
+export async function DELETE(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url)
+    const reservationId = searchParams.get('reservationId')
+
+    if (!reservationId) {
+      return NextResponse.json(
+        { error: 'Reservation ID is required' },
+        { status: 400 }
+      )
+    }
+
+    // TODO: Implement actual reservation cancellation
+    // This would remove the reservation record from the database
+    
+    return NextResponse.json({
+      cancelled: true,
+      reservationId
+    })
+
+  } catch (error) {
+    console.error('Stock reservation cancellation error:', error)
+    return NextResponse.json(
+      { error: 'Failed to cancel reservation' },
       { status: 500 }
     )
   }
