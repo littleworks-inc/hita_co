@@ -1,3 +1,5 @@
+// File: app/products/[slug]/page.tsx - Enhanced with Draft System Protection
+
 import { Suspense } from 'react'
 import { notFound } from 'next/navigation'
 import Image from 'next/image'
@@ -28,7 +30,8 @@ import {
   Tag,
   Info,
   CheckCircle,
-  AlertTriangle
+  AlertTriangle,
+  Eye
 } from 'lucide-react'
 
 interface ProductDetailPageProps {
@@ -44,7 +47,7 @@ async function getStoreSettings() {
   })
 }
 
-// Get product by slug
+// Enhanced product fetching with Draft System Protection
 async function getProduct(slug: string) {
   // Extract SKU from slug (format: product-name-SKU)
   const parts = slug.split('-')
@@ -53,7 +56,18 @@ async function getProduct(slug: string) {
   const product = await db.product.findFirst({
     where: {
       sku: sku,
-      isActive: true
+      // CRITICAL: Only show published products to customers
+      OR: [
+        { status: 'PUBLISHED' },
+        { 
+          AND: [
+            { status: null }, // Legacy products without status
+            { isActive: true } // But must be active
+          ]
+        }
+      ]
+      // NOTE: We don't check stockQuantity here as customers should see 
+      // out-of-stock products (just not be able to buy them)
     },
     include: {
       category: {
@@ -62,19 +76,34 @@ async function getProduct(slug: string) {
         }
       },
       country: true,
-      supplier: true
+      supplier: {
+        select: {
+          id: true,
+          name: true,
+          country: true
+        }
+      }
     }
   })
 
   return product
 }
 
-// Get related products
+// Get related published products only
 async function getRelatedProducts(productId: string, categoryId: string) {
   return await db.product.findMany({
     where: {
-      isActive: true,
-      stockQuantity: { gt: 0 },
+      // Only published products for related products
+      OR: [
+        { status: 'PUBLISHED' },
+        { 
+          AND: [
+            { status: null },
+            { isActive: true }
+          ]
+        }
+      ],
+      stockQuantity: { gt: 0 }, // Related products should have stock
       categoryId: categoryId,
       id: { not: productId }
     },
@@ -83,7 +112,10 @@ async function getRelatedProducts(productId: string, categoryId: string) {
       country: true
     },
     take: 4,
-    orderBy: { createdAt: 'desc' }
+    orderBy: [
+      { isFeatured: 'desc' },
+      { createdAt: 'desc' }
+    ]
   })
 }
 
@@ -91,6 +123,7 @@ async function getRelatedProducts(productId: string, categoryId: string) {
 async function ProductDetail({ slug }: { slug: string }) {
   const product = await getProduct(slug)
 
+  // Return 404 for draft/archived products or non-existent products
   if (!product) {
     notFound()
   }
@@ -114,7 +147,7 @@ async function ProductDetail({ slug }: { slug: string }) {
           <Link href="/products" className="hover:text-purple-600">Products</Link>
           <span className="mx-2">/</span>
           <Link 
-            href={`/categories/${product.category.slug}`}
+            href={`/categories/${product.category.slug}`} 
             className="hover:text-purple-600"
           >
             {product.category.name}
@@ -123,22 +156,22 @@ async function ProductDetail({ slug }: { slug: string }) {
           <span className="text-gray-900">{product.name}</span>
         </nav>
 
-        {/* Product Title & Rating */}
+        {/* Product Title & SKU */}
         <div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">{product.name}</h1>
           <div className="flex items-center gap-4">
-            <div className="flex items-center gap-1">
-              {[1, 2, 3, 4, 5].map((star) => (
-                <Star key={star} className="h-5 w-5 text-yellow-400 fill-current" />
-              ))}
-              <span className="text-sm text-gray-600 ml-2">(24 reviews)</span>
-            </div>
             <span className="text-sm text-gray-500">SKU: {product.sku}</span>
+            {product.isFeatured && (
+              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                <Star className="h-3 w-3 mr-1" />
+                Featured
+              </span>
+            )}
           </div>
         </div>
 
         {/* Price */}
-        <div className="text-3xl font-bold text-gray-900">
+        <div className="text-3xl font-bold text-purple-600">
           {formatPrice(product.sellingPriceUSD)}
         </div>
 
@@ -146,97 +179,100 @@ async function ProductDetail({ slug }: { slug: string }) {
         <div className="flex items-center gap-2">
           {isOutOfStock ? (
             <div className="flex items-center gap-2 text-red-600">
-              <AlertTriangle className="h-5 w-5" />
+              <AlertTriangle className="h-4 w-4" />
               <span className="font-medium">Out of Stock</span>
             </div>
           ) : isLowStock ? (
             <div className="flex items-center gap-2 text-orange-600">
-              <AlertTriangle className="h-5 w-5" />
-              <span className="font-medium">Only {product.stockQuantity} left in stock</span>
+              <AlertTriangle className="h-4 w-4" />
+              <span className="font-medium">Only {product.stockQuantity} left</span>
             </div>
           ) : (
             <div className="flex items-center gap-2 text-green-600">
-              <CheckCircle className="h-5 w-5" />
-              <span className="font-medium">In Stock</span>
+              <CheckCircle className="h-4 w-4" />
+              <span className="font-medium">In Stock ({product.stockQuantity} available)</span>
             </div>
           )}
         </div>
 
         {/* Short Description */}
         {product.shortDescription && (
-          <div className="text-lg text-gray-600 leading-relaxed">
-            {product.shortDescription}
-          </div>
+          <p className="text-gray-600 text-lg">{product.shortDescription}</p>
         )}
 
         {/* Product Details */}
-        <div className="grid grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg">
-          <div className="flex items-center gap-2">
-            <Tag className="h-4 w-4 text-gray-500" />
-            <span className="text-sm text-gray-600">Category:</span>
-            <span className="text-sm font-medium">{product.category.name}</span>
+        <div className="space-y-3 py-4 border-t border-gray-200">
+          <div className="flex items-center gap-3">
+            <MapPin className="h-4 w-4 text-gray-400" />
+            <span className="text-sm text-gray-600">
+              Made in <span className="font-medium">{product.country.name}</span>
+            </span>
           </div>
-          <div className="flex items-center gap-2">
-            <MapPin className="h-4 w-4 text-gray-500" />
-            <span className="text-sm text-gray-600">Origin:</span>
-            <span className="text-sm font-medium">{product.country.name}</span>
+          <div className="flex items-center gap-3">
+            <Package className="h-4 w-4 text-gray-400" />
+            <span className="text-sm text-gray-600">
+              Category: <span className="font-medium">{product.category.name}</span>
+            </span>
           </div>
-        </div>
-
-        {/* Action Buttons */}
-        <div className="space-y-4">
-          <div className="flex gap-4">
-            <button
-              disabled={isOutOfStock}
-              className={`flex-1 flex items-center justify-center gap-2 py-4 px-6 rounded-lg font-semibold text-lg transition-all ${
-                isOutOfStock
-                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                  : 'bg-gradient-to-r from-purple-600 to-pink-600 text-white hover:shadow-lg transform hover:-translate-y-1'
-              }`}
-            >
-              <ShoppingCart className="h-5 w-5" />
-              {isOutOfStock ? 'Out of Stock' : 'Add to Cart'}
-            </button>
-            
-            <button className="p-4 border-2 border-gray-300 rounded-lg hover:border-red-500 hover:text-red-500 transition-colors">
-              <Heart className="h-6 w-6" />
-            </button>
-            
-            <button className="p-4 border-2 border-gray-300 rounded-lg hover:border-purple-500 hover:text-purple-500 transition-colors">
-              <Share2 className="h-6 w-6" />
-            </button>
-          </div>
-
-          {/* Buy Now Button */}
-          {!isOutOfStock && (
-            <button className="w-full bg-gray-900 text-white py-4 px-6 rounded-lg font-semibold text-lg hover:bg-gray-800 transition-colors">
-              Buy Now
-            </button>
+          {product.tags && product.tags.length > 0 && (
+            <div className="flex items-center gap-3">
+              <Tag className="h-4 w-4 text-gray-400" />
+              <div className="flex flex-wrap gap-1">
+                {product.tags.slice(0, 5).map((tag, index) => (
+                  <span 
+                    key={index}
+                    className="inline-block px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded"
+                  >
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            </div>
           )}
         </div>
 
-        {/* Trust Indicators */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-6 border-t border-gray-200">
-          <div className="flex items-center gap-3 text-sm">
-            <Truck className="h-5 w-5 text-green-600" />
-            <div>
-              <div className="font-medium text-gray-900">Free Shipping</div>
-              <div className="text-gray-500">On orders over $100</div>
-            </div>
+        {/* Action Buttons */}
+        <div className="space-y-3">
+          <button
+            disabled={isOutOfStock}
+            className={`w-full flex items-center justify-center gap-2 px-6 py-3 rounded-lg font-medium transition-colors ${
+              isOutOfStock
+                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                : 'bg-purple-600 text-white hover:bg-purple-700'
+            }`}
+          >
+            <ShoppingCart className="h-5 w-5" />
+            {isOutOfStock ? 'Out of Stock' : 'Add to Cart'}
+          </button>
+          
+          <div className="grid grid-cols-2 gap-3">
+            <button className="flex items-center justify-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+              <Heart className="h-4 w-4" />
+              Save
+            </button>
+            <button className="flex items-center justify-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+              <Share2 className="h-4 w-4" />
+              Share
+            </button>
           </div>
-          <div className="flex items-center gap-3 text-sm">
-            <Shield className="h-5 w-5 text-blue-600" />
-            <div>
-              <div className="font-medium text-gray-900">Secure Payment</div>
-              <div className="text-gray-500">100% protected</div>
-            </div>
+        </div>
+
+        {/* Trust Badges */}
+        <div className="grid grid-cols-3 gap-4 pt-6 border-t border-gray-200">
+          <div className="text-center">
+            <Shield className="h-6 w-6 text-purple-600 mx-auto mb-2" />
+            <div className="text-sm font-medium text-gray-900">Secure Payment</div>
+            <div className="text-xs text-gray-500">SSL protected</div>
           </div>
-          <div className="flex items-center gap-3 text-sm">
-            <RotateCcw className="h-5 w-5 text-purple-600" />
-            <div>
-              <div className="font-medium text-gray-900">Easy Returns</div>
-              <div className="text-gray-500">30-day policy</div>
-            </div>
+          <div className="text-center">
+            <Truck className="h-6 w-6 text-purple-600 mx-auto mb-2" />
+            <div className="text-sm font-medium text-gray-900">Fast Shipping</div>
+            <div className="text-xs text-gray-500">2-3 business days</div>
+          </div>
+          <div className="text-center">
+            <RotateCcw className="h-6 w-6 text-purple-600 mx-auto mb-2" />
+            <div className="text-sm font-medium text-gray-900">Easy Returns</div>
+            <div className="text-xs text-gray-500">30-day policy</div>
           </div>
         </div>
       </div>
@@ -244,7 +280,7 @@ async function ProductDetail({ slug }: { slug: string }) {
   )
 }
 
-// Related Products Component
+// Related Products Component (only published products)
 async function RelatedProducts({ productId, categoryId }: { productId: string, categoryId: string }) {
   const relatedProducts = await getRelatedProducts(productId, categoryId)
 
@@ -264,17 +300,67 @@ async function RelatedProducts({ productId, categoryId }: { productId: string, c
   )
 }
 
+// Generate static paths for published products only (for static generation)
+export async function generateStaticParams() {
+  // Only generate paths for published products
+  const products = await db.product.findMany({
+    where: {
+      OR: [
+        { status: 'PUBLISHED' },
+        { 
+          AND: [
+            { status: null },
+            { isActive: true }
+          ]
+        }
+      ]
+    },
+    select: {
+      sku: true,
+      name: true
+    }
+  })
+
+  return products.map((product) => ({
+    slug: `${product.name.toLowerCase().replace(/\s+/g, '-')}-${product.sku}`
+  }))
+}
+
+// Enhanced metadata generation with draft system considerations
+export async function generateMetadata({ params }: ProductDetailPageProps) {
+  const [product, storeSettings] = await Promise.all([
+    getProduct(params.slug),
+    getStoreSettings()
+  ])
+
+  // Return 404 metadata for draft/archived products
+  if (!product) {
+    return {
+      title: 'Product Not Found',
+      description: 'The requested product could not be found or is no longer available.',
+      robots: {
+        index: false,
+        follow: false
+      }
+    }
+  }
+
+  return generateProductMetadata(product, storeSettings)
+}
+
+// Main Page Component
 export default async function ProductDetailPage({ params }: ProductDetailPageProps) {
   const [storeSettings, product] = await Promise.all([
     getStoreSettings(),
     getProduct(params.slug)
   ])
 
+  // Return 404 for draft/archived products
   if (!product) {
     notFound()
   }
 
-  // Generate structured data
+  // Generate structured data (only for published products)
   const productSchema = generateProductJsonLd(product, storeSettings)
   const breadcrumbSchema = generateBreadcrumbJsonLd([
     { name: 'Home', url: '/' },
@@ -285,7 +371,7 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
 
   return (
     <>
-      {/* JSON-LD Structured Data */}
+      {/* JSON-LD Structured Data for Published Products Only */}
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
@@ -307,7 +393,7 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
             <ProductDetail slug={params.slug} />
           </Suspense>
 
-          {/* Product Description */}
+          {/* Product Description (only for published products) */}
           {product.description && (
             <section className="mt-16 pt-16 border-t border-gray-200">
               <div className="max-w-4xl">
@@ -321,7 +407,7 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
             </section>
           )}
 
-          {/* Related Products */}
+          {/* Related Products (only published) */}
           <Suspense fallback={<LoadingSpinner text="Loading related products..." />}>
             <RelatedProducts productId={product.id} categoryId={product.categoryId} />
           </Suspense>
@@ -329,21 +415,4 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
       </div>
     </>
   )
-}
-
-// Generate metadata for SEO
-export async function generateMetadata({ params }: ProductDetailPageProps) {
-  const [product, storeSettings] = await Promise.all([
-    getProduct(params.slug),
-    getStoreSettings()
-  ])
-
-  if (!product) {
-    return {
-      title: 'Product Not Found',
-      description: 'The requested product could not be found.',
-    }
-  }
-
-  return generateProductMetadata(product, storeSettings)
 }
