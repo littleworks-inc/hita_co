@@ -16,6 +16,8 @@ import {
   Package
 } from 'lucide-react'
 import CurrencySelector from '@/components/customer/CurrencySelector'
+import { useCart } from '@/contexts/CartContext'
+import { useCurrency } from '@/contexts/CurrencyContext'
 
 interface Category {
   id: string
@@ -44,6 +46,10 @@ export default function CustomerNavigation({ storeSettings }: CustomerNavigation
   const [searchQuery, setSearchQuery] = useState('')
   const [showSearch, setShowSearch] = useState(false)
   const [categories, setCategories] = useState<Category[]>([])
+
+  // Cart integration
+  const { totalItems, totalPriceUSD, toggleCart, isClient } = useCart()
+  const { formatPrice } = useCurrency()
 
   // Fetch categories for navigation
   useEffect(() => {
@@ -187,12 +193,25 @@ export default function CustomerNavigation({ storeSettings }: CustomerNavigation
                 </span>
               </button>
 
-              {/* Cart */}
-              <button className="text-gray-700 hover:text-purple-600 transition-colors relative">
+              {/* Enhanced Cart Button with live count and price */}
+              <button 
+                onClick={toggleCart}
+                className="text-gray-700 hover:text-purple-600 transition-colors relative group"
+              >
                 <ShoppingBag className="h-6 w-6" />
-                <span className="absolute -top-2 -right-2 bg-purple-600 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                  0
-                </span>
+                {/* Cart count badge */}
+                {isClient && totalItems > 0 && (
+                  <span className="absolute -top-2 -right-2 bg-purple-600 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center animate-pulse">
+                    {totalItems > 99 ? '99+' : totalItems}
+                  </span>
+                )}
+                
+                {/* Cart preview tooltip */}
+                {isClient && totalItems > 0 && (
+                  <div className="absolute right-0 top-8 invisible group-hover:visible bg-gray-900 text-white text-xs rounded py-2 px-3 whitespace-nowrap z-50">
+                    {totalItems} item{totalItems !== 1 ? 's' : ''} • {formatPrice(totalPriceUSD)}
+                  </div>
+                )}
               </button>
 
               {/* User Account */}
@@ -205,20 +224,16 @@ export default function CustomerNavigation({ storeSettings }: CustomerNavigation
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
                 className="md:hidden text-gray-700 hover:text-purple-600"
               >
-                {mobileMenuOpen ? (
-                  <X className="h-6 w-6" />
-                ) : (
-                  <Menu className="h-6 w-6" />
-                )}
+                {mobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
               </button>
             </div>
           </div>
         </div>
 
-        {/* Mobile Navigation Menu */}
+        {/* Mobile Menu */}
         {mobileMenuOpen && (
-          <div className="md:hidden bg-white border-t border-gray-200">
-            <div className="px-4 pt-2 pb-4 space-y-2">
+          <div className="md:hidden absolute top-16 left-0 right-0 bg-white shadow-lg border-t border-gray-200 z-40">
+            <div className="px-4 py-2 space-y-1">
               {/* Mobile Search */}
               <form onSubmit={handleSearch} className="flex mb-4">
                 <input
@@ -226,11 +241,11 @@ export default function CustomerNavigation({ storeSettings }: CustomerNavigation
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Search products..."
-                  className="flex-1 px-4 py-2 border border-gray-300 rounded-l-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none"
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-l-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none"
                 />
                 <button
                   type="submit"
-                  className="bg-purple-600 text-white px-4 py-2 rounded-r-lg hover:bg-purple-700"
+                  className="bg-purple-600 text-white px-4 py-2 rounded-r-lg hover:bg-purple-700 transition-colors"
                 >
                   <Search className="h-5 w-5" />
                 </button>
@@ -242,7 +257,7 @@ export default function CustomerNavigation({ storeSettings }: CustomerNavigation
                   key={item.name}
                   href={item.href}
                   onClick={() => setMobileMenuOpen(false)}
-                  className={`block px-4 py-2 text-base font-medium rounded-lg transition-colors ${
+                  className={`block px-4 py-3 text-base font-medium rounded-lg transition-colors ${
                     item.current
                       ? 'bg-purple-100 text-purple-600'
                       : 'text-gray-700 hover:bg-gray-100'
@@ -251,6 +266,25 @@ export default function CustomerNavigation({ storeSettings }: CustomerNavigation
                   {item.name}
                 </Link>
               ))}
+
+              {/* Mobile Cart Summary */}
+              {isClient && totalItems > 0 && (
+                <button
+                  onClick={() => {
+                    toggleCart()
+                    setMobileMenuOpen(false)
+                  }}
+                  className="w-full flex items-center justify-between px-4 py-3 bg-purple-50 text-purple-600 rounded-lg"
+                >
+                  <div className="flex items-center gap-2">
+                    <ShoppingBag className="h-5 w-5" />
+                    <span>Shopping Cart</span>
+                  </div>
+                  <div className="text-sm">
+                    {totalItems} item{totalItems !== 1 ? 's' : ''} • {formatPrice(totalPriceUSD)}
+                  </div>
+                </button>
+              )}
 
               {/* Mobile Currency Selector */}
               <div className="pt-4 border-t border-gray-200">

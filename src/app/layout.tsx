@@ -1,6 +1,8 @@
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import { CurrencyProvider } from '@/contexts/CurrencyContext'
+import { CartProvider } from '@/contexts/CartContext'
+import CartDrawer from '@/components/cart/CartDrawer'
 import './globals.css'
 
 const inter = Inter({ 
@@ -58,7 +60,7 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: 'Hita&Co - Authentic Indian Ethnic Wear & Lifestyle',
     description: 'Discover our curated collection of authentic handcrafted Indian ethnic wear, jewelry, and lifestyle products.',
-    images: ['/og-image.jpg']
+    images: ['/twitter-image.jpg']
   },
   robots: {
     index: true,
@@ -72,44 +74,43 @@ export const metadata: Metadata = {
     },
   },
   verification: {
-    google: process.env.NEXT_PUBLIC_GOOGLE_VERIFICATION,
-  },
-}
-
-// Server-side function to get initial currency and rates (optional)
-async function getInitialCurrencyData() {
-  try {
-    // You can fetch exchange rates server-side if needed
-    // For now, we'll let the client handle it
-    return {
-      initialCurrency: 'USD' as const,
-      initialRates: {}
-    }
-  } catch (error) {
-    console.warn('Error fetching initial currency data:', error)
-    return {
-      initialCurrency: 'USD' as const,
-      initialRates: {}
-    }
+    google: process.env.GOOGLE_VERIFICATION,
   }
 }
 
-export default async function RootLayout({
-  children,
-}: {
+// Get initial currency and exchange rates (server-side)
+async function getInitialCurrencyData() {
+  try {
+    // In a real app, you might detect user's location and set initial currency
+    // For now, we'll use USD as default
+    const initialCurrency = 'USD'
+    
+    // Fetch initial exchange rates (you might want to cache these)
+    const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/currency/rates`, {
+      next: { revalidate: 3600 } // Cache for 1 hour
+    })
+    
+    const initialRates = response.ok ? await response.json() : {}
+    
+    return { initialCurrency, initialRates }
+  } catch (error) {
+    console.warn('Failed to fetch initial currency data:', error)
+    return { initialCurrency: 'USD', initialRates: {} }
+  }
+}
+
+interface RootLayoutProps {
   children: React.ReactNode
-}) {
-  // Get initial currency data (optional)
+}
+
+export default async function RootLayout({ children }: RootLayoutProps) {
+  // Get initial currency data for SSR
   const { initialCurrency, initialRates } = await getInitialCurrencyData()
 
   return (
-    <html lang="en" className={inter.variable}>
+    <html lang="en" suppressHydrationWarning>
       <head>
-        {/* Preload critical resources */}
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        
-        {/* Prevent FOUC (Flash of Unstyled Content) */}
+        {/* Theme detection script */}
         <script
           dangerouslySetInnerHTML={{
             __html: `
@@ -125,16 +126,21 @@ export default async function RootLayout({
         />
       </head>
       <body className={`${inter.className} font-sans antialiased`}>
-        {/* Fixed CurrencyProvider wrapper */}
+        {/* Enhanced Provider wrapper with Cart and Currency */}
         <CurrencyProvider 
           initialCurrency={initialCurrency}
           initialRates={initialRates}
         >
-          <div className="flex min-h-screen flex-col">
-            <main className="flex-1">
-              {children}
-            </main>
-          </div>
+          <CartProvider>
+            <div className="flex min-h-screen flex-col">
+              <main className="flex-1">
+                {children}
+              </main>
+            </div>
+            
+            {/* Global Cart Drawer - Available on all pages */}
+            <CartDrawer />
+          </CartProvider>
         </CurrencyProvider>
         
         {/* Analytics scripts would go here */}

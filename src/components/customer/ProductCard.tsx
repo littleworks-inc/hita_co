@@ -5,6 +5,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { formatPrice } from '@/lib/utils'
 import { CardPrice } from '@/components/customer/PriceDisplay'
+import AddToCartButton from '@/components/cart/AddToCartButton'
 import {
   Heart,
   ShoppingCart,
@@ -12,7 +13,8 @@ import {
   Eye,
   Tag,
   Sparkles,
-  Package
+  Package,
+  AlertCircle
 } from 'lucide-react'
 
 interface Product {
@@ -25,10 +27,15 @@ interface Product {
   shortDescription?: string | null
   isFeatured: boolean
   category: {
+    id: string
     name: string
+    slug: string
   }
   country: {
+    id: string
     name: string
+    currency: string
+    currencySymbol: string
   }
 }
 
@@ -46,13 +53,6 @@ export default function ProductCard({ product, className = '' }: ProductCardProp
   const primaryImage = product.images[0]
   const secondaryImage = product.images[1]
 
-  const handleAddToCart = (e: React.MouseEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    // TODO: Implement add to cart functionality
-    console.log('Add to cart:', product.id)
-  }
-
   const handleToggleWishlist = (e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
@@ -64,9 +64,43 @@ export default function ProductCard({ product, className = '' }: ProductCardProp
   const isOutOfStock = product.stockQuantity === 0
 
   return (
-    <div className={`group relative bg-white rounded-2xl shadow-md hover:shadow-xl transition-all duration-300 overflow-hidden ${className}`}>
+    <div className={`group relative bg-white rounded-2xl shadow-md hover:shadow-xl transition-all duration-300 overflow-hidden border border-gray-100 ${className}`}>
       {/* Product Link Wrapper */}
       <Link href={`/products/${productSlug}`} className="block">
+        {/* Badge Container */}
+        <div className="absolute top-3 left-3 z-10 flex flex-col gap-2">
+          {product.isFeatured && (
+            <span className="inline-flex items-center gap-1 px-2 py-1 bg-purple-600 text-white text-xs font-medium rounded-full">
+              <Sparkles className="h-3 w-3" />
+              Featured
+            </span>
+          )}
+          {isLowStock && !isOutOfStock && (
+            <span className="inline-flex items-center gap-1 px-2 py-1 bg-amber-500 text-white text-xs font-medium rounded-full">
+              <AlertCircle className="h-3 w-3" />
+              Low Stock
+            </span>
+          )}
+          {isOutOfStock && (
+            <span className="inline-flex items-center gap-1 px-2 py-1 bg-red-500 text-white text-xs font-medium rounded-full">
+              <Package className="h-3 w-3" />
+              Out of Stock
+            </span>
+          )}
+        </div>
+
+        {/* Wishlist Button */}
+        <button
+          onClick={handleToggleWishlist}
+          className="absolute top-3 right-3 z-10 p-2 bg-white/80 backdrop-blur-sm rounded-full opacity-0 group-hover:opacity-100 transition-all duration-200 hover:bg-white hover:scale-110"
+        >
+          <Heart 
+            className={`h-4 w-4 transition-colors ${
+              isWishlisted ? 'fill-red-500 text-red-500' : 'text-gray-600'
+            }`} 
+          />
+        </button>
+
         {/* Image Container */}
         <div className="relative aspect-square overflow-hidden bg-gray-100">
           {/* Product Image */}
@@ -89,7 +123,7 @@ export default function ProductCard({ product, className = '' }: ProductCardProp
               {secondaryImage && (
                 <Image
                   src={secondaryImage}
-                  alt={`${product.name} - alternate view`}
+                  alt={`${product.name} - View 2`}
                   fill
                   className="object-cover opacity-0 group-hover:opacity-100 transition-opacity duration-500"
                   sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
@@ -97,140 +131,83 @@ export default function ProductCard({ product, className = '' }: ProductCardProp
               )}
             </>
           ) : (
-            /* Fallback when no image */
+            // Fallback placeholder
             <div className="w-full h-full flex items-center justify-center bg-gray-200">
-              <Package className="h-16 w-16 text-gray-400" />
+              <Package className="h-12 w-12 text-gray-400" />
             </div>
           )}
 
-          {/* Badges */}
-          <div className="absolute top-3 left-3 flex flex-col gap-2">
-            {product.isFeatured && (
-              <span className="bg-gradient-to-r from-yellow-400 to-orange-500 text-white text-xs font-bold px-2 py-1 rounded-full flex items-center gap-1">
-                <Star className="h-3 w-3 fill-current" />
-                Featured
-              </span>
-            )}
-            {isLowStock && !isOutOfStock && (
-              <span className="bg-orange-500 text-white text-xs font-bold px-2 py-1 rounded-full">
-                Low Stock
-              </span>
-            )}
-            {isOutOfStock && (
-              <span className="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">
-                Out of Stock
-              </span>
-            )}
-          </div>
-
-          {/* Action Buttons */}
-          <div className="absolute top-3 right-3 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-            {/* Wishlist */}
-            <button
-              onClick={handleToggleWishlist}
-              className={`p-2 rounded-full backdrop-blur-sm transition-all duration-200 ${
-                isWishlisted
-                  ? 'bg-red-500 text-white'
-                  : 'bg-white/80 text-gray-700 hover:bg-red-500 hover:text-white'
-              }`}
-              title="Add to wishlist"
-            >
-              <Heart className={`h-4 w-4 ${isWishlisted ? 'fill-current' : ''}`} />
-            </button>
-
-            {/* Quick View */}
-            <button
-              onClick={(e) => {
-                e.preventDefault()
-                e.stopPropagation()
-                // TODO: Implement quick view modal
-              }}
-              className="p-2 rounded-full bg-white/80 text-gray-700 backdrop-blur-sm hover:bg-purple-500 hover:text-white transition-all duration-200"
-              title="Quick view"
-            >
-              <Eye className="h-4 w-4" />
-            </button>
-          </div>
-
-          {/* Quick Add to Cart */}
-          {!isOutOfStock && (
-            <div className="absolute bottom-3 left-3 right-3">
-              <button
-                onClick={handleAddToCart}
-                className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white py-2 px-4 rounded-full font-semibold opacity-0 group-hover:opacity-100 transform translate-y-2 group-hover:translate-y-0 transition-all duration-300 flex items-center justify-center gap-2 hover:shadow-lg"
-              >
-                <ShoppingCart className="h-4 w-4" />
-                Add to Cart
-              </button>
+          {/* Quick Actions Overlay */}
+          <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
+            <div className="flex gap-2">
+              <div className="p-3 bg-white/90 backdrop-blur-sm rounded-full hover:bg-white transition-colors">
+                <Eye className="h-5 w-5 text-gray-700" />
+              </div>
             </div>
-          )}
-        </div>
-
-        {/* Product Info */}
-        <div className="p-4">
-          {/* Category */}
-          <div className="flex items-center gap-2 mb-2">
-            <Tag className="h-3 w-3 text-gray-400" />
-            <span className="text-xs text-gray-500 uppercase tracking-wide">
-              {product.category.name}
-            </span>
-            {product.country.name !== 'United States' && (
-              <span className="text-xs text-purple-600 font-medium">
-                · {product.country.name}
-              </span>
-            )}
-          </div>
-
-          {/* Product Name */}
-          <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2 group-hover:text-purple-600 transition-colors">
-            {product.name}
-          </h3>
-
-          {/* Short Description */}
-          {product.shortDescription && (
-            <p className="text-sm text-gray-600 mb-3 line-clamp-2">
-              {product.shortDescription}
-            </p>
-          )}
-
-          {/* Price and Stock */}
-          <div className="flex items-center justify-between">
-            <div className="flex flex-col">
-              <CardPrice priceUSD={product.sellingPriceUSD} />
-              <span className="text-xs text-gray-500">
-                SKU: {product.sku}
-              </span>
-            </div>
-            
-            <div className="text-right">
-              {isOutOfStock ? (
-                <span className="text-red-500 font-medium text-sm">
-                  Out of Stock
-                </span>
-              ) : isLowStock ? (
-                <span className="text-orange-500 font-medium text-sm">
-                  Only {product.stockQuantity} left
-                </span>
-              ) : (
-                <span className="text-green-600 font-medium text-sm">
-                  In Stock
-                </span>
-              )}
-            </div>
-          </div>
-
-          {/* Rating Stars (Placeholder) */}
-          <div className="flex items-center gap-1 mt-3">
-            {[1, 2, 3, 4, 5].map((star) => (
-              <Star
-                key={star}
-                className="h-4 w-4 text-yellow-400 fill-current"
-              />
-            ))}
-            <span className="text-sm text-gray-500 ml-1">(24 reviews)</span>
           </div>
         </div>
       </Link>
+
+      {/* Product Info */}
+      <div className="p-4 space-y-3">
+        {/* Category & Country */}
+        <div className="flex items-center justify-between text-xs text-gray-500">
+          <span className="flex items-center gap-1">
+            <Tag className="h-3 w-3" />
+            {product.category.name}
+          </span>
+          <span>{product.country.name}</span>
+        </div>
+
+        {/* Product Name */}
+        <Link href={`/products/${productSlug}`} className="block">
+          <h3 className="font-semibold text-gray-900 line-clamp-2 hover:text-purple-600 transition-colors">
+            {product.name}
+          </h3>
+        </Link>
+
+        {/* Short Description */}
+        {product.shortDescription && (
+          <p className="text-sm text-gray-600 line-clamp-2">
+            {product.shortDescription}
+          </p>
+        )}
+
+        {/* Price */}
+        <div className="flex items-center justify-between">
+          <CardPrice priceUSD={product.sellingPriceUSD} />
+          {product.stockQuantity <= 5 && product.stockQuantity > 0 && (
+            <span className="text-xs text-amber-600 font-medium">
+              {product.stockQuantity} left
+            </span>
+          )}
+        </div>
+
+        {/* Add to Cart Section */}
+        <div className="pt-3 border-t border-gray-100">
+          <AddToCartButton 
+            product={{
+              id: product.id,
+              sku: product.sku,
+              name: product.name,
+              sellingPriceUSD: product.sellingPriceUSD,
+              stockQuantity: product.stockQuantity,
+              images: product.images,
+              category: product.category,
+              country: product.country
+            }}
+            variant="default"
+            className="w-full"
+          />
+        </div>
+
+        {/* Stock Status */}
+        {isOutOfStock && (
+          <div className="text-center text-sm text-red-600 font-medium">
+            Currently Unavailable
+          </div>
+        )}
+      </div>
     </div>
   )
 }
