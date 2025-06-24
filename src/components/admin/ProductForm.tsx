@@ -88,6 +88,10 @@ interface Product {
   images: string[]
   seoTitle?: string
   seoDescription?: string
+  // ✅ ADDED: Draft system fields
+  status?: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED'
+  publishedAt?: string | null
+  archivedAt?: string | null
 }
 
 interface ProductFormProps {
@@ -151,7 +155,11 @@ export default function ProductForm({ categories, countries, suppliers, product,
     tags: product?.tags || [],
     images: product?.images || [],
     seoTitle: product?.seoTitle || '',
-    seoDescription: product?.seoDescription || ''
+    seoDescription: product?.seoDescription || '',
+    // ✅ ADDED: Draft system initialization
+    status: product?.status || 'DRAFT',
+    publishedAt: product?.publishedAt || null,
+    archivedAt: product?.archivedAt || null
   })
 
   // Get selected country for exchange rate
@@ -243,7 +251,7 @@ export default function ProductForm({ categories, countries, suppliers, product,
     }
   }
 
-  // ✅ ENHANCED: Form validation including barcode
+  // ✅ ENHANCED: Form validation including barcode and draft status
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {}
 
@@ -255,6 +263,14 @@ export default function ProductForm({ categories, countries, suppliers, product,
     if (!formData.barcode.trim()) newErrors.barcode = 'Barcode is required'
     if (formData.originalPrice <= 0) newErrors.originalPrice = 'Original price must be greater than 0'
     if (formData.stockQuantity < 0) newErrors.stockQuantity = 'Stock quantity cannot be negative'
+
+    // ✅ ADDED: Additional validation for publishing
+    if (formData.status === 'PUBLISHED') {
+      if (!formData.description?.trim()) newErrors.description = 'Description is required for published products'
+      if (!formData.shortDescription?.trim()) newErrors.shortDescription = 'Short description is required for published products'
+      if (!formData.images || formData.images.length === 0) newErrors.images = 'At least one image is required for published products'
+      if (formData.sellingPriceUSD <= 0) newErrors.sellingPriceUSD = 'Selling price must be greater than 0 for published products'
+    }
 
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
@@ -308,7 +324,7 @@ export default function ProductForm({ categories, countries, suppliers, product,
     }
   }
 
-  // ✅ ENHANCED: Form submission
+  // ✅ ENHANCED: Form submission with draft system
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
@@ -326,16 +342,36 @@ export default function ProductForm({ categories, countries, suppliers, product,
       
       const method = mode === 'create' ? 'POST' : 'PUT'
 
+      // ✅ ADDED: Handle draft system timestamps
+      const submitData = { ...formData }
+      
+      // Set publishedAt timestamp if publishing for the first time
+      if (formData.status === 'PUBLISHED' && !formData.publishedAt) {
+        submitData.publishedAt = new Date().toISOString()
+      }
+      
+      // Set archivedAt timestamp if archiving
+      if (formData.status === 'ARCHIVED' && !formData.archivedAt) {
+        submitData.archivedAt = new Date().toISOString()
+      }
+      
+      // Clear archivedAt if moving from archived to draft/published
+      if (formData.status !== 'ARCHIVED') {
+        submitData.archivedAt = null
+      }
+
       const response = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
+        body: JSON.stringify(submitData)
       })
 
       const data = await response.json()
 
       if (data.success) {
-        setSuccessMessage(`Product ${mode === 'create' ? 'created' : 'updated'} successfully!`)
+        const statusText = formData.status === 'DRAFT' ? 'saved as draft' : 
+                          formData.status === 'PUBLISHED' ? 'published' : 'archived'
+        setSuccessMessage(`Product ${mode === 'create' ? 'created' : 'updated'} and ${statusText} successfully!`)
         if (mode === 'create') {
           setTimeout(() => router.push('/admin/products'), 1500)
         }
@@ -788,7 +824,129 @@ export default function ProductForm({ categories, countries, suppliers, product,
         </CardContent>
       </Card>
 
-      {/* 8. Tags & SEO */}
+      {/* 8. ✅ ADDED: Product Status & Draft System */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Settings className="h-5 w-5" />
+            Product Status & Settings
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Product Status Section */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <Label htmlFor="status">Publication Status</Label>
+              {/* Current Status Badge */}
+              <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm font-medium ${
+                formData.status === 'DRAFT' ? 'bg-yellow-100 text-yellow-800 border border-yellow-200' :
+                formData.status === 'PUBLISHED' ? 'bg-green-100 text-green-800 border border-green-200' :
+                'bg-gray-100 text-gray-800 border border-gray-200'
+              }`}>
+                {formData.status === 'DRAFT' && <Eye className="h-3 w-3" />}
+                {formData.status === 'PUBLISHED' && <CheckCircle className="h-3 w-3" />}
+                {formData.status === 'ARCHIVED' && <AlertTriangle className="h-3 w-3" />}
+                {formData.status || 'Draft'}
+              </div>
+            </div>
+
+            <select
+              id="status"
+              value={formData.status}
+              onChange={(e) => handleInputChange('status', e.target.value as 'DRAFT' | 'PUBLISHED' | 'ARCHIVED')}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              <option value="DRAFT">Draft - Work in progress, not visible to customers</option>
+              <option value="PUBLISHED">Published - Live and visible to customers</option>
+              <option value="ARCHIVED">Archived - Hidden but preserved in system</option>
+            </select>
+
+            {/* Status Information */}
+            <div className="bg-gray-50 p-3 rounded-lg">
+              <div className="text-sm text-gray-700">
+                {formData.status === 'DRAFT' && (
+                  <>
+                    <strong>Draft Status:</strong> This product is being created or edited. It's not visible to customers and can be freely modified.
+                  </>
+                )}
+                {formData.status === 'PUBLISHED' && (
+                  <>
+                    <strong>Published Status:</strong> This product is live and visible to customers. Additional validation is required.
+                    {formData.publishedAt && (
+                      <div className="text-xs text-gray-500 mt-1">
+                        First published: {new Date(formData.publishedAt).toLocaleDateString()}
+                      </div>
+                    )}
+                  </>
+                )}
+                {formData.status === 'ARCHIVED' && (
+                  <>
+                    <strong>Archived Status:</strong> This product is hidden from customers but preserved in the system for reference.
+                    {formData.archivedAt && (
+                      <div className="text-xs text-gray-500 mt-1">
+                        Archived: {new Date(formData.archivedAt).toLocaleDateString()}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* Publishing Requirements Alert */}
+            {formData.status === 'PUBLISHED' && (
+              <div className="flex items-start gap-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <AlertTriangle className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <div className="font-medium text-blue-800">Publishing Requirements</div>
+                  <div className="text-sm text-blue-700 mt-1">
+                    To publish this product, ensure you have:
+                    <ul className="list-disc list-inside mt-1 space-y-1">
+                      <li>Product name and descriptions</li>
+                      <li>At least one product image</li>
+                      <li>Valid pricing information</li>
+                      <li>Stock quantity set</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Product Settings */}
+          <div className="space-y-4">
+            <Label>Product Settings</Label>
+            <div className="grid gap-4 md:grid-cols-2">
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={formData.isActive}
+                  onChange={(e) => handleInputChange('isActive', e.target.checked)}
+                  className="rounded"
+                />
+                <span className="text-sm">Active Product (Legacy)</span>
+              </label>
+
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={formData.isFeatured}
+                  onChange={(e) => handleInputChange('isFeatured', e.target.checked)}
+                  className="rounded"
+                  disabled={formData.status !== 'PUBLISHED'}
+                />
+                <span className="text-sm">
+                  Featured Product
+                  {formData.status !== 'PUBLISHED' && (
+                    <span className="text-gray-400"> (only for published products)</span>
+                  )}
+                </span>
+              </label>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* 9. Tags & SEO */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -896,7 +1054,59 @@ export default function ProductForm({ categories, countries, suppliers, product,
         </CardContent>
       </Card>
 
-      {/* Action Buttons */}
+      {/* 10. Cost Breakdown Summary */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <DollarSign className="h-5 w-5" />
+            Cost Breakdown Summary
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <div className="bg-blue-50 p-3 rounded-lg">
+              <div className="text-sm text-blue-600 font-medium">Total Cost (USD)</div>
+              <div className="text-lg font-bold text-blue-800">
+                ${(formData.costPriceUSD || 0).toFixed(2)}
+              </div>
+            </div>
+            
+            <div className="bg-green-50 p-3 rounded-lg">
+              <div className="text-sm text-green-600 font-medium">Per Piece (USD)</div>
+              <div className="text-lg font-bold text-green-800">
+                ${(formData.piecePriceUSD || 0).toFixed(2)}
+              </div>
+            </div>
+            
+            <div className="bg-purple-50 p-3 rounded-lg">
+              <div className="text-sm text-purple-600 font-medium">Selling Price (USD)</div>
+              <div className="text-lg font-bold text-purple-800">
+                ${(formData.sellingPriceUSD || 0).toFixed(2)}
+              </div>
+            </div>
+            
+            <div className="bg-yellow-50 p-3 rounded-lg">
+              <div className="text-sm text-yellow-600 font-medium">Profit Margin</div>
+              <div className="text-lg font-bold text-yellow-800">
+                {(formData.profitMargin || 0).toFixed(1)}%
+              </div>
+            </div>
+          </div>
+
+          {/* Exchange Rate Info */}
+          {selectedCountry && (
+            <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+              <div className="text-sm text-gray-600">
+                <strong>Exchange Rate:</strong> 1 {selectedCountry.currency} = ${(1/(exchangeRate || 1)).toFixed(4)} USD
+                <br />
+                <strong>Original Price:</strong> {selectedCountry.currencySymbol}{(formData.originalPrice || 0).toFixed(2)} {selectedCountry.currency}
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* ✅ ENHANCED: Action Buttons with Draft System */}
       <div className="flex justify-between items-center pt-6 border-t">
         <Link href="/admin/products">
           <Button type="button" variant="outline">
@@ -914,13 +1124,38 @@ export default function ProductForm({ categories, countries, suppliers, product,
             </Link>
           )}
 
+          {/* Save as Draft Button */}
+          <Button 
+            type="button" 
+            variant="outline"
+            onClick={() => {
+              handleInputChange('status', 'DRAFT')
+              // Trigger form submission after state update
+              setTimeout(() => {
+                const form = document.querySelector('form') as HTMLFormElement
+                form?.requestSubmit()
+              }, 100)
+            }}
+            disabled={loading || formData.status === 'DRAFT'}
+            className="border-yellow-300 text-yellow-700 hover:bg-yellow-50"
+          >
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Save as Draft
+          </Button>
+
+          {/* Main Submit Button - Dynamic based on status */}
           <Button type="submit" disabled={loading}>
             {loading ? (
               <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
             ) : (
               <Save className="h-4 w-4 mr-2" />
             )}
-            {mode === 'create' ? 'Create Product' : 'Update Product'}
+            {formData.status === 'PUBLISHED' ? 
+              (mode === 'create' ? 'Create & Publish' : 'Update & Publish') :
+              formData.status === 'ARCHIVED' ?
+              (mode === 'create' ? 'Create & Archive' : 'Update & Archive') :
+              (mode === 'create' ? 'Create Draft' : 'Update Draft')
+            }
           </Button>
         </div>
       </div>
