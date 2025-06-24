@@ -7,16 +7,58 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth'
 import { db } from '@/lib/db'
 
-export async function POST(request: NextRequest) {
+// TypeScript interfaces for type safety
+interface AIGenerationRequest {
+  type: 'short_description' | 'product_description' | 'seo_content'
+  context: {
+    name: string
+    category?: string
+    price?: number
+    materials?: string[]
+    colors?: string[]
+    userInput?: {
+      fabricType?: string
+      occasion?: string
+      specialFeatures?: string
+      craftmanship?: string
+      careInstructions?: string
+      targetKeywords?: string
+    }
+  }
+  options?: {
+    tone?: 'elegant' | 'casual' | 'professional' | 'playful'
+    maxTokens?: number
+    temperature?: number
+  }
+}
+
+interface AIResponse {
+  success: boolean
+  content?: any
+  error?: string
+  provider?: string
+  model?: string
+  usage?: {
+    tokens: number
+    cost?: number
+  }
+}
+
+interface SEOContent {
+  title: string
+  description: string
+}
+
+export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     const session = await getSession()
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const body = await request.json()
+    const body: AIGenerationRequest = await request.json()
     
-    // Handle different request formats
+    // Handle different request formats for backward compatibility
     let type, context, options = {}
     
     if (body.contentType) {
@@ -30,6 +72,14 @@ export async function POST(request: NextRequest) {
     }
 
     console.log('AI Generate Request:', { type, context, options })
+
+    // Validate required fields
+    if (!type || !context?.name) {
+      return NextResponse.json({
+        success: false,
+        error: 'Missing required fields: type and context.name are required'
+      }, { status: 400 })
+    }
 
     // Get AI settings from store settings
     const storeSettings = await db.storeSetting.findFirst({
@@ -56,7 +106,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Generate content based on type
-    let generatedContent = ''
+    let generatedContent: any = null
     
     try {
       console.log('Generating content for type:', type)
@@ -71,7 +121,7 @@ export async function POST(request: NextRequest) {
         console.error('Unsupported content type:', type)
         return NextResponse.json({
           success: false,
-          error: `Unsupported content type: ${type}`
+          error: `Unsupported content type: ${type}. Supported types: short_description, product_description, seo_content`
         }, { status: 400 })
       }
 
@@ -82,7 +132,7 @@ export async function POST(request: NextRequest) {
       }
 
       // ✅ FIXED: Clean the generated content properly handling both objects and strings
-      const cleanedContent = cleanAIResponse(generatedContent)
+      const cleanedContent = safeCleanAIResponse(generatedContent, type)
 
       return NextResponse.json({
         success: true,
@@ -95,7 +145,8 @@ export async function POST(request: NextRequest) {
       console.error('AI generation error:', error)
       return NextResponse.json({
         success: false,
-        error: error instanceof Error ? error.message : 'Content generation failed'
+        error: error instanceof Error ? error.message : 'Content generation failed',
+        provider: storeSettings.aiProvider
       }, { status: 500 })
     }
 
@@ -108,101 +159,151 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// ✅ FIXED: Clean AI response to handle both strings and objects
-function cleanAIResponse(content: any): any {
-  // If content is already an object (like SEO content), return it as-is
-  if (typeof content === 'object' && content !== null) {
-    console.log('Content is object, returning as-is:', content)
-    return content
+// ✅ COMPLETELY REWRITTEN: Safe AI response cleaning with proper type handling
+function safeCleanAIResponse(content: any, contentType: string): any {
+  console.log('Cleaning AI response:', { content, type: typeof content, contentType })
+
+  // Handle null or undefined
+  if (content === null || content === undefined) {
+    console.warn('Content is null/undefined, returning fallback')
+    return contentType === 'seo_content' 
+      ? { title: 'Untitled Product', description: 'Product description coming soon.' }
+      : 'Product description coming soon.'
   }
 
-  // If content is not a string, convert it to string
-  if (typeof content !== 'string') {
-    console.log('Content is not string, converting:', typeof content, content)
-    content = String(content)
+  // Handle SEO content - should be an object
+  if (contentType === 'seo_content') {
+    // If already a proper object with title and description, return as-is
+    if (typeof content === 'object' && content.title && content.description) {
+      console.log('SEO content is valid object, returning as-is')
+      return {
+        title: String(content.title).substring(0, 60), // SEO title limit
+        description: String(content.description).substring(0, 160) // Meta description limit
+      }
+    }
+
+    // If content is a string, try to parse as JSON
+    if (typeof content === 'string') {
+      try {
+        const parsed = JSON.parse(content)
+        if (parsed.title && parsed.description) {
+          console.log('Successfully parsed SEO JSON from string')
+          return {
+            title: String(parsed.title).substring(0, 60),
+            description: String(parsed.description).substring(0, 160)
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to parse SEO content as JSON:', e)
+      }
+
+      // Fallback: create SEO object from string content
+      console.log('Creating fallback SEO content from string')
+      const cleanedString = cleanStringContent(content)
+      return {
+        title: cleanedString.substring(0, 60) || 'Elegant Traditional Wear',
+        description: cleanedString.substring(0, 160) || 'Discover beautiful traditional clothing with premium quality and authentic designs.'
+      }
+    }
+
+    // Fallback for any other type
+    console.warn('Unexpected SEO content type, creating fallback')
+    return {
+      title: 'Premium Traditional Wear',
+      description: 'Beautiful traditional clothing with authentic designs and premium quality materials.'
+    }
   }
 
-  // Clean string content to remove reasoning and explanations
-  const cleanedContent = content
-    // Remove lines that start with reasoning indicators
-    .replace(/^(Alright,?|First,?|I should|Let me|So,?|Therefore,?|Now,?|Here's?|This is).*/gim, '')
-    // Remove explanation paragraphs
-    .replace(/^(The |This |It |A ).*(description|should|needs to|requires).*/gim, '')
-    // Remove any lines in parentheses or brackets
+  // Handle string content (short_description, product_description)
+  if (typeof content === 'string') {
+    return cleanStringContent(content)
+  }
+
+  // If content is an object but not SEO, try to extract description
+  if (typeof content === 'object') {
+    console.log('Content is object for string type, extracting text')
+    
+    // Try common properties
+    if (content.description) return cleanStringContent(String(content.description))
+    if (content.content) return cleanStringContent(String(content.content))
+    if (content.text) return cleanStringContent(String(content.text))
+    
+    // Try to convert entire object to string
+    return cleanStringContent(String(content))
+  }
+
+  // Fallback: convert whatever it is to string
+  console.warn('Unexpected content type, converting to string:', typeof content)
+  return cleanStringContent(String(content))
+}
+
+// ✅ ENHANCED: String cleaning function with better patterns
+function cleanStringContent(content: string): string {
+  if (!content || typeof content !== 'string') {
+    return 'Beautiful traditional wear crafted with care and attention to detail.'
+  }
+
+  // Clean the content step by step
+  let cleaned = content
+    // Remove JSON markers if present
+    .replace(/^```json\s*|\s*```$/g, '')
+    .replace(/^```\s*|\s*```$/g, '')
+    
+    // Remove reasoning and meta-commentary
+    .replace(/^(Here's?|This is|I'll|Let me|I should|I would|I've|So,?|Now,?|Therefore,?|Alright,?|First,?).*/gim, '')
+    .replace(/^(The description|This description|Here is|This is a|I've created).*/gim, '')
+    
+    // Remove explanation phrases
+    .replace(/^.*?(would be|should be|needs to|requires).*$/gim, '')
+    .replace(/^.*?(I think|I believe|In my opinion).*$/gim, '')
+    
+    // Remove lines in parentheses or brackets  
     .replace(/\([^)]*\)/g, '')
     .replace(/\[[^\]]*\]/g, '')
-    // Remove multiple line breaks
-    .replace(/\n\s*\n\s*\n/g, '\n\n')
-    // Remove leading/trailing whitespace
+    
+    // Remove markdown formatting
+    .replace(/\*\*(.*?)\*\*/g, '$1')
+    .replace(/\*(.*?)\*/g, '$1')
+    .replace(/#{1,6}\s/g, '')
+    
+    // Remove quotes if they wrap the entire content
+    .replace(/^["'`](.*)["'`]$/s, '$1')
+    
+    // Clean up whitespace
+    .replace(/\n\s*\n\s*\n/g, '\n\n') // Multiple line breaks
+    .replace(/^\s+|\s+$/g, '') // Leading/trailing whitespace
     .trim()
 
-  // If the content starts with quotes, remove them
-  const withoutQuotes = cleanedContent.replace(/^["']|["']$/g, '')
+  // If content starts with explanation words after cleaning, take everything after first sentence
+  if (/^(This|The|It|A)\s+\w+\s+(is|are|should|will|has|have|can|could|would|features|offers)/i.test(cleaned)) {
+    const sentences = cleaned.split(/[.!?]+/)
+    if (sentences.length > 1) {
+      cleaned = sentences.slice(1).join('.').trim()
+    }
+  }
+
+  // Take only the first paragraph if multiple exist
+  const firstParagraph = cleaned.split('\n\n')[0]
   
-  // Take only the first paragraph if multiple paragraphs exist
-  const firstParagraph = withoutQuotes.split('\n\n')[0]
-  
-  return firstParagraph.trim()
+  // Final cleanup
+  const result = firstParagraph
+    .replace(/^[.!?;,\s]+/, '') // Remove leading punctuation
+    .replace(/[.!?;,\s]+$/, '') // Remove trailing punctuation except final period
+    .trim()
+
+  // Ensure it ends with proper punctuation
+  if (result && !/[.!?]$/.test(result)) {
+    return result + '.'
+  }
+
+  return result || 'Beautiful traditional wear crafted with authentic designs and premium materials.'
 }
 
-// Enhanced short description generation with better prompts
-async function generateShortDescription(settings: any, context: any, options: any = {}) {
-  const { name, category, images, userInput, materials, colors, price } = context
+// ✅ ENHANCED: Short description generation with better error handling
+async function generateShortDescription(settings: any, context: any, options: any = {}): Promise<string> {
+  const { name, category, userInput, materials, colors, price } = context
   
-  // Build comprehensive prompt with user input
-  let prompt = `Write a 30-40 word product description for "${name}".
-
-Product Details:
-- Category: ${category || 'Traditional wear'}
-- Type: ${name}`
-
-  // Add user input if provided
-  if (userInput?.fabricType) {
-    prompt += `\n- Fabric: ${userInput.fabricType}`
-  }
-  
-  if (userInput?.occasion) {
-    prompt += `\n- Best for: ${userInput.occasion}`
-  }
-  
-  if (userInput?.specialFeatures) {
-    prompt += `\n- Special features: ${userInput.specialFeatures}`
-  }
-
-  // Add detected materials and colors
-  if (materials?.length > 0) {
-    prompt += `\n- Materials: ${materials.join(', ')}`
-  }
-  
-  if (colors?.length > 0) {
-    prompt += `\n- Colors: ${colors.join(', ')}`
-  }
-
-  if (price) {
-    prompt += `\n- Price: $${price}`
-  }
-
-  prompt += `
-
-Instructions:
-- Write ONLY the product description
-- Exactly 30-40 words
-- Focus on style, comfort, and occasion
-- Use elegant, sales-focused language
-- NO explanations or reasoning
-- Start directly with the description
-
-Description:`
-
-  return await callAIProvider(settings, prompt, 80)
-}
-
-// Enhanced product description generation
-async function generateProductDescription(settings: any, context: any, options: any = {}) {
-  const { name, category, price, materials, colors, tags, images, userInput } = context
-  const { tone = 'elegant' } = options
-
-  let prompt = `Write a detailed 100-150 word product description for "${name}".
+  let prompt = `Write a compelling 30-40 word product description for "${name}".
 
 Product Details:
 - Category: ${category || 'Traditional wear'}
@@ -212,9 +313,41 @@ Product Details:
   if (userInput?.fabricType) prompt += `\n- Fabric: ${userInput.fabricType}`
   if (userInput?.occasion) prompt += `\n- Perfect for: ${userInput.occasion}`
   if (userInput?.specialFeatures) prompt += `\n- Features: ${userInput.specialFeatures}`
+  if (materials?.length > 0) prompt += `\n- Materials: ${materials.join(', ')}`
+  if (colors?.length > 0) prompt += `\n- Available in: ${colors.join(', ')}`
+  if (price) prompt += `\n- Price: $${price}`
+
+  prompt += `
+
+Instructions:
+- Write EXACTLY 30-40 words
+- Focus on style, quality, and appeal
+- Use elegant, sales-focused language
+- NO explanations, reasoning, or meta-commentary
+- Start directly with the product description
+- End with proper punctuation
+
+Description:`
+
+  return await callAIProvider(settings, prompt, 80)
+}
+
+// ✅ ENHANCED: Product description generation  
+async function generateProductDescription(settings: any, context: any, options: any = {}): Promise<string> {
+  const { name, category, price, materials, colors, userInput } = context
+  const { tone = 'elegant' } = options
+
+  let prompt = `Write a detailed 100-150 word product description for "${name}".
+
+Product Details:
+- Category: ${category || 'Traditional wear'}
+- Name: ${name}`
+
+  if (userInput?.fabricType) prompt += `\n- Fabric: ${userInput.fabricType}`
+  if (userInput?.occasion) prompt += `\n- Perfect for: ${userInput.occasion}`
+  if (userInput?.specialFeatures) prompt += `\n- Features: ${userInput.specialFeatures}`
   if (userInput?.craftmanship) prompt += `\n- Craftsmanship: ${userInput.craftmanship}`
   if (userInput?.careInstructions) prompt += `\n- Care: ${userInput.careInstructions}`
-
   if (materials?.length > 0) prompt += `\n- Materials: ${materials.join(', ')}`
   if (colors?.length > 0) prompt += `\n- Colors: ${colors.join(', ')}`
   if (price) prompt += `\n- Price: $${price}`
@@ -223,23 +356,24 @@ Product Details:
 
 Instructions:
 - Write in ${tone} tone
-- 100-150 words
+- Exactly 100-150 words
 - Focus on quality, style, and cultural significance
 - Highlight unique features and craftsmanship
 - Appeal to customers who appreciate authentic ethnic wear
-- NO explanations or reasoning
+- NO explanations, reasoning, or meta-commentary
 - Start directly with the description
+- End with proper punctuation
 
 Description:`
 
   return await callAIProvider(settings, prompt, 200)
 }
 
-// ✅ FIXED: Enhanced SEO content generation - returns structured object
-async function generateSEOContent(settings: any, context: any, options: any = {}) {
+// ✅ COMPLETELY REWRITTEN: SEO content generation with guaranteed JSON structure
+async function generateSEOContent(settings: any, context: any, options: any = {}): Promise<SEOContent> {
   const { name, category, price, materials, colors, userInput } = context
 
-  let prompt = `Generate SEO content for "${name}" product.
+  let prompt = `Generate SEO content for the product "${name}".
 
 Product Details:
 - Name: ${name}
@@ -252,55 +386,100 @@ Product Details:
 
   prompt += `
 
-Create:
+Create SEO-optimized content:
+
 1. SEO Title (50-60 characters, include main keyword)
 2. Meta Description (150-160 characters, compelling and keyword-rich)
 
-Format as JSON:
+CRITICAL: Respond ONLY with valid JSON in this exact format:
 {
-  "title": "SEO title here",
-  "description": "Meta description here"
+  "title": "Your SEO title here (50-60 chars)",
+  "description": "Your meta description here (150-160 chars)"
 }
 
-Return ONLY the JSON, no explanations:`
+No explanations, no additional text, only the JSON object:`
 
-  const response = await callAIProvider(settings, prompt, 150)
-  
-  // Try to parse JSON response
   try {
-    const parsed = JSON.parse(response)
-    if (parsed.title && parsed.description) {
-      return parsed
+    const response = await callAIProvider(settings, prompt, 150)
+    
+    // Try to parse JSON response
+    try {
+      const parsed = JSON.parse(response)
+      if (parsed.title && parsed.description) {
+        return {
+          title: String(parsed.title).substring(0, 60),
+          description: String(parsed.description).substring(0, 160)
+        }
+      }
+    } catch (parseError) {
+      console.warn('Failed to parse SEO JSON, creating fallback:', parseError)
     }
-  } catch (e) {
-    console.log('Failed to parse JSON, creating fallback SEO content')
-  }
 
-  // Fallback if JSON parsing fails
-  return {
-    title: `${name} - Authentic ${category || 'Traditional Wear'}`,
-    description: `Discover our beautiful ${name}. Premium quality ${category || 'traditional wear'} perfect for special occasions. Shop authentic Indian ethnic wear.`
+    // Enhanced fallback creation
+    const cleanResponse = cleanStringContent(response)
+    const productName = name || 'Traditional Wear'
+    const categoryName = category || 'Ethnic Fashion'
+    
+    return {
+      title: `${productName} - Authentic ${categoryName} | Premium Quality`,
+      description: `Discover ${productName} featuring traditional designs and premium quality. Perfect for special occasions. ${cleanResponse.substring(0, 50)}...`
+    }
+
+  } catch (error) {
+    console.error('SEO generation failed:', error)
+    
+    // Final fallback
+    return {
+      title: `${name} - Authentic ${category || 'Traditional Wear'}`,
+      description: `Beautiful ${name} with authentic designs and premium quality. Perfect for special occasions and cultural celebrations.`
+    }
   }
 }
 
-// Call AI Provider (with OpenRouter support)
-async function callAIProvider(settings: any, prompt: string, maxTokens: number = 150): Promise<any> {
+// ✅ ENHANCED: AI provider calling with better error handling and retries
+async function callAIProvider(settings: any, prompt: string, maxTokens: number = 200): Promise<string> {
   const { aiProvider, aiApiKey, aiModel } = settings
+  
+  // Add retry logic
+  const maxRetries = 2
+  let lastError: Error | null = null
 
-  if (aiProvider === 'openai') {
-    return await callOpenAI(aiApiKey, aiModel, prompt, maxTokens)
-  } else if (aiProvider === 'gemini') {
-    return await callGemini(aiApiKey, aiModel, prompt, maxTokens)
-  } else if (aiProvider === 'claude') {
-    return await callClaude(aiApiKey, aiModel, prompt, maxTokens)
-  } else if (aiProvider === 'openrouter') {
-    return await callOpenRouter(aiApiKey, aiModel, prompt, maxTokens)
-  } else if (aiProvider === 'mistral') {
-    return await callMistral(aiApiKey, aiModel, prompt, maxTokens)
-  } else {
-    throw new Error(`Unsupported AI provider: ${aiProvider}`)
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      console.log(`AI Provider call attempt ${attempt}/${maxRetries}:`, { provider: aiProvider, model: aiModel })
+      
+      switch (aiProvider) {
+        case 'openai':
+          return await callOpenAI(aiApiKey, aiModel, prompt, maxTokens)
+        case 'gemini':
+          return await callGemini(aiApiKey, aiModel, prompt, maxTokens)
+        case 'claude':
+          return await callClaude(aiApiKey, aiModel, prompt, maxTokens)
+        case 'mistral':
+          return await callMistral(aiApiKey, aiModel, prompt, maxTokens)
+        case 'openrouter':
+          return await callOpenRouter(aiApiKey, aiModel, prompt, maxTokens)
+        default:
+          throw new Error(`Unsupported AI provider: ${aiProvider}`)
+      }
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error))
+      console.error(`AI Provider call failed (attempt ${attempt}):`, lastError.message)
+      
+      // If it's the last attempt, throw the error
+      if (attempt === maxRetries) {
+        throw lastError
+      }
+      
+      // Wait before retry (exponential backoff)
+      await new Promise(resolve => setTimeout(resolve, 1000 * attempt))
+    }
   }
+  
+  throw lastError || new Error('All retry attempts failed')
 }
+
+// ✅ ENHANCED: Individual AI provider functions with better error handling
 
 // OpenAI API call
 async function callOpenAI(apiKey: string, model: string, prompt: string, maxTokens: number): Promise<string> {
@@ -312,35 +491,6 @@ async function callOpenAI(apiKey: string, model: string, prompt: string, maxToke
     },
     body: JSON.stringify({
       model: model || 'gpt-4o-mini',
-      messages: [
-        { role: 'user', content: prompt }
-      ],
-      max_tokens: maxTokens,
-      temperature: 0.7,
-    }),
-  })
-
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}))
-    throw new Error(`OpenAI API error: ${errorData.error?.message || response.statusText}`)
-  }
-
-  const data = await response.json()
-  return data.choices[0]?.message?.content || ''
-}
-
-// ✅ NEW: OpenRouter API call
-async function callOpenRouter(apiKey: string, model: string, prompt: string, maxTokens: number): Promise<string> {
-  const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-      'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
-      'X-Title': 'Hita&Co eCommerce Platform'
-    },
-    body: JSON.stringify({
-      model: model || 'meta-llama/llama-3.2-3b-instruct:free',
       messages: [
         {
           role: 'system',
@@ -358,11 +508,17 @@ async function callOpenRouter(apiKey: string, model: string, prompt: string, max
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}))
-    throw new Error(`OpenRouter API error: ${errorData.error?.message || response.statusText}`)
+    throw new Error(`OpenAI API error: ${errorData.error?.message || response.statusText}`)
   }
 
   const data = await response.json()
-  return data.choices[0]?.message?.content || ''
+  const content = data.choices[0]?.message?.content
+  
+  if (!content) {
+    throw new Error('No content generated by OpenAI')
+  }
+  
+  return content.trim()
 }
 
 // Gemini API call
@@ -389,7 +545,13 @@ async function callGemini(apiKey: string, model: string, prompt: string, maxToke
   }
 
   const data = await response.json()
-  return data.candidates[0]?.content?.parts[0]?.text || ''
+  const content = data.candidates[0]?.content?.parts[0]?.text
+  
+  if (!content) {
+    throw new Error('No content generated by Gemini')
+  }
+  
+  return content.trim()
 }
 
 // Claude API call
@@ -417,10 +579,16 @@ async function callClaude(apiKey: string, model: string, prompt: string, maxToke
   }
 
   const data = await response.json()
-  return data.content[0]?.text || ''
+  const content = data.content[0]?.text
+  
+  if (!content) {
+    throw new Error('No content generated by Claude')
+  }
+  
+  return content.trim()
 }
 
-// ✅ NEW: Mistral API call
+// Mistral API call
 async function callMistral(apiKey: string, model: string, prompt: string, maxTokens: number): Promise<string> {
   const response = await fetch('https://api.mistral.ai/v1/chat/completions', {
     method: 'POST',
@@ -451,5 +619,53 @@ async function callMistral(apiKey: string, model: string, prompt: string, maxTok
   }
 
   const data = await response.json()
-  return data.choices[0]?.message?.content || ''
+  const content = data.choices[0]?.message?.content
+  
+  if (!content) {
+    throw new Error('No content generated by Mistral')
+  }
+  
+  return content.trim()
+}
+
+// OpenRouter API call
+async function callOpenRouter(apiKey: string, model: string, prompt: string, maxTokens: number): Promise<string> {
+  const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+      'HTTP-Referer': 'https://your-ecommerce-site.com',
+      'X-Title': 'Ecommerce AI Content Generator',
+    },
+    body: JSON.stringify({
+      model: model || 'meta-llama/llama-3.1-8b-instruct:free',
+      messages: [
+        {
+          role: 'system',
+          content: 'You are a professional copywriter specializing in ethnic fashion. Write ONLY the requested content. Never include reasoning, explanations, or meta-commentary in your responses.'
+        },
+        { 
+          role: 'user', 
+          content: prompt 
+        }
+      ],
+      max_tokens: maxTokens,
+      temperature: 0.7,
+    }),
+  })
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}))
+    throw new Error(`OpenRouter API error: ${errorData.error?.message || response.statusText}`)
+  }
+
+  const data = await response.json()
+  const content = data.choices[0]?.message?.content
+  
+  if (!content) {
+    throw new Error('No content generated by OpenRouter')
+  }
+  
+  return content.trim()
 }
