@@ -1,104 +1,89 @@
 // =====================================
-// src/components/admin/ProductTags.tsx - FIXED
+// src/components/admin/ProductSEO.tsx - CORRECTED SEO COMPONENT
 // =====================================
 'use client'
 
-import { useState } from 'react'
-import { Card, CardContent, CardHeader, CardTitle, Input, Label, Button } from '@/components/ui'
-import { Plus, X } from 'lucide-react'
+import { Card, CardContent, CardHeader, CardTitle, Input, Label } from '@/components/ui'
+import { Search } from 'lucide-react'
 
 interface Product {
-  tags: string[]
-  isActive: boolean
-  isFeatured: boolean
+  seoTitle: string
+  seoDescription: string
 }
 
-interface ProductTagsProps {
+interface ProductSEOProps {
   formData: Product
   onInputChange: (field: keyof Product, value: any) => void
 }
 
-export default function ProductTags({ 
+export default function ProductSEO({ 
   formData, 
   onInputChange 
-}: ProductTagsProps) {
-  const [tagInput, setTagInput] = useState('')
-
-  const handleAddTag = () => {
-    if (tagInput.trim() && !formData.tags.includes(tagInput.trim())) {
-      onInputChange('tags', [...formData.tags, tagInput.trim()])
-      setTagInput('')
-    }
-  }
-
-  const handleRemoveTag = (tagToRemove: string) => {
-    onInputChange('tags', formData.tags.filter(tag => tag !== tagToRemove))
-  }
-
+}: ProductSEOProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Tags & Settings</CardTitle>
+        <CardTitle className="flex items-center gap-2">
+          <Search className="h-5 w-5" />
+          SEO Settings
+        </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Tags */}
         <div className="space-y-2">
-          <Label>Product Tags</Label>
-          <div className="flex gap-2">
-            <Input
-              value={tagInput}
-              onChange={(e) => setTagInput(e.target.value)}
-              placeholder="Add a tag"
-              onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddTag())}
-            />
-            <Button type="button" onClick={handleAddTag} variant="outline">
-              <Plus className="h-4 w-4" />
-            </Button>
-          </div>
-          {formData.tags.length > 0 && (
-            <div className="flex flex-wrap gap-2 mt-2">
-              {formData.tags.map((tag, index) => (
-                <span
-                  key={index}
-                  className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-800 text-sm rounded-md"
-                >
-                  {tag}
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveTag(tag)}
-                    className="text-blue-600 hover:text-blue-800"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </span>
-              ))}
-            </div>
-          )}
+          <Label htmlFor="seoTitle">SEO Title</Label>
+          <Input
+            id="seoTitle"
+            value={formData.seoTitle || ''}
+            onChange={(e) => onInputChange('seoTitle', e.target.value)}
+            placeholder="SEO optimized title"
+          />
+          <p className="text-xs text-gray-500">
+            {(formData.seoTitle || '').length}/60 characters (recommended)
+          </p>
         </div>
 
-        {/* Product Settings */}
-        <div className="grid gap-4 md:grid-cols-2">
-          <div className="flex items-center space-x-2">
-            <input
-              id="isActive"
-              type="checkbox"
-              checked={formData.isActive}
-              onChange={(e) => onInputChange('isActive', e.target.checked)}
-              className="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
-            />
-            <Label htmlFor="isActive">Active Product</Label>
-          </div>
+        <div className="space-y-2">
+          <Label htmlFor="seoDescription">SEO Description</Label>
+          <textarea
+            id="seoDescription"
+            value={formData.seoDescription || ''}
+            onChange={(e) => onInputChange('seoDescription', e.target.value)}
+            placeholder="SEO optimized description"
+            rows={3}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          <p className="text-xs text-gray-500">
+            {(formData.seoDescription || '').length}/160 characters (recommended)
+          </p>
+        </div>
 
-          <div className="flex items-center space-x-2">
-            <input
-              id="isFeatured"
-              type="checkbox"
-              checked={formData.isFeatured}
-              onChange={(e) => onInputChange('isFeatured', e.target.checked)}
-              className="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
-            />
-            <Label htmlFor="isFeatured">Featured Product</Label>
+        {/* SEO Preview */}
+        {(formData.seoTitle || formData.seoDescription) && (
+          <div className="mt-4 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+            <h4 className="text-sm font-medium text-gray-700 mb-2">SEO Preview</h4>
+            <div className="space-y-1">
+              <div className="text-blue-600 text-lg font-medium truncate">
+                {formData.seoTitle || 'Product Title'}
+              </div>
+              <div className="text-green-700 text-sm">
+                www.yourstore.com/products/product-name
+              </div>
+              <div className="text-gray-600 text-sm leading-relaxed">
+                {formData.seoDescription || 'Product description will appear here...'}
+              </div>
+            </div>
           </div>
+        )}
+
+        {/* SEO Tips */}
+        <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+          <h4 className="text-sm font-medium text-blue-700 mb-2">SEO Tips</h4>
+          <ul className="text-xs text-blue-600 space-y-1">
+            <li>• Include your main keyword in the title</li>
+            <li>• Keep title under 60 characters</li>
+            <li>• Write compelling meta descriptions under 160 characters</li>
+            <li>• Include relevant keywords naturally</li>
+          </ul>
         </div>
       </CardContent>
     </Card>
