@@ -260,7 +260,7 @@ export default function ProductForm({ categories, countries, suppliers, product,
     if (!formData.name?.trim() || !formData.categoryId) return
 
     setIsGeneratingAI(true)
-    
+
     try {
       const context = {
         name: formData.name.trim(),
@@ -297,7 +297,7 @@ export default function ProductForm({ categories, countries, suppliers, product,
           if (data.content.title) handleInputChange('seoTitle', data.content.title)
           if (data.content.description) handleInputChange('seoDescription', data.content.description)
         }
-        
+
         setSuccessMessage(`${type.replace('_', ' ')} generated successfully!`)
         setTimeout(() => setSuccessMessage(''), 3000)
       } else {
@@ -392,7 +392,7 @@ export default function ProductForm({ categories, countries, suppliers, product,
         onInputChange={handleInputChange}
       />
 
-      {/* Product Images */}
+      {/* Product Images - FIXED */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -402,11 +402,11 @@ export default function ProductForm({ categories, countries, suppliers, product,
         </CardHeader>
         <CardContent>
           <ImageUpload
-            label="Product Images"
-            value={formData.images}
-            onChange={(images) => handleInputChange('images', images)}
-            multiple={true}
-            description="Upload high-quality product images. First image will be used as the main product image."
+            images={formData.images || []}  // ✅ CHANGED: Use 'images' prop instead of 'value'
+            onImagesChange={(images) => handleInputChange('images', images)}  // ✅ CHANGED: Use 'onImagesChange' instead of 'onChange'
+            maxImages={8}
+            maxVideos={2}
+            disabled={loading}
           />
         </CardContent>
       </Card>
@@ -467,7 +467,7 @@ export default function ProductForm({ categories, countries, suppliers, product,
             Cancel
           </Button>
         </Link>
-        
+
         <div className="flex gap-2">
           {mode === 'edit' && (
             <Link href={`/admin/products/${product?.id}`}>
@@ -477,7 +477,7 @@ export default function ProductForm({ categories, countries, suppliers, product,
               </Button>
             </Link>
           )}
-          
+
           <Button type="submit" disabled={loading}>
             {loading ? (
               <RefreshCw className="h-4 w-4 mr-2 animate-spin" />

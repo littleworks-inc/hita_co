@@ -1,5 +1,5 @@
 // =====================================
-// src/components/admin/ProductPricing.tsx - FIXED
+// src/components/admin/ProductPricing.tsx - FIXED WITH NULL SAFETY
 // =====================================
 'use client'
 
@@ -41,6 +41,42 @@ export default function ProductPricing({
   errors,
   onInputChange
 }: ProductPricingProps) {
+  // ✅ SAFE NUMBER FORMATTING - Handle undefined/null values
+  const safeToFixed = (value: number | undefined | null, digits: number = 2): string => {
+    if (value === undefined || value === null || isNaN(value)) {
+      return '0.00'
+    }
+    return Number(value).toFixed(digits)
+  }
+
+  // ✅ SAFE NUMBER DISPLAY - For calculations that might result in undefined
+  const safeNumber = (value: number | undefined | null): number => {
+    if (value === undefined || value === null || isNaN(value)) {
+      return 0
+    }
+    return Number(value)
+  }
+
+  // ✅ SAFE CALCULATION - Handle division by zero and undefined values
+  const safeProfitCalculation = (): { profit: string; percentage: string } => {
+    const sellingPrice = safeNumber(formData.sellingPriceUSD)
+    const costPrice = safeNumber(formData.costPriceUSD)
+    
+    if (costPrice === 0) {
+      return { profit: '0.00', percentage: '0.0' }
+    }
+    
+    const profit = sellingPrice - costPrice
+    const percentage = (profit / costPrice) * 100
+    
+    return {
+      profit: safeToFixed(profit, 2),
+      percentage: safeToFixed(percentage, 1)
+    }
+  }
+
+  const { profit, percentage } = safeProfitCalculation()
+
   return (
     <Card>
       <CardHeader>
@@ -58,7 +94,7 @@ export default function ProductPricing({
               id="originalPrice"
               type="number"
               step="0.01"
-              value={formData.originalPrice}
+              value={formData.originalPrice || 0}
               onChange={(e) => onInputChange('originalPrice', parseFloat(e.target.value) || 0)}
               placeholder="1000"
               className={errors.originalPrice ? 'border-red-500' : ''}
@@ -70,7 +106,7 @@ export default function ProductPricing({
             <Label htmlFor="originalCurrency">Currency</Label>
             <select
               id="originalCurrency"
-              value={formData.originalCurrency}
+              value={formData.originalCurrency || 'INR'}
               onChange={(e) => onInputChange('originalCurrency', e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
@@ -86,8 +122,8 @@ export default function ProductPricing({
             <Input
               id="quantity"
               type="number"
-              value={formData.quantity}
-              onChange={(e) => onInputChange('quantity', parseInt(e.target.value) || 0)}
+              value={formData.quantity || 1}
+              onChange={(e) => onInputChange('quantity', parseInt(e.target.value) || 1)}
               placeholder="5"
               className={errors.quantity ? 'border-red-500' : ''}
             />
@@ -103,7 +139,7 @@ export default function ProductPricing({
               id="gstPercentage"
               type="number"
               step="0.01"
-              value={formData.gstPercentage}
+              value={formData.gstPercentage || 0}
               onChange={(e) => onInputChange('gstPercentage', parseFloat(e.target.value) || 0)}
               placeholder="18"
             />
@@ -115,7 +151,7 @@ export default function ProductPricing({
               id="shippingCost"
               type="number"
               step="0.01"
-              value={formData.shippingCost}
+              value={formData.shippingCost || 0}
               onChange={(e) => onInputChange('shippingCost', parseFloat(e.target.value) || 0)}
               placeholder="50"
             />
@@ -127,7 +163,7 @@ export default function ProductPricing({
               id="conversionCharges"
               type="number"
               step="0.01"
-              value={formData.conversionCharges}
+              value={formData.conversionCharges || 0}
               onChange={(e) => onInputChange('conversionCharges', parseFloat(e.target.value) || 0)}
               placeholder="25"
             />
@@ -139,33 +175,33 @@ export default function ProductPricing({
               id="additionalExpenses"
               type="number"
               step="0.01"
-              value={formData.additionalExpenses}
+              value={formData.additionalExpenses || 0}
               onChange={(e) => onInputChange('additionalExpenses', parseFloat(e.target.value) || 0)}
               placeholder="100"
             />
           </div>
         </div>
 
-        {/* Calculated Costs */}
+        {/* Calculated Costs - ✅ WITH NULL SAFETY */}
         <div className="bg-gray-50 p-4 rounded-md">
           <h4 className="font-medium text-gray-900 mb-3">Calculated Costs</h4>
           <div className="grid gap-4 md:grid-cols-3">
             <div>
               <Label>Total Cost (USD)</Label>
               <div className="text-lg font-semibold text-green-600">
-                ${formData.costPriceUSD.toFixed(2)}
+                ${safeToFixed(formData.costPriceUSD)}
               </div>
             </div>
             <div>
               <Label>Per Piece Cost (USD)</Label>
               <div className="text-lg font-semibold text-blue-600">
-                ${formData.piecePriceUSD.toFixed(2)}
+                ${safeToFixed(formData.piecePriceUSD)}
               </div>
             </div>
             <div>
               <Label>Exchange Rate</Label>
               <div className="text-sm text-gray-600">
-                1 USD = {exchangeRate} {selectedCountry?.currency || 'INR'}
+                1 USD = {exchangeRate || 1} {selectedCountry?.currency || 'INR'}
               </div>
             </div>
           </div>
@@ -179,7 +215,7 @@ export default function ProductPricing({
               id="profitMargin"
               type="number"
               step="0.01"
-              value={formData.profitMargin}
+              value={formData.profitMargin || 0}
               onChange={(e) => onInputChange('profitMargin', parseFloat(e.target.value) || 0)}
               placeholder="100"
             />
@@ -191,22 +227,21 @@ export default function ProductPricing({
               id="discountPercentage"
               type="number"
               step="0.01"
-              value={formData.discountPercentage}
+              value={formData.discountPercentage || 0}
               onChange={(e) => onInputChange('discountPercentage', parseFloat(e.target.value) || 0)}
               placeholder="10"
             />
           </div>
         </div>
 
-        {/* Final Selling Price */}
+        {/* Final Selling Price - ✅ WITH NULL SAFETY */}
         <div className="bg-blue-50 p-4 rounded-md">
           <Label>Final Selling Price (USD)</Label>
           <div className="text-2xl font-bold text-blue-600">
-            ${formData.sellingPriceUSD.toFixed(2)}
+            ${safeToFixed(formData.sellingPriceUSD)}
           </div>
           <p className="text-sm text-gray-600 mt-1">
-            Profit: ${(formData.sellingPriceUSD - formData.costPriceUSD).toFixed(2)}
-            ({((formData.sellingPriceUSD - formData.costPriceUSD) / formData.costPriceUSD * 100).toFixed(1)}%)
+            Profit: ${profit} ({percentage}%)
           </p>
         </div>
       </CardContent>
