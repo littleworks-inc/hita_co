@@ -5,25 +5,40 @@ import { Button } from '@/components/ui'
 import { Upload, X, Image as ImageIcon, Plus, Video, Play } from 'lucide-react'
 
 interface ImageUploadProps {
-  images: string[]
-  onImagesChange: (images: string[]) => void
+  // ✅ FLEXIBLE: Support both prop naming conventions
+  images?: string[]
+  value?: string[]
+  onImagesChange?: (images: string[]) => void
+  onChange?: (images: string[]) => void
   maxImages?: number
   maxVideos?: number
   disabled?: boolean
+  multiple?: boolean
+  label?: string
+  description?: string
 }
 
 export default function ImageUpload({ 
-  images, 
-  onImagesChange, 
+  images: imagesProp,
+  value: valueProp,
+  onImagesChange: onImagesChangeProp,
+  onChange: onChangeProp,
   maxImages = 8,
   maxVideos = 2,
-  disabled = false 
+  disabled = false,
+  multiple = true,
+  label,
+  description
 }: ImageUploadProps) {
   const [uploading, setUploading] = useState(false)
   const [dragOver, setDragOver] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // Separate images and videos
+  // ✅ FLEXIBLE: Support both prop naming conventions
+  const images = imagesProp || valueProp || []
+  const onImagesChange = onImagesChangeProp || onChangeProp || (() => {})
+
+  // Rest of the component remains the same but with proper null checks
   const imageFiles = images.filter(file => !file.includes('video-marker:'))
   const videoFiles = images.filter(file => file.includes('video-marker:'))
 
@@ -34,6 +49,8 @@ export default function ImageUpload({
     const remainingVideoSlots = maxVideos - videoFiles.length
     
     setUploading(true)
+
+    const processedFiles: string[] = []
 
     for (let i = 0; i < files.length; i++) {
       const file = files[i]
@@ -71,6 +88,9 @@ export default function ImageUpload({
         const dataUrl = e.target?.result as string
         // Mark videos with a special prefix for identification
         const markedUrl = isVideo ? `video-marker:${dataUrl}` : dataUrl
+        processedFiles.push(markedUrl)
+        
+        // Update with the new file
         onImagesChange([...images, markedUrl])
       }
       reader.readAsDataURL(file)
@@ -104,6 +124,16 @@ export default function ImageUpload({
 
   return (
     <div className="space-y-4">
+      {/* Label and Description */}
+      {label && (
+        <div>
+          <h3 className="text-sm font-medium text-gray-900 mb-1">{label}</h3>
+          {description && (
+            <p className="text-sm text-gray-500">{description}</p>
+          )}
+        </div>
+      )}
+
       {/* Upload Area */}
       {canAddMore && (
         <div
@@ -120,7 +150,7 @@ export default function ImageUpload({
           <input
             ref={fileInputRef}
             type="file"
-            multiple
+            multiple={multiple}
             accept="image/*,video/*"
             className="hidden"
             onChange={(e) => handleFileSelect(e.target.files)}
@@ -186,60 +216,26 @@ export default function ImageUpload({
                 <button
                   type="button"
                   onClick={() => removeFile(index)}
-                  className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                  className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
                   disabled={disabled}
                 >
                   <X className="h-4 w-4" />
                 </button>
                 
-                {/* Primary Badge */}
-                {index === 0 && (
-                  <div className="absolute bottom-2 left-2 bg-blue-500 text-white text-xs px-2 py-1 rounded">
-                    Primary
-                  </div>
-                )}
+                {/* Index Badge */}
+                <div className="absolute bottom-2 left-2 bg-black bg-opacity-70 text-white text-xs px-2 py-1 rounded">
+                  {index === 0 ? 'Main' : index + 1}
+                </div>
               </div>
             )
           })}
-
-          {/* Add More Button */}
-          {canAddMore && (
-            <button
-              type="button"
-              onClick={() => !disabled && fileInputRef.current?.click()}
-              className="aspect-square rounded-lg border-2 border-dashed border-gray-300 hover:border-gray-400 flex items-center justify-center group transition-colors"
-              disabled={disabled}
-            >
-              <div className="text-center">
-                <Plus className="mx-auto h-8 w-8 text-gray-400 group-hover:text-gray-500" />
-                <p className="text-sm text-gray-500 mt-1">Add Media</p>
-              </div>
-            </button>
-          )}
         </div>
       )}
 
-      {/* Media Count */}
-      <div className="flex justify-between items-center text-sm text-gray-500">
-        <span>
-          {imageFiles.length} of {maxImages} images • {videoFiles.length} of {maxVideos} videos
-        </span>
-        {images.length > 0 && (
-          <span>First item will be used as the main product media</span>
-        )}
-      </div>
-
-      {/* Enhanced Guidelines */}
-      <div className="bg-blue-50 p-3 rounded-md">
-        <h4 className="text-sm font-medium text-blue-900 mb-1">Media Guidelines:</h4>
-        <ul className="text-xs text-blue-700 space-y-1">
-          <li>• <strong>Images:</strong> High-quality photos (minimum 800x800px recommended)</li>
-          <li>• <strong>Videos:</strong> Short clips (15-30 seconds) showing product details</li>
-          <li>• Show product from different angles and in use</li>
-          <li>• Use good lighting and clean backgrounds</li>
-          <li>• First item will be the main product media</li>
-          <li>• Supported: JPG, PNG, WEBP, MP4, MOV</li>
-        </ul>
+      {/* Upload Stats */}
+      <div className="flex justify-between text-sm text-gray-500">
+        <span>Images: {imageFiles.length}/{maxImages}</span>
+        <span>Videos: {videoFiles.length}/{maxVideos}</span>
       </div>
     </div>
   )
