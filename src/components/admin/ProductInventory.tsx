@@ -1,10 +1,25 @@
 // =====================================
-// ProductInventory.tsx
+// src/components/admin/ProductInventory.tsx - FIXED
 // =====================================
-export function ProductInventory({ formData, onInputChange }: {
-  formData: { stockQuantity: number; lowStockAlert: number }
-  onInputChange: (field: string, value: any) => void
-}) {
+'use client'
+
+import { Card, CardContent, CardHeader, CardTitle, Input, Label } from '@/components/ui'
+import { Package } from 'lucide-react'
+
+interface Product {
+  stockQuantity: number
+  lowStockAlert: number
+}
+
+interface ProductInventoryProps {
+  formData: Product
+  onInputChange: (field: keyof Product, value: any) => void
+}
+
+export default function ProductInventory({ 
+  formData, 
+  onInputChange 
+}: ProductInventoryProps) {
   return (
     <Card>
       <CardHeader>

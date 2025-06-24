@@ -1,10 +1,27 @@
 // =====================================
-// ProductTags.tsx
+// src/components/admin/ProductTags.tsx - FIXED
 // =====================================
-export function ProductTags({ formData, onInputChange }: {
-  formData: { tags: string[]; isActive: boolean; isFeatured: boolean }
-  onInputChange: (field: string, value: any) => void
-}) {
+'use client'
+
+import { useState } from 'react'
+import { Card, CardContent, CardHeader, CardTitle, Input, Label, Button } from '@/components/ui'
+import { Plus, X } from 'lucide-react'
+
+interface Product {
+  tags: string[]
+  isActive: boolean
+  isFeatured: boolean
+}
+
+interface ProductTagsProps {
+  formData: Product
+  onInputChange: (field: keyof Product, value: any) => void
+}
+
+export default function ProductTags({ 
+  formData, 
+  onInputChange 
+}: ProductTagsProps) {
   const [tagInput, setTagInput] = useState('')
 
   const handleAddTag = () => {

@@ -1,10 +1,10 @@
 // =====================================
-// ProductPricing.tsx
+// src/components/admin/ProductPricing.tsx - FIXED
 // =====================================
 'use client'
 
 import { Card, CardContent, CardHeader, CardTitle, Input, Label } from '@/components/ui'
-import { DollarSign, Calculator } from 'lucide-react'
+import { DollarSign } from 'lucide-react'
 
 interface Country {
   currency: string
@@ -34,7 +34,7 @@ interface ProductPricingProps {
   onInputChange: (field: keyof Product, value: any) => void
 }
 
-export function ProductPricing({
+export default function ProductPricing({
   formData,
   selectedCountry,
   exchangeRate,

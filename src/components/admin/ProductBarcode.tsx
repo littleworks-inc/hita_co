@@ -1,11 +1,28 @@
 // =====================================
-// ProductBarcode.tsx
+// src/components/admin/ProductBarcode.tsx - FIXED
 // =====================================
-export function ProductBarcode({ formData, onInputChange, mode }: {
-  formData: { sku: string; barcode: string; barcodeType: string }
-  onInputChange: (field: string, value: any) => void
+'use client'
+
+import { Card, CardContent, CardHeader, CardTitle, Input, Label } from '@/components/ui'
+import { Search } from 'lucide-react'
+
+interface Product {
+  sku: string
+  barcode: string
+  barcodeType: string
+}
+
+interface ProductBarcodeProps {
+  formData: Product
+  onInputChange: (field: keyof Product, value: any) => void
   mode: 'create' | 'edit'
-}) {
+}
+
+export default function ProductBarcode({ 
+  formData, 
+  onInputChange, 
+  mode 
+}: ProductBarcodeProps) {
   return (
     <Card>
       <CardHeader>
