@@ -1,4 +1,7 @@
-// lib/barcode-utils.ts
+// =====================================
+// Complete Barcode Utilities
+// src/lib/barcode-utils.ts
+// =====================================
 
 export interface BarcodeValidationResult {
   isValid: boolean
@@ -7,15 +10,67 @@ export interface BarcodeValidationResult {
   suggestion?: string
 }
 
+export interface BarcodeFormatInfo {
+  name: string
+  description: string
+  minLength: number
+  maxLength: number
+  allowedChars: string
+  hasCheckDigit: boolean
+  useCases: string[]
+}
+
+// ✅ Barcode format information
+export const BARCODE_FORMATS: Record<string, BarcodeFormatInfo> = {
+  UPC: {
+    name: 'UPC (Universal Product Code)',
+    description: 'Standard US retail barcode',
+    minLength: 11,
+    maxLength: 12,
+    allowedChars: '0-9',
+    hasCheckDigit: true,
+    useCases: ['Retail products', 'Grocery items', 'US market']
+  },
+  EAN13: {
+    name: 'EAN-13 (European Article Number)',
+    description: 'International retail barcode',
+    minLength: 12,
+    maxLength: 13,
+    allowedChars: '0-9',
+    hasCheckDigit: true,
+    useCases: ['International retail', 'Books', 'Global market']
+  },
+  CODE128: {
+    name: 'Code 128',
+    description: 'High-density alphanumeric barcode',
+    minLength: 1,
+    maxLength: 80,
+    allowedChars: 'ASCII 0-127',
+    hasCheckDigit: false,
+    useCases: ['Shipping', 'Inventory', 'Internal tracking']
+  },
+  CODE39: {
+    name: 'Code 39',
+    description: 'Alphanumeric barcode with limited character set',
+    minLength: 1,
+    maxLength: 43,
+    allowedChars: '0-9, A-Z, -.$/+% and space',
+    hasCheckDigit: false,
+    useCases: ['Industrial', 'Government', 'Asset tracking']
+  }
+}
+
 /**
- * Validate and correct barcode based on format type
+ * Main validation function that routes to specific validators
  */
 export const validateBarcode = (code: string, type: string): BarcodeValidationResult => {
   if (!code || code.trim() === '') {
     return { isValid: false, error: 'Barcode cannot be empty' }
   }
 
-  switch (type.toUpperCase()) {
+  const normalizedType = type.toUpperCase()
+  
+  switch (normalizedType) {
     case 'UPC':
       return validateUPC(code)
     case 'EAN13':
@@ -34,7 +89,7 @@ export const validateBarcode = (code: string, type: string): BarcodeValidationRe
  * Format: 12 digits with check digit
  */
 export const validateUPC = (code: string): BarcodeValidationResult => {
-  // Remove any non-digits and spaces
+  // Remove spaces, hyphens, and non-digits
   const cleanCode = code.replace(/[\s\-]/g, '').replace(/\D/g, '')
   
   if (cleanCode.length === 0) {
@@ -45,7 +100,7 @@ export const validateUPC = (code: string): BarcodeValidationResult => {
     return { 
       isValid: false, 
       error: `UPC too short (${cleanCode.length} digits). Need at least 11 digits.`,
-      suggestion: 'Pad with leading zeros to make 11 digits, then system will add check digit'
+      suggestion: 'Pad with leading zeros to make 11 digits'
     }
   }
   
@@ -80,7 +135,10 @@ export const validateUPC = (code: string): BarcodeValidationResult => {
   if (cleanCode.length > 12) {
     // Truncate to 12 digits and validate
     const truncated = cleanCode.substring(0, 12)
-    return validateUPC(truncated)
+    return {
+      ...validateUPC(truncated),
+      suggestion: `Truncated from ${cleanCode.length} to 12 digits`
+    }
   }
   
   return { isValid: false, error: `Invalid UPC length: ${cleanCode.length}` }
@@ -101,7 +159,7 @@ export const validateEAN13 = (code: string): BarcodeValidationResult => {
     return { 
       isValid: false, 
       error: `EAN-13 too short (${cleanCode.length} digits). Need at least 12 digits.`,
-      suggestion: 'Pad with leading zeros to make 12 digits, then system will add check digit'
+      suggestion: 'Pad with leading zeros to make 12 digits'
     }
   }
   
@@ -136,7 +194,10 @@ export const validateEAN13 = (code: string): BarcodeValidationResult => {
   if (cleanCode.length > 13) {
     // Truncate to 13 digits and validate
     const truncated = cleanCode.substring(0, 13)
-    return validateEAN13(truncated)
+    return {
+      ...validateEAN13(truncated),
+      suggestion: `Truncated from ${cleanCode.length} to 13 digits`
+    }
   }
   
   return { isValid: false, error: `Invalid EAN-13 length: ${cleanCode.length}` }
@@ -214,6 +275,7 @@ export const validateCODE39 = (code: string): BarcodeValidationResult => {
 
 /**
  * Calculate UPC check digit
+ * UPC Algorithm: Multiply odd positions by 3, sum all, take modulo 10, subtract from 10
  */
 export const calculateUPCCheckDigit = (code: string): number => {
   let sum = 0
@@ -221,7 +283,7 @@ export const calculateUPCCheckDigit = (code: string): number => {
     const digit = parseInt(code[i])
     if (isNaN(digit)) continue
     
-    // Multiply odd positions by 3, even positions by 1
+    // UPC: Multiply odd positions (1st, 3rd, 5th...) by 3
     sum += (i % 2 === 0) ? digit * 3 : digit
   }
   
@@ -231,6 +293,7 @@ export const calculateUPCCheckDigit = (code: string): number => {
 
 /**
  * Calculate EAN-13 check digit
+ * EAN13 Algorithm: Multiply even positions by 3, sum all, take modulo 10, subtract from 10
  */
 export const calculateEAN13CheckDigit = (code: string): number => {
   let sum = 0
@@ -238,7 +301,7 @@ export const calculateEAN13CheckDigit = (code: string): number => {
     const digit = parseInt(code[i])
     if (isNaN(digit)) continue
     
-    // Multiply even positions by 3, odd positions by 1
+    // EAN13: Multiply even positions (2nd, 4th, 6th...) by 3
     sum += (i % 2 === 0) ? digit : digit * 3
   }
   
@@ -249,7 +312,10 @@ export const calculateEAN13CheckDigit = (code: string): number => {
 /**
  * Generate barcode from SKU with proper format validation
  */
-export const generateBarcodeFromSKU = (sku: string, preferredFormat: string = 'CODE128'): BarcodeValidationResult => {
+export const generateBarcodeFromSKU = (
+  sku: string, 
+  preferredFormat: string = 'CODE128'
+): BarcodeValidationResult => {
   if (!sku || sku.trim() === '') {
     return { isValid: false, error: 'SKU cannot be empty' }
   }
@@ -285,93 +351,170 @@ export const generateBarcodeFromSKU = (sku: string, preferredFormat: string = 'C
 /**
  * Get barcode format recommendations based on use case
  */
-export const getBarcodeFormatRecommendation = (useCase: 'retail' | 'inventory' | 'international' | 'simple'): {
-  format: string
-  reason: string
-  description: string
-} => {
-  switch (useCase) {
-    case 'retail':
-      return {
-        format: 'UPC',
-        reason: 'Standard for US retail, compatible with all POS systems',
-        description: '12-digit format used by major retailers like Walmart, Target, Amazon'
-      }
+export const getBarcodeFormatRecommendation = (useCase: string): string => {
+  const recommendations: Record<string, string> = {
+    retail: 'UPC',
+    international: 'EAN13',
+    inventory: 'CODE128',
+    warehouse: 'CODE128',
+    shipping: 'CODE128',
+    internal: 'CODE39',
+    assets: 'CODE39',
+    books: 'EAN13',
+    grocery: 'UPC'
+  }
+  
+  return recommendations[useCase.toLowerCase()] || 'CODE128'
+}
+
+/**
+ * Generate random valid barcode for testing
+ */
+export const generateRandomBarcode = (format: string): BarcodeValidationResult => {
+  switch (format.toUpperCase()) {
+    case 'UPC':
+      const upcDigits = Array.from({ length: 11 }, () => Math.floor(Math.random() * 10)).join('')
+      return validateUPC(upcDigits)
       
-    case 'international':
-      return {
-        format: 'EAN13',
-        reason: 'International standard, accepted worldwide',
-        description: '13-digit format used globally, includes country codes'
-      }
+    case 'EAN13':
+      const eanDigits = Array.from({ length: 12 }, () => Math.floor(Math.random() * 10)).join('')
+      return validateEAN13(eanDigits)
       
-    case 'simple':
-      return {
-        format: 'CODE39',
-        reason: 'Simple format, easy to implement, alphanumeric support',
-        description: 'Basic format good for internal tracking, supports letters and numbers'
-      }
+    case 'CODE39':
+      const code39Chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+      const code39Length = Math.floor(Math.random() * 10) + 5 // 5-15 chars
+      const code39Data = Array.from({ length: code39Length }, () => 
+        code39Chars[Math.floor(Math.random() * code39Chars.length)]
+      ).join('')
+      return validateCODE39(code39Data)
       
-    case 'inventory':
+    case 'CODE128':
     default:
-      return {
-        format: 'CODE128',
-        reason: 'High density, compact, supports full ASCII character set',
-        description: 'Most versatile format, perfect for inventory management and internal use'
-      }
+      const code128Chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+      const code128Length = Math.floor(Math.random() * 15) + 8 // 8-23 chars
+      const code128Data = Array.from({ length: code128Length }, () => 
+        code128Chars[Math.floor(Math.random() * code128Chars.length)]
+      ).join('')
+      return validateCODE128(code128Data)
   }
 }
 
 /**
- * Check if barcode is likely to be scannable
+ * Check if barcode format supports images/logos
  */
-export const checkScannability = (code: string, format: string): {
-  scannable: boolean
-  issues: string[]
-  suggestions: string[]
-} => {
-  const issues: string[] = []
-  const suggestions: string[] = []
+export const supportsDataMatrix = (format: string): boolean => {
+  const dataMatrixFormats = ['CODE128', 'CODE39']
+  return dataMatrixFormats.includes(format.toUpperCase())
+}
+
+/**
+ * Get optimal barcode dimensions for printing
+ */
+export const getOptimalDimensions = (
+  format: string, 
+  printSize: 'small' | 'medium' | 'large' = 'medium'
+): { width: number; height: number; dpi: number } => {
+  const baseDimensions = {
+    UPC: { width: 300, height: 100 },
+    EAN13: { width: 300, height: 100 },
+    CODE128: { width: 400, height: 80 },
+    CODE39: { width: 400, height: 80 }
+  }
   
-  const validation = validateBarcode(code, format)
+  const sizeMultipliers = {
+    small: 0.7,
+    medium: 1.0,
+    large: 1.5
+  }
+  
+  const base = baseDimensions[format.toUpperCase()] || baseDimensions.CODE128
+  const multiplier = sizeMultipliers[printSize]
+  
+  return {
+    width: Math.round(base.width * multiplier),
+    height: Math.round(base.height * multiplier),
+    dpi: 300 // Standard print DPI
+  }
+}
+
+/**
+ * Validate barcode readability score (0-100)
+ */
+export const calculateReadabilityScore = (
+  code: string, 
+  format: string, 
+  printQuality: 'low' | 'medium' | 'high' = 'medium'
+): number => {
+  let score = 100
+  
+  // Length penalties
+  if (format === 'CODE39' && code.length > 20) score -= 20
+  if (format === 'CODE128' && code.length > 30) score -= 15
+  if (code.length > 40) score -= 25
+  
+  // Character complexity penalties
+  const specialChars = (code.match(/[^A-Z0-9]/g) || []).length
+  score -= specialChars * 2
+  
+  // Print quality adjustments
+  const qualityMultipliers = { low: 0.7, medium: 0.9, high: 1.0 }
+  score *= qualityMultipliers[printQuality]
+  
+  // Format reliability adjustments
+  const formatReliability = {
+    UPC: 0.95,
+    EAN13: 0.95,
+    CODE128: 0.90,
+    CODE39: 0.85
+  }
+  score *= formatReliability[format.toUpperCase()] || 0.85
+  
+  return Math.max(0, Math.min(100, Math.round(score)))
+}
+
+/**
+ * Get troubleshooting tips for barcode issues
+ */
+export const getTroubleshootingTips = (
+  validation: BarcodeValidationResult,
+  format: string
+): string[] => {
+  const tips: string[] = []
   
   if (!validation.isValid) {
-    issues.push(`Invalid ${format} format: ${validation.error}`)
-    return { scannable: false, issues, suggestions }
-  }
-  
-  // Check length for scanning reliability
-  if (format === 'CODE128' && code.length > 50) {
-    issues.push('CODE128 barcode is very long, may be difficult to scan')
-    suggestions.push('Consider shorter product codes or use CODE39 for simple data')
-  }
-  
-  if (format === 'CODE39' && code.length > 30) {
-    issues.push('CODE39 barcode is long, may be difficult to scan')
-    suggestions.push('Consider using CODE128 for longer data')
-  }
-  
-  // Check for common scanning issues
-  if (code.includes('  ')) {
-    issues.push('Multiple consecutive spaces may cause scanning issues')
-    suggestions.push('Replace multiple spaces with single spaces or dashes')
-  }
-  
-  if (format === 'UPC' || format === 'EAN13') {
-    const numericCode = validation.correctedCode || code
-    if (numericCode.startsWith('000000')) {
-      suggestions.push('Leading zeros may indicate test/internal use - not suitable for retail')
+    tips.push('✓ Check barcode format matches the selected type')
+    tips.push('✓ Verify all characters are valid for this format')
+    
+    if (format === 'UPC' || format === 'EAN13') {
+      tips.push('✓ Ensure numeric-only input for UPC/EAN13')
+      tips.push('✓ Check digit length (UPC: 11-12, EAN13: 12-13)')
     }
+    
+    if (format === 'CODE39') {
+      tips.push('✓ Use only: 0-9, A-Z, and symbols: - . $ / + %')
+      tips.push('✓ Avoid lowercase letters (will be converted)')
+    }
+    
+    if (format === 'CODE128') {
+      tips.push('✓ Avoid special Unicode characters')
+      tips.push('✓ Keep length under 40 characters for best scanning')
+    }
+  } else {
+    tips.push('✓ Test print at actual size before mass production')
+    tips.push('✓ Ensure good contrast between bars and background')
+    tips.push('✓ Use high-quality printer for best results')
+    tips.push('✓ Test scan with multiple devices to verify readability')
   }
   
-  // Positive indicators
-  const scannable = issues.length === 0
-  
-  if (scannable) {
-    suggestions.push(`${format} format is optimal for scanning`)
-    suggestions.push('Print with high contrast (black bars on white background)')
-    suggestions.push('Ensure minimum 2x width multiplier for reliable scanning')
-  }
-  
-  return { scannable, issues, suggestions }
+  return tips
+}
+
+// Export all validation functions for external use
+export {
+  validateUPC,
+  validateEAN13,
+  validateCODE128,
+  validateCODE39,
+  calculateUPCCheckDigit,
+  calculateEAN13CheckDigit
 }

@@ -1,8 +1,13 @@
+// =====================================
+// FIXED: Complete Barcode System
+// src/components/admin/BarcodeDisplay.tsx
+// =====================================
+
 'use client'
 
-import { useState, useEffect, useRef, useMemo } from 'react'
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
-import { Copy, Printer, Download, AlertCircle } from 'lucide-react'
+import { Copy, Printer, Download, AlertCircle, CheckCircle } from 'lucide-react'
 import JsBarcode from 'jsbarcode'
 
 interface BarcodeDisplayProps {
@@ -13,9 +18,20 @@ interface BarcodeDisplayProps {
   size?: 'small' | 'medium' | 'large'
 }
 
-// Barcode validation utilities
-const validateBarcode = (code: string, type: string): { isValid: boolean; error?: string; correctedCode?: string } => {
-  switch (type) {
+interface ValidationResult {
+  isValid: boolean
+  error?: string
+  correctedCode?: string
+  suggestion?: string
+}
+
+// ✅ FIXED: Complete validation functions
+const validateBarcode = (code: string, type: string): ValidationResult => {
+  if (!code || code.trim() === '') {
+    return { isValid: false, error: 'Barcode cannot be empty' }
+  }
+
+  switch (type.toUpperCase()) {
     case 'UPC':
       return validateUPC(code)
     case 'EAN13':
@@ -25,18 +41,36 @@ const validateBarcode = (code: string, type: string): { isValid: boolean; error?
     case 'CODE39':
       return validateCODE39(code)
     default:
-      return { isValid: false, error: 'Unknown barcode type' }
+      return { isValid: false, error: `Unknown barcode type: ${type}` }
   }
 }
 
-const validateUPC = (code: string): { isValid: boolean; error?: string; correctedCode?: string } => {
-  const cleanCode = code.replace(/\D/g, '')
+const validateUPC = (code: string): ValidationResult => {
+  const cleanCode = code.replace(/[\s\-]/g, '').replace(/\D/g, '')
+  
+  if (cleanCode.length === 0) {
+    return { isValid: false, error: 'UPC cannot be empty' }
+  }
+  
+  if (cleanCode.length < 11) {
+    return { 
+      isValid: false, 
+      error: `UPC too short (${cleanCode.length} digits). Need at least 11 digits.`,
+      suggestion: 'Pad with leading zeros'
+    }
+  }
   
   if (cleanCode.length === 11) {
     const checkDigit = calculateUPCCheckDigit(cleanCode)
     const correctedCode = cleanCode + checkDigit
-    return { isValid: true, correctedCode }
-  } else if (cleanCode.length === 12) {
+    return { 
+      isValid: true, 
+      correctedCode,
+      suggestion: `Added check digit: ${checkDigit}`
+    }
+  }
+  
+  if (cleanCode.length === 12) {
     const providedCheckDigit = parseInt(cleanCode[11])
     const calculatedCheckDigit = calculateUPCCheckDigit(cleanCode.substring(0, 11))
     
@@ -44,21 +78,48 @@ const validateUPC = (code: string): { isValid: boolean; error?: string; correcte
       return { isValid: true, correctedCode: cleanCode }
     } else {
       const correctedCode = cleanCode.substring(0, 11) + calculatedCheckDigit
-      return { isValid: true, correctedCode, error: `Check digit corrected from ${providedCheckDigit} to ${calculatedCheckDigit}` }
+      return { 
+        isValid: true, 
+        correctedCode, 
+        error: `Check digit corrected: ${providedCheckDigit} → ${calculatedCheckDigit}`
+      }
     }
-  } else {
-    return { isValid: false, error: 'UPC must be 11 or 12 digits' }
   }
+  
+  if (cleanCode.length > 12) {
+    const truncated = cleanCode.substring(0, 12)
+    return validateUPC(truncated)
+  }
+  
+  return { isValid: false, error: `Invalid UPC length: ${cleanCode.length}` }
 }
 
-const validateEAN13 = (code: string): { isValid: boolean; error?: string; correctedCode?: string } => {
-  const cleanCode = code.replace(/\D/g, '')
+const validateEAN13 = (code: string): ValidationResult => {
+  const cleanCode = code.replace(/[\s\-]/g, '').replace(/\D/g, '')
+  
+  if (cleanCode.length === 0) {
+    return { isValid: false, error: 'EAN-13 cannot be empty' }
+  }
+  
+  if (cleanCode.length < 12) {
+    return { 
+      isValid: false, 
+      error: `EAN-13 too short (${cleanCode.length} digits). Need at least 12 digits.`,
+      suggestion: 'Pad with leading zeros'
+    }
+  }
   
   if (cleanCode.length === 12) {
     const checkDigit = calculateEAN13CheckDigit(cleanCode)
     const correctedCode = cleanCode + checkDigit
-    return { isValid: true, correctedCode }
-  } else if (cleanCode.length === 13) {
+    return { 
+      isValid: true, 
+      correctedCode,
+      suggestion: `Added check digit: ${checkDigit}`
+    }
+  }
+  
+  if (cleanCode.length === 13) {
     const providedCheckDigit = parseInt(cleanCode[12])
     const calculatedCheckDigit = calculateEAN13CheckDigit(cleanCode.substring(0, 12))
     
@@ -66,57 +127,107 @@ const validateEAN13 = (code: string): { isValid: boolean; error?: string; correc
       return { isValid: true, correctedCode: cleanCode }
     } else {
       const correctedCode = cleanCode.substring(0, 12) + calculatedCheckDigit
-      return { isValid: true, correctedCode, error: `Check digit corrected from ${providedCheckDigit} to ${calculatedCheckDigit}` }
+      return { 
+        isValid: true, 
+        correctedCode, 
+        error: `Check digit corrected: ${providedCheckDigit} → ${calculatedCheckDigit}`
+      }
     }
-  } else {
-    return { isValid: false, error: 'EAN-13 must be 12 or 13 digits' }
   }
+  
+  if (cleanCode.length > 13) {
+    const truncated = cleanCode.substring(0, 13)
+    return validateEAN13(truncated)
+  }
+  
+  return { isValid: false, error: `Invalid EAN-13 length: ${cleanCode.length}` }
 }
 
-const validateCODE128 = (code: string): { isValid: boolean; error?: string; correctedCode?: string } => {
+const validateCODE128 = (code: string): ValidationResult => {
   if (code.length === 0) {
     return { isValid: false, error: 'CODE128 cannot be empty' }
   }
   
-  const isValidChars = code.split('').every(char => char.charCodeAt(0) <= 127)
-  
-  if (!isValidChars) {
-    return { isValid: false, error: 'CODE128 contains invalid characters' }
+  if (code.length > 80) {
+    return { 
+      isValid: false, 
+      error: `CODE128 too long (${code.length} characters). Maximum 80 characters.`
+    }
   }
   
-  return { isValid: true, correctedCode: code }
+  // Check for valid ASCII characters (0-127)
+  const invalidChars = code.split('').filter(char => char.charCodeAt(0) > 127)
+  
+  if (invalidChars.length > 0) {
+    return { 
+      isValid: false, 
+      error: `Contains invalid characters: ${invalidChars.join(', ')}`,
+      suggestion: 'Use only ASCII characters'
+    }
+  }
+  
+  return { 
+    isValid: true, 
+    correctedCode: code,
+    suggestion: code.length > 40 ? 'Long barcodes may be harder to scan' : undefined
+  }
 }
 
-const validateCODE39 = (code: string): { isValid: boolean; error?: string; correctedCode?: string } => {
-  const validChars = /^[0-9A-Z\-\.\$\/\+\%\s]*$/
-  
-  if (!validChars.test(code)) {
-    return { isValid: false, error: 'CODE39 contains invalid characters. Allowed: 0-9, A-Z, -.$/+% and space' }
-  }
-  
+const validateCODE39 = (code: string): ValidationResult => {
   if (code.length === 0) {
     return { isValid: false, error: 'CODE39 cannot be empty' }
   }
   
-  return { isValid: true, correctedCode: code.toUpperCase() }
+  if (code.length > 43) {
+    return { 
+      isValid: false, 
+      error: `CODE39 too long (${code.length} characters). Maximum 43 characters.`
+    }
+  }
+  
+  // CODE39 valid characters: 0-9, A-Z, space, and symbols: - . $ / + %
+  const validPattern = /^[0-9A-Z\-\.\$\/\+\%\s]*$/
+  const upperCode = code.toUpperCase()
+  
+  if (!validPattern.test(upperCode)) {
+    const invalidChars = upperCode.split('').filter(char => !validPattern.test(char))
+    return { 
+      isValid: false, 
+      error: `Invalid characters: ${invalidChars.join(', ')}`,
+      suggestion: 'Allowed: 0-9, A-Z, space, and symbols: - . $ / + %'
+    }
+  }
+  
+  return { 
+    isValid: true, 
+    correctedCode: upperCode,
+    suggestion: upperCode !== code ? 'Converted to uppercase' : undefined
+  }
 }
 
+// ✅ FIXED: Correct check digit calculations
 const calculateUPCCheckDigit = (code: string): number => {
   let sum = 0
   for (let i = 0; i < code.length; i++) {
     const digit = parseInt(code[i])
+    if (isNaN(digit)) continue
+    // UPC: Multiply odd positions (1st, 3rd, 5th...) by 3
     sum += (i % 2 === 0) ? digit * 3 : digit
   }
-  return (10 - (sum % 10)) % 10
+  const remainder = sum % 10
+  return remainder === 0 ? 0 : 10 - remainder
 }
 
 const calculateEAN13CheckDigit = (code: string): number => {
   let sum = 0
   for (let i = 0; i < code.length; i++) {
     const digit = parseInt(code[i])
+    if (isNaN(digit)) continue
+    // EAN13: Multiply even positions (2nd, 4th, 6th...) by 3
     sum += (i % 2 === 0) ? digit : digit * 3
   }
-  return (10 - (sum % 10)) % 10
+  const remainder = sum % 10
+  return remainder === 0 ? 0 : 10 - remainder
 }
 
 export default function BarcodeDisplay({ 
@@ -127,12 +238,13 @@ export default function BarcodeDisplay({
   size = 'medium' 
 }: BarcodeDisplayProps) {
   const [copied, setCopied] = useState(false)
-  const [validation, setValidation] = useState<{ isValid: boolean; error?: string; correctedCode?: string }>({ isValid: true })
+  const [validation, setValidation] = useState<ValidationResult>({ isValid: true })
+  const [barcodeGenerated, setBarcodeGenerated] = useState(false)
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
-  // 🔧 FIX: Memoize the config object to prevent infinite re-renders
+  // ✅ FIXED: Stable config object to prevent infinite re-renders
   const config = useMemo(() => {
-    const sizeConfigs = {
+    const configs = {
       small: {
         width: 200,
         height: 80,
@@ -161,30 +273,46 @@ export default function BarcodeDisplay({
         priceClass: 'text-xl font-bold'
       }
     }
-    return sizeConfigs[size]
+    return configs[size]
   }, [size])
 
-  // 🔧 FIX: Separate validation and barcode generation into different effects
-  // This prevents the infinite loop
+  // ✅ FIXED: Separate validation effect to prevent loops
   useEffect(() => {
     if (!barcode) {
       setValidation({ isValid: true })
+      setBarcodeGenerated(false)
       return
     }
 
+    console.log('Validating barcode:', { barcode, barcodeType })
     const result = validateBarcode(barcode, barcodeType)
     setValidation(result)
-  }, [barcode, barcodeType]) // Only depend on barcode and barcodeType
+    setBarcodeGenerated(false) // Reset generation state when barcode changes
+  }, [barcode, barcodeType])
 
-  // 🔧 FIX: Separate effect for barcode generation
+  // ✅ FIXED: Separate generation effect with proper error handling
   useEffect(() => {
-    if (!validation.isValid || !validation.correctedCode || !canvasRef.current) {
+    if (!validation.isValid || !validation.correctedCode || !canvasRef.current || barcodeGenerated) {
       return
     }
 
+    const canvas = canvasRef.current
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+
     try {
-      JsBarcode(canvasRef.current, validation.correctedCode, {
-        format: barcodeType === 'EAN13' ? 'EAN13' : barcodeType,
+      console.log('Generating barcode:', validation.correctedCode, barcodeType)
+      
+      // Clear canvas first
+      ctx.clearRect(0, 0, canvas.width, canvas.height)
+      
+      // Set canvas dimensions
+      canvas.width = config.width
+      canvas.height = config.height
+
+      // Generate barcode with JsBarcode
+      JsBarcode(canvas, validation.correctedCode, {
+        format: barcodeType === 'EAN13' ? 'EAN13' : barcodeType.toUpperCase(),
         width: barcodeType === 'CODE39' ? 1.5 : 2,
         height: config.height - 40,
         displayValue: true,
@@ -192,52 +320,66 @@ export default function BarcodeDisplay({
         textMargin: config.textMargin,
         margin: 10,
         background: '#ffffff',
-        lineColor: '#000000'
+        lineColor: '#000000',
+        valid: (valid) => {
+          if (valid) {
+            setBarcodeGenerated(true)
+            console.log('Barcode generated successfully')
+          } else {
+            console.error('JsBarcode validation failed')
+          }
+        }
       })
     } catch (error) {
       console.error('Barcode generation error:', error)
-      // 🔧 FIX: Don't update validation state here to prevent loop
-      // Instead, just log the error
+      // Draw error message on canvas
+      ctx.fillStyle = '#ffffff'
+      ctx.fillRect(0, 0, canvas.width, canvas.height)
+      ctx.fillStyle = '#ef4444'
+      ctx.font = '12px Arial'
+      ctx.textAlign = 'center'
+      ctx.fillText('Barcode Generation Failed', canvas.width / 2, canvas.height / 2)
+      ctx.fillText(error instanceof Error ? error.message : 'Unknown error', canvas.width / 2, canvas.height / 2 + 20)
     }
-  }, [validation.isValid, validation.correctedCode, barcodeType, config]) // Safe dependencies
+  }, [validation.isValid, validation.correctedCode, barcodeType, config, barcodeGenerated])
 
-  const copyBarcode = () => {
+  // ✅ FIXED: Stable callback functions
+  const copyBarcode = useCallback(() => {
     const codeToUse = validation.correctedCode || barcode
-    navigator.clipboard.writeText(codeToUse)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
-  }
+    navigator.clipboard.writeText(codeToUse).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    }).catch(err => {
+      console.error('Failed to copy:', err)
+    })
+  }, [validation.correctedCode, barcode])
 
-  const printBarcode = () => {
-    if (!canvasRef.current) return
+  const printBarcode = useCallback(() => {
+    if (!canvasRef.current || !barcodeGenerated) return
+    
+    const canvas = canvasRef.current
+    const dataURL = canvas.toDataURL('image/png')
     
     const printWindow = window.open('', '_blank')
     if (printWindow) {
-      const canvas = canvasRef.current
-      const dataURL = canvas.toDataURL('image/png')
-      
       printWindow.document.write(`
         <html>
           <head>
             <title>Barcode - ${productName || barcode}</title>
             <style>
-              body { margin: 0; padding: 20px; text-align: center; }
-              .barcode-container { margin: 20px auto; }
-              .product-info { margin: 10px 0; font-family: Arial, sans-serif; }
-              .product-name { font-size: 14px; font-weight: bold; margin-bottom: 5px; }
-              .product-price { font-size: 16px; color: #059669; font-weight: bold; }
-              .barcode-info { font-size: 10px; color: #666; margin-top: 5px; }
-              @media print { 
-                body { margin: 0; padding: 5px; } 
-                .barcode-container { page-break-inside: avoid; }
-              }
+              body { margin: 0; padding: 20px; text-align: center; font-family: Arial, sans-serif; }
+              .barcode-container { margin: 20px auto; max-width: 400px; }
+              .product-name { font-size: 16px; font-weight: bold; margin-bottom: 10px; }
+              .product-price { font-size: 18px; color: #059669; font-weight: bold; margin-top: 10px; }
+              .barcode-info { font-size: 12px; color: #666; margin-top: 10px; }
+              @media print { body { margin: 0; padding: 5px; } }
             </style>
           </head>
           <body>
             <div class="barcode-container">
-              ${productName ? `<div class="product-info"><div class="product-name">${productName}</div></div>` : ''}
-              <img src="${dataURL}" alt="Barcode" style="max-width: 100%;" />
-              ${price ? `<div class="product-info"><div class="product-price">${price}</div></div>` : ''}
+              ${productName ? `<div class="product-name">${productName}</div>` : ''}
+              <img src="${dataURL}" alt="Barcode" style="max-width: 100%; height: auto;" />
+              ${price ? `<div class="product-price">${price}</div>` : ''}
               <div class="barcode-info">${barcodeType} • ${validation.correctedCode || barcode}</div>
             </div>
           </body>
@@ -246,137 +388,115 @@ export default function BarcodeDisplay({
       printWindow.document.close()
       printWindow.print()
     }
-  }
+  }, [barcodeGenerated, productName, price, barcodeType, validation.correctedCode, barcode])
 
-  const downloadBarcode = () => {
-    if (!canvasRef.current) return
+  const downloadBarcode = useCallback(() => {
+    if (!canvasRef.current || !barcodeGenerated) return
 
-    const downloadCanvas = document.createElement('canvas')
-    const ctx = downloadCanvas.getContext('2d')
-    if (!ctx) return
+    const canvas = canvasRef.current
+    const link = document.createElement('a')
+    link.download = `barcode-${validation.correctedCode || barcode}.png`
+    link.href = canvas.toDataURL('image/png', 1.0)
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }, [barcodeGenerated, validation.correctedCode, barcode])
 
-    const scale = 3
-    downloadCanvas.width = config.width * scale
-    downloadCanvas.height = (config.height + 60) * scale
-
-    ctx.fillStyle = '#ffffff'
-    ctx.fillRect(0, 0, downloadCanvas.width, downloadCanvas.height)
-
-    const tempCanvas = document.createElement('canvas')
-    try {
-      JsBarcode(tempCanvas, validation.correctedCode || barcode, {
-        format: barcodeType === 'EAN13' ? 'EAN13' : barcodeType,
-        width: (barcodeType === 'CODE39' ? 1.5 : 2) * scale,
-        height: (config.height - 20) * scale,
-        displayValue: true,
-        fontSize: config.fontSize * scale,
-        textMargin: config.textMargin * scale,
-        margin: 10 * scale,
-        background: '#ffffff',
-        lineColor: '#000000'
-      })
-
-      const barcodeY = productName ? 30 * scale : 10 * scale
-      ctx.drawImage(tempCanvas, 
-        (downloadCanvas.width - tempCanvas.width) / 2, 
-        barcodeY
-      )
-
-      if (productName) {
-        ctx.fillStyle = '#000000'
-        ctx.font = `bold ${16 * scale}px Arial`
-        ctx.textAlign = 'center'
-        ctx.fillText(productName, downloadCanvas.width / 2, 20 * scale)
-      }
-
-      if (price) {
-        ctx.fillStyle = '#059669'
-        ctx.font = `bold ${18 * scale}px Arial`
-        ctx.textAlign = 'center'
-        const priceY = barcodeY + tempCanvas.height + 25 * scale
-        ctx.fillText(price, downloadCanvas.width / 2, priceY)
-      }
-
-      const link = document.createElement('a')
-      link.download = `barcode-${validation.correctedCode || barcode}.png`
-      link.href = downloadCanvas.toDataURL('image/png', 1.0)
-      link.click()
-    } catch (error) {
-      console.error('Download generation error:', error)
-    }
-  }
-
+  // No barcode provided
   if (!barcode) {
     return (
-      <div className="text-center text-gray-400 py-4">
-        <div className="text-sm">No barcode generated</div>
+      <div className="text-center text-gray-400 py-8 border-2 border-dashed border-gray-200 rounded-lg">
+        <div className="text-sm">No barcode to display</div>
+        <div className="text-xs text-gray-500 mt-1">Enter a barcode to generate</div>
       </div>
     )
   }
 
   return (
-    <div className="space-y-3">
-      {/* Validation Error */}
+    <div className="space-y-4">
+      {/* Validation Messages */}
       {!validation.isValid && (
-        <div className="flex items-center gap-2 p-2 bg-red-50 border border-red-200 rounded-md">
-          <AlertCircle className="h-4 w-4 text-red-500" />
-          <span className="text-sm text-red-700">{validation.error}</span>
+        <div className="flex items-start gap-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+          <AlertCircle className="h-5 w-5 text-red-500 flex-shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <div className="font-medium text-red-800">Invalid Barcode</div>
+            <div className="text-sm text-red-700">{validation.error}</div>
+            {validation.suggestion && (
+              <div className="text-xs text-red-600 mt-1">💡 {validation.suggestion}</div>
+            )}
+          </div>
         </div>
       )}
 
-      {/* Validation Warning */}
       {validation.isValid && validation.error && (
-        <div className="flex items-center gap-2 p-2 bg-yellow-50 border border-yellow-200 rounded-md">
-          <AlertCircle className="h-4 w-4 text-yellow-500" />
-          <span className="text-sm text-yellow-700">{validation.error}</span>
+        <div className="flex items-start gap-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+          <AlertCircle className="h-5 w-5 text-yellow-500 flex-shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <div className="font-medium text-yellow-800">Barcode Corrected</div>
+            <div className="text-sm text-yellow-700">{validation.error}</div>
+            {validation.suggestion && (
+              <div className="text-xs text-yellow-600 mt-1">💡 {validation.suggestion}</div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {validation.isValid && !validation.error && validation.suggestion && (
+        <div className="flex items-start gap-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+          <CheckCircle className="h-5 w-5 text-blue-500 flex-shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <div className="font-medium text-blue-800">Barcode Generated</div>
+            <div className="text-sm text-blue-700">{validation.suggestion}</div>
+          </div>
         </div>
       )}
 
       {/* Barcode Display */}
       {validation.isValid && (
-        <div className={`border border-gray-300 rounded-md bg-white ${config.containerClass} text-center`}>
+        <div className={`border border-gray-300 rounded-lg bg-white ${config.containerClass} text-center shadow-sm`}>
           {/* Product Name */}
           {productName && (
-            <div className={`${config.nameClass} font-medium text-gray-900 mb-2 truncate`}>
+            <div className={`${config.nameClass} font-medium text-gray-900 mb-3 truncate`}>
               {productName}
             </div>
           )}
           
           {/* Barcode Canvas */}
-          <div className="flex justify-center mb-2">
+          <div className="flex justify-center mb-3">
             <canvas 
               ref={canvasRef}
               style={{ maxWidth: '100%', height: 'auto' }}
-              className="border border-gray-100"
+              className="border border-gray-100 bg-white"
             />
           </div>
           
           {/* Price */}
           {price && (
-            <div className={`${config.priceClass} text-green-600 mb-2`}>
+            <div className={`${config.priceClass} text-green-600 mb-3`}>
               {price}
             </div>
           )}
           
-          {/* Barcode Type */}
-          <div className="text-xs text-gray-500">
-            {barcodeType} • {validation.correctedCode || barcode}
+          {/* Barcode Info */}
+          <div className="text-xs text-gray-500 bg-gray-50 py-2 px-3 rounded">
+            <div>{barcodeType} Format</div>
+            <div className="font-mono mt-1">{validation.correctedCode || barcode}</div>
           </div>
         </div>
       )}
 
       {/* Action Buttons */}
-      {validation.isValid && (
-        <div className="flex gap-2 justify-center">
+      {validation.isValid && barcodeGenerated && (
+        <div className="flex flex-wrap gap-2 justify-center">
           <Button
             type="button"
             variant="outline"
             size="sm"
             onClick={copyBarcode}
-            className="flex items-center gap-1"
+            className="flex items-center gap-2"
           >
-            <Copy className="h-3 w-3" />
-            {copied ? 'Copied!' : 'Copy'}
+            <Copy className="h-4 w-4" />
+            {copied ? 'Copied!' : 'Copy Code'}
           </Button>
           
           <Button
@@ -384,10 +504,10 @@ export default function BarcodeDisplay({
             variant="outline"
             size="sm"
             onClick={printBarcode}
-            className="flex items-center gap-1"
+            className="flex items-center gap-2"
           >
-            <Printer className="h-3 w-3" />
-            Print
+            <Printer className="h-4 w-4" />
+            Print Label
           </Button>
           
           <Button
@@ -395,11 +515,18 @@ export default function BarcodeDisplay({
             variant="outline"
             size="sm"
             onClick={downloadBarcode}
-            className="flex items-center gap-1"
+            className="flex items-center gap-2"
           >
-            <Download className="h-3 w-3" />
-            Download
+            <Download className="h-4 w-4" />
+            Download PNG
           </Button>
+        </div>
+      )}
+
+      {/* Loading State */}
+      {validation.isValid && !barcodeGenerated && validation.correctedCode && (
+        <div className="text-center py-4">
+          <div className="text-sm text-gray-500">Generating barcode...</div>
         </div>
       )}
     </div>
