@@ -27,8 +27,7 @@ import {
   Search,
   Wand2,
   Brain,
-  Settings2,
-  FileText // Added for Draft System
+  Settings2
 } from 'lucide-react'
 
 interface Category {
@@ -167,11 +166,6 @@ export default function ProductForm({ categories, countries, suppliers, product,
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
-  
-  // Draft System States
-  const [submitMode, setSubmitMode] = useState<'draft' | 'publish' | null>(null)
-  const [showPublishValidation, setShowPublishValidation] = useState(false)
-  
   const [isGeneratingBarcode, setIsGeneratingBarcode] = useState(false)
   const [barcodeRecommendation, setBarcodeRecommendation] = useState<any>(null)
   const [successMessage, setSuccessMessage] = useState('')
@@ -230,33 +224,6 @@ export default function ProductForm({ categories, countries, suppliers, product,
   // Get selected country for exchange rate
   const selectedCountry = countries.find(c => c.id === formData.countryId)
   const exchangeRate = selectedCountry?.exchangeRate || 1
-
-  // Draft System: Validation function for publishing
-  const validateForPublishing = () => {
-    const errors = []
-    
-    if (!formData.description || formData.description.trim().length < 10) {
-      errors.push('Product description is required (minimum 10 characters)')
-    }
-    
-    if (!formData.images || formData.images.length === 0) {
-      errors.push('At least one product image is required')
-    }
-    
-    if (!formData.sellingPriceUSD || formData.sellingPriceUSD <= 0) {
-      errors.push('Valid selling price is required')
-    }
-    
-    if (formData.stockQuantity === undefined || formData.stockQuantity < 0) {
-      errors.push('Stock quantity must be set')
-    }
-    
-    if (!formData.categoryId) {
-      errors.push('Product category must be selected')
-    }
-    
-    return errors
-  }
 
   /**
    * Build dynamic product context from current form data
@@ -668,43 +635,14 @@ export default function ProductForm({ categories, countries, suppliers, product,
     return Object.keys(newErrors).length === 0
   }
 
-  // Enhanced handleSubmit with Draft System
-  const handleSubmit = async (e: React.FormEvent, submitType: 'draft' | 'publish' = 'draft') => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    setSubmitMode(submitType)
-    
-    // For drafts, only validate basic required fields
-    if (submitType === 'draft') {
-      if (!formData.name.trim() || !formData.sku.trim()) {
-        setErrors({ submit: 'Product name and SKU are required for drafts' })
-        setSubmitMode(null)
-        return
-      }
-    } else {
-      // For publishing, validate everything + publishing requirements
-      if (!validateForm()) {
-        setSubmitMode(null)
-        return
-      }
-      
-      const validationErrors = validateForPublishing()
-      if (validationErrors.length > 0) {
-        setShowPublishValidation(true)
-        setSubmitMode(null)
-        return
-      }
-    }
+    if (!validateForm()) return
 
     setLoading(true)
 
     try {
-      // Prepare form data with status
-      const submissionData = {
-        ...formData,
-        status: submitType === 'publish' ? 'PUBLISHED' : 'DRAFT'
-      }
-
       const url = mode === 'create'
         ? '/api/admin/products'
         : `/api/admin/products/${product?.id}`
@@ -716,35 +654,20 @@ export default function ProductForm({ categories, countries, suppliers, product,
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(submissionData),
+        body: JSON.stringify(formData),
       })
 
-      const data = await response.json()
-
       if (response.ok) {
-        const successMessage = submitType === 'publish' ? 
-          'Product published successfully!' : 
-          'Product saved as draft!'
-        
-        setSuccessMessage(successMessage)
-        
-        // Redirect after short delay
-        setTimeout(() => {
-          router.push('/admin/products')
-          router.refresh()
-        }, 1500)
+        router.push('/admin/products')
+        router.refresh()
       } else {
-        if (data.validationErrors) {
-          setErrors({ submit: `Validation failed: ${data.validationErrors.join(', ')}` })
-        } else {
-          setErrors({ submit: data.error || 'Failed to save product' })
-        }
+        const errorData = await response.json()
+        setErrors({ submit: errorData.error || 'Something went wrong' })
       }
     } catch (error) {
       setErrors({ submit: 'Network error. Please try again.' })
     } finally {
       setLoading(false)
-      setSubmitMode(null)
     }
   }
 
@@ -780,7 +703,7 @@ export default function ProductForm({ categories, countries, suppliers, product,
   ]
 
   return (
-    <form className="space-y-6">
+    <form onSubmit={handleSubmit} className="space-y-6">
       {errors.submit && (
         <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md">
           {errors.submit}
@@ -920,9 +843,6 @@ export default function ProductForm({ categories, countries, suppliers, product,
             maxVideos={2}
             disabled={loading}
           />
-          <p className="text-sm text-gray-500 mt-2">
-            {formData.images.length} of 8 images uploaded {formData.images.length === 0 && '(at least 1 required for publishing)'}
-          </p>
         </CardContent>
       </Card>
 
@@ -1030,9 +950,6 @@ export default function ProductForm({ categories, countries, suppliers, product,
               placeholder="Detailed product description (or use Smart Generate based on your inputs)"
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
-            <p className="text-sm text-gray-500">
-              {formData.description.length} characters {formData.description.length < 10 && '(minimum 10 for publishing)'}
-            </p>
             {errors.aiGeneration && (
               <div className="flex items-center gap-2 text-sm text-red-600">
                 <AlertTriangle className="h-4 w-4" />
@@ -1083,7 +1000,228 @@ export default function ProductForm({ categories, countries, suppliers, product,
         </CardContent>
       </Card>
 
-      {/* Supplier & Purchase Information */}
+      {/* SEO & Marketing Section - REMOVED SOCIAL MEDIA CAPTIONS */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Search className="h-5 w-5" />
+            SEO & Marketing
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* SEO Meta Fields */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label htmlFor="seoTitle">SEO Title</Label>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => handleCustomAIGeneration('seoTitle')}
+                disabled={!isReadyForAI()}
+              >
+                <Sparkles className="h-3 w-3 mr-1" />
+                Generate
+              </Button>
+            </div>
+            <Input
+              id="seoTitle"
+              value={formData.seoTitle || ''}
+              onChange={(e) => handleInputChange('seoTitle', e.target.value)}
+              placeholder="SEO-optimized page title (60 characters max)"
+              maxLength={60}
+            />
+            <p className="text-xs text-gray-500">
+              {(formData.seoTitle || '').length}/60 characters
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label htmlFor="seoDescription">Meta Description</Label>
+              <AISEOButton
+                productContext={buildProductContext()}
+                onSuccess={(content) => {
+                  handleInputChange('seoDescription', content)
+                  setSuccessMessage('SEO description generated successfully!')
+                }}
+                onError={(error) => {
+                  setErrors(prev => ({ ...prev, seoGeneration: error }))
+                }}
+                disabled={!isReadyForAI()}
+              />
+            </div>
+            <textarea
+              id="seoDescription"
+              rows={3}
+              value={formData.seoDescription || ''}
+              onChange={(e) => handleInputChange('seoDescription', e.target.value)}
+              placeholder="SEO meta description (160 characters max)"
+              maxLength={160}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <p className="text-xs text-gray-500">
+              {(formData.seoDescription || '').length}/160 characters
+            </p>
+          </div>
+
+          {/* AI Content Generation Status - Updated without social media reference */}
+          <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="flex items-start gap-2">
+              <Sparkles className="h-4 w-4 text-blue-500 mt-0.5" />
+              <div className="text-sm">
+                <p className="font-medium text-blue-900">AI Content Generation</p>
+                <p className="text-blue-700 mt-1">
+                  Fill in the product name and category first, then use AI to generate compelling descriptions and SEO content.
+                  For social media content, use the dedicated Social Media section in the admin menu.
+                </p>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Enhanced Barcode Configuration */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <div className="p-1 bg-blue-100 rounded">
+              📊
+            </div>
+            Barcode Configuration
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+
+          {/* Barcode Type Selection */}
+          <div className="space-y-3">
+            <Label className="text-base font-medium">Barcode Format</Label>
+            <div className="grid gap-3 md:grid-cols-2">
+              {formatOptions.map((option) => (
+                <div
+                  key={option.value}
+                  className={`p-3 border rounded-lg cursor-pointer transition-all ${formData.barcodeType === option.value
+                      ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-200'
+                      : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                  onClick={() => handleBarcodeFormatChange(option.value)}
+                >
+                  <div className="flex items-start gap-3">
+                    <span className="text-xl">{option.icon}</span>
+                    <div className="flex-1">
+                      <div className="font-medium text-sm">{option.label}</div>
+                      <div className="text-xs text-gray-600 mt-1">{option.description}</div>
+                      <div className="text-xs text-blue-600 mt-1">{option.useCase}</div>
+                    </div>
+                    {formData.barcodeType === option.value && (
+                      <CheckCircle className="h-4 w-4 text-blue-500" />
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Format Recommendation */}
+          {barcodeRecommendation && (
+            <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <div className="flex items-start gap-2">
+                <Info className="h-4 w-4 text-blue-500 mt-0.5" />
+                <div>
+                  <div className="font-medium text-sm text-blue-900">
+                    {formData.barcodeType} Format Selected
+                  </div>
+                  <div className="text-sm text-blue-700 mt-1">
+                    {barcodeRecommendation.reason}
+                  </div>
+                  <div className="text-xs text-blue-600 mt-1">
+                    {barcodeRecommendation.description}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Barcode Input and Generation */}
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="barcode">Barcode Code</Label>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={generateNewBarcode}
+                  disabled={!formData.sku || isGeneratingBarcode}
+                  className="h-6 px-2 text-xs"
+                >
+                  {isGeneratingBarcode ? (
+                    <RefreshCw className="h-3 w-3 animate-spin" />
+                  ) : (
+                    <Zap className="h-3 w-3" />
+                  )}
+                  {isGeneratingBarcode ? 'Generating...' : 'Regenerate'}
+                </Button>
+              </div>
+              <Input
+                id="barcode"
+                value={formData.barcode}
+                onChange={(e) => handleInputChange('barcode', e.target.value)}
+                placeholder={`Auto-generated ${formData.barcodeType} code`}
+                className={errors.barcode ? 'border-red-500' : ''}
+              />
+              {errors.barcode && (
+                <p className="text-sm text-red-600">{errors.barcode}</p>
+              )}
+              <p className="text-xs text-gray-500">
+                Auto-generated from SKU or enter custom code
+              </p>
+            </div>
+
+            {/* Scanner Compatibility Status */}
+            <div className="space-y-2">
+              <Label>Scanner Compatibility</Label>
+              <div className="p-2 rounded-md text-xs bg-green-50 border border-green-200">
+                <div className="flex items-center gap-1 font-medium text-green-700">
+                  <CheckCircle className="h-3 w-3" />
+                  Scanner Ready
+                </div>
+                <div className="mt-1 space-y-1">
+                  <div className="text-green-600">💡 {formData.barcodeType} format is optimal for scanning</div>
+                  <div className="text-green-600">📱 Compatible with mobile scanner apps</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Barcode Preview */}
+          <div className="space-y-2">
+            <Label>Barcode Preview & Actions</Label>
+            <BarcodeDisplay
+              barcode={formData.barcode}
+              barcodeType={formData.barcodeType}
+              productName={formData.name || 'Product Name'}
+              price={formData.sellingPriceUSD ? `${formData.sellingPriceUSD.toFixed(2)}` : undefined}
+              size="medium"
+            />
+          </div>
+
+          {/* Quick Tips */}
+          <div className="bg-gray-50 p-3 rounded-lg">
+            <div className="text-sm font-medium text-gray-900 mb-2">💡 Barcode Best Practices</div>
+            <div className="text-xs text-gray-600 space-y-1">
+              <div>• <strong>CODE128:</strong> Best for internal inventory, supports all characters</div>
+              <div>• <strong>UPC:</strong> Required for US retail stores (Walmart, Target, Amazon)</div>
+              <div>• <strong>EAN-13:</strong> International standard, required for global sales</div>
+              <div>• <strong>Print Quality:</strong> Use high contrast (black on white) for best scanning</div>
+              <div>• <strong>Size:</strong> Minimum 1.5x width multiplier for reliable scanning</div>
+            </div>
+          </div>
+
+        </CardContent>
+      </Card>
+
+      {/* Supplier Information */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -1166,7 +1304,7 @@ export default function ProductForm({ categories, countries, suppliers, product,
         </CardContent>
       </Card>
 
-      {/* Cost & Pricing Calculation */}
+      {/* Cost & Pricing */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -1328,7 +1466,7 @@ export default function ProductForm({ categories, countries, suppliers, product,
         </CardContent>
       </Card>
 
-      {/* Inventory Management */}
+      {/* Inventory */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -1358,227 +1496,6 @@ export default function ProductForm({ categories, countries, suppliers, product,
                 onChange={(e) => handleInputChange('lowStockAlert', parseInt(e.target.value) || 0)}
                 placeholder="5"
               />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Enhanced Barcode Configuration */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <div className="p-1 bg-blue-100 rounded">
-              📊
-            </div>
-            Barcode Configuration
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-6">
-
-          {/* Barcode Type Selection */}
-          <div className="space-y-3">
-            <Label className="text-base font-medium">Barcode Format</Label>
-            <div className="grid gap-3 md:grid-cols-2">
-              {formatOptions.map((option) => (
-                <div
-                  key={option.value}
-                  className={`p-3 border rounded-lg cursor-pointer transition-all ${formData.barcodeType === option.value
-                      ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-200'
-                      : 'border-gray-200 hover:border-gray-300'
-                    }`}
-                  onClick={() => handleBarcodeFormatChange(option.value)}
-                >
-                  <div className="flex items-start gap-3">
-                    <span className="text-xl">{option.icon}</span>
-                    <div className="flex-1">
-                      <div className="font-medium text-sm">{option.label}</div>
-                      <div className="text-xs text-gray-600 mt-1">{option.description}</div>
-                      <div className="text-xs text-blue-600 mt-1">{option.useCase}</div>
-                    </div>
-                    {formData.barcodeType === option.value && (
-                      <CheckCircle className="h-4 w-4 text-blue-500" />
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Format Recommendation */}
-          {barcodeRecommendation && (
-            <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-              <div className="flex items-start gap-2">
-                <Info className="h-4 w-4 text-blue-500 mt-0.5" />
-                <div>
-                  <div className="font-medium text-sm text-blue-900">
-                    {formData.barcodeType} Format Selected
-                  </div>
-                  <div className="text-sm text-blue-700 mt-1">
-                    {barcodeRecommendation.reason}
-                  </div>
-                  <div className="text-xs text-blue-600 mt-1">
-                    {barcodeRecommendation.description}
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Barcode Input and Generation */}
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="barcode">Barcode Code</Label>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={generateNewBarcode}
-                  disabled={!formData.sku || isGeneratingBarcode}
-                  className="h-6 px-2 text-xs"
-                >
-                  {isGeneratingBarcode ? (
-                    <RefreshCw className="h-3 w-3 animate-spin" />
-                  ) : (
-                    <Zap className="h-3 w-3" />
-                  )}
-                  {isGeneratingBarcode ? 'Generating...' : 'Regenerate'}
-                </Button>
-              </div>
-              <Input
-                id="barcode"
-                value={formData.barcode}
-                onChange={(e) => handleInputChange('barcode', e.target.value)}
-                placeholder={`Auto-generated ${formData.barcodeType} code`}
-                className={errors.barcode ? 'border-red-500' : ''}
-              />
-              {errors.barcode && (
-                <p className="text-sm text-red-600">{errors.barcode}</p>
-              )}
-              <p className="text-xs text-gray-500">
-                Auto-generated from SKU or enter custom code
-              </p>
-            </div>
-
-            {/* Scanner Compatibility Status */}
-            <div className="space-y-2">
-              <Label>Scanner Compatibility</Label>
-              <div className="p-2 rounded-md text-xs bg-green-50 border border-green-200">
-                <div className="flex items-center gap-1 font-medium text-green-700">
-                  <CheckCircle className="h-3 w-3" />
-                  Scanner Ready
-                </div>
-                <div className="mt-1 space-y-1">
-                  <div className="text-green-600">💡 {formData.barcodeType} format is optimal for scanning</div>
-                  <div className="text-green-600">📱 Compatible with mobile scanner apps</div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Barcode Preview */}
-          <div className="space-y-2">
-            <Label>Barcode Preview & Actions</Label>
-            <BarcodeDisplay
-              barcode={formData.barcode}
-              barcodeType={formData.barcodeType}
-              productName={formData.name || 'Product Name'}
-              price={formData.sellingPriceUSD ? `${formData.sellingPriceUSD.toFixed(2)}` : undefined}
-              size="medium"
-            />
-          </div>
-
-          {/* Quick Tips */}
-          <div className="bg-gray-50 p-3 rounded-lg">
-            <div className="text-sm font-medium text-gray-900 mb-2">💡 Barcode Best Practices</div>
-            <div className="text-xs text-gray-600 space-y-1">
-              <div>• <strong>CODE128:</strong> Best for internal inventory, supports all characters</div>
-              <div>• <strong>UPC:</strong> Required for US retail stores (Walmart, Target, Amazon)</div>
-              <div>• <strong>EAN-13:</strong> International standard, required for global sales</div>
-              <div>• <strong>Print Quality:</strong> Use high contrast (black on white) for best scanning</div>
-              <div>• <strong>Size:</strong> Minimum 1.5x width multiplier for reliable scanning</div>
-            </div>
-          </div>
-
-        </CardContent>
-      </Card>
-
-      {/* SEO & Marketing Section */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Search className="h-5 w-5" />
-            SEO & Marketing
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {/* SEO Meta Fields */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label htmlFor="seoTitle">SEO Title</Label>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                onClick={() => handleCustomAIGeneration('seoTitle')}
-                disabled={!isReadyForAI()}
-              >
-                <Sparkles className="h-3 w-3 mr-1" />
-                Generate
-              </Button>
-            </div>
-            <Input
-              id="seoTitle"
-              value={formData.seoTitle || ''}
-              onChange={(e) => handleInputChange('seoTitle', e.target.value)}
-              placeholder="SEO-optimized page title (60 characters max)"
-              maxLength={60}
-            />
-            <p className="text-xs text-gray-500">
-              {(formData.seoTitle || '').length}/60 characters
-            </p>
-          </div>
-
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label htmlFor="seoDescription">Meta Description</Label>
-              <AISEOButton
-                productContext={buildProductContext()}
-                onSuccess={(content) => {
-                  handleInputChange('seoDescription', content)
-                  setSuccessMessage('SEO description generated successfully!')
-                }}
-                onError={(error) => {
-                  setErrors(prev => ({ ...prev, seoGeneration: error }))
-                }}
-                disabled={!isReadyForAI()}
-              />
-            </div>
-            <textarea
-              id="seoDescription"
-              rows={3}
-              value={formData.seoDescription || ''}
-              onChange={(e) => handleInputChange('seoDescription', e.target.value)}
-              placeholder="SEO meta description (160 characters max)"
-              maxLength={160}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            <p className="text-xs text-gray-500">
-              {(formData.seoDescription || '').length}/160 characters
-            </p>
-          </div>
-
-          {/* AI Content Generation Status */}
-          <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-            <div className="flex items-start gap-2">
-              <Sparkles className="h-4 w-4 text-blue-500 mt-0.5" />
-              <div className="text-sm">
-                <p className="font-medium text-blue-900">AI Content Generation</p>
-                <p className="text-blue-700 mt-1">
-                  Fill in the product name and category first, then use AI to generate compelling descriptions and SEO content.
-                  For social media content, use the dedicated Social Media section in the admin menu.
-                </p>
-              </div>
             </div>
           </div>
         </CardContent>
@@ -1656,7 +1573,7 @@ export default function ProductForm({ categories, countries, suppliers, product,
             </div>
           </div>
 
-          {/* AI Content Summary */}
+          {/* AI Content Summary - Updated to remove social media references */}
           {(formData.description || formData.seoTitle || formData.seoDescription) && (
             <div className="bg-gradient-to-r from-purple-50 to-blue-50 p-4 rounded-lg border border-purple-200">
               <div className="flex items-center gap-2 mb-2">
@@ -1679,7 +1596,7 @@ export default function ProductForm({ categories, countries, suppliers, product,
         </CardContent>
       </Card>
 
-      {/* Enhanced Submit Buttons with Draft System */}
+      {/* Submit Buttons */}
       <div className="flex gap-4 justify-end sticky bottom-4 bg-white p-4 border-t border-gray-200 rounded-lg shadow-lg">
         <Button
           type="button"
@@ -1690,8 +1607,8 @@ export default function ProductForm({ categories, countries, suppliers, product,
           Cancel
         </Button>
 
-        {mode === 'edit' && product?.id && (
-          <Link href={`/products/${product.id}`} target="_blank">
+        {mode === 'edit' && (
+          <Link href={`/products/${product?.id}`} target="_blank">
             <Button
               type="button"
               variant="outline"
@@ -1704,133 +1621,24 @@ export default function ProductForm({ categories, countries, suppliers, product,
           </Link>
         )}
 
-        {/* Save as Draft Button */}
         <Button
-          type="button"
-          variant="outline"
-          onClick={(e) => handleSubmit(e, 'draft')}
+          type="submit"
           disabled={loading}
-          className="flex items-center gap-2 min-w-[140px] border-gray-300 text-gray-700 hover:bg-gray-50"
+          className="flex items-center gap-2 min-w-[140px]"
         >
-          {loading && submitMode === 'draft' ? (
+          {loading ? (
             <>
               <RefreshCw className="h-4 w-4 animate-spin" />
               Saving...
             </>
           ) : (
             <>
-              <FileText className="h-4 w-4" />
-              Save as Draft
-            </>
-          )}
-        </Button>
-
-        {/* Publish Product Button */}
-        <Button
-          type="button"
-          onClick={(e) => handleSubmit(e, 'publish')}
-          disabled={loading}
-          className="flex items-center gap-2 min-w-[140px] bg-green-600 hover:bg-green-700 text-white"
-        >
-          {loading && submitMode === 'publish' ? (
-            <>
-              <RefreshCw className="h-4 w-4 animate-spin" />
-              Publishing...
-            </>
-          ) : (
-            <>
-              <Eye className="h-4 w-4" />
-              Publish Product
+              <Save className="h-4 w-4" />
+              {mode === 'create' ? 'Create Product' : 'Update Product'}
             </>
           )}
         </Button>
       </div>
-
-      {/* Publishing Validation Modal */}
-      {showPublishValidation && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <div className="flex items-center gap-3 mb-4">
-              <AlertTriangle className="h-6 w-6 text-orange-500" />
-              <h3 className="text-lg font-semibold">Publishing Requirements</h3>
-            </div>
-            
-            <div className="mb-6">
-              <p className="text-gray-600 mb-4">
-                This product cannot be published yet. Please complete the following requirements:
-              </p>
-              
-              <ul className="space-y-2">
-                {validateForPublishing().map((error, index) => (
-                  <li key={index} className="flex items-start gap-2 text-sm text-red-600">
-                    <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                    {error}
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            <div className="flex gap-3">
-              <Button
-                variant="outline"
-                onClick={() => setShowPublishValidation(false)}
-                className="flex-1"
-              >
-                Continue Editing
-              </Button>
-              <Button
-                onClick={(e) => {
-                  setShowPublishValidation(false)
-                  handleSubmit(e, 'draft')
-                }}
-                disabled={loading}
-                className="flex-1"
-              >
-                Save as Draft
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Draft System Help */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-6">
-        <div className="flex items-start gap-3">
-          <div className="bg-blue-100 p-2 rounded-lg">
-            <FileText className="h-5 w-5 text-blue-600" />
-          </div>
-          <div>
-            <h3 className="text-sm font-medium text-blue-900 mb-1">
-              Draft System Guide
-            </h3>
-            <div className="text-sm text-blue-700 space-y-1">
-              <p><strong>Save as Draft:</strong> Save your work in progress - not visible to customers</p>
-              <p><strong>Publish Product:</strong> Make product live after validation - visible to customers</p>
-              <p><strong>Requirements:</strong> Description, images, price, and category are required for publishing</p>
-              <p><strong>AI Features:</strong> Use AI buttons to generate descriptions and SEO content automatically</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* AI Readiness Status */}
-      {!isReadyForAI() && (
-        <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
-          <div className="flex items-start gap-3">
-            <div className="bg-orange-100 p-2 rounded-lg">
-              <Wand2 className="h-5 w-5 text-orange-600" />
-            </div>
-            <div>
-              <h3 className="text-sm font-medium text-orange-900 mb-1">
-                AI Content Generation
-              </h3>
-              <p className="text-sm text-orange-700">
-                Complete product name and category to unlock AI-powered content generation features.
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* AI Generation Progress Indicator */}
       {loading && (
@@ -1838,9 +1646,7 @@ export default function ProductForm({ categories, countries, suppliers, product,
           <div className="bg-white p-6 rounded-lg shadow-xl max-w-md w-full mx-4">
             <div className="flex items-center gap-3 mb-4">
               <RefreshCw className="h-5 w-5 animate-spin text-blue-600" />
-              <span className="text-lg font-medium">
-                {submitMode === 'publish' ? 'Publishing Product' : 'Saving Product'}
-              </span>
+              <span className="text-lg font-medium">Saving Product</span>
             </div>
             <div className="text-sm text-gray-600">
               Please wait while we save your product information and any AI-generated content...
