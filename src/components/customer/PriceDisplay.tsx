@@ -1,117 +1,144 @@
+// ✅ NEW: src/components/customer/PriceDisplay.tsx
+
 'use client'
 
 import { useCurrency } from '@/contexts/CurrencyContext'
-import { Loader2 } from 'lucide-react'
+import { formatPrice } from '@/lib/utils'
+import { calculateDiscountInfo } from '@/lib/discount-utils'
+import { Percent, Tag } from 'lucide-react'
+
+interface Product {
+  sellingPriceUSD: number
+  discountPercentage: number
+  showDiscountToCustomers: boolean
+}
 
 interface PriceDisplayProps {
-  priceUSD: number
-  className?: string
-  showOriginal?: boolean
+  product: Product
   size?: 'sm' | 'md' | 'lg' | 'xl'
-  comparePrice?: number // For showing discounts
+  showSavings?: boolean
+  className?: string
 }
 
 export default function PriceDisplay({ 
-  priceUSD, 
-  className = '',
-  showOriginal = false,
-  size = 'md',
-  comparePrice
+  product, 
+  size = 'md', 
+  showSavings = true,
+  className = '' 
 }: PriceDisplayProps) {
-  const { formatPrice, currency, isLoading } = useCurrency()
+  const { currentCurrency, convertPrice } = useCurrency()
 
-  // Size classes
+  // Calculate discount information
+  const discountInfo = calculateDiscountInfo({
+    sellingPriceUSD: product.sellingPriceUSD,
+    discountPercentage: product.discountPercentage,
+    showDiscountToCustomers: product.showDiscountToCustomers
+  })
+
+  // Convert prices to current currency
+  const finalPrice = convertPrice(product.sellingPriceUSD, currentCurrency)
+  const originalPrice = discountInfo.shouldShowDiscount 
+    ? convertPrice(discountInfo.originalPrice, currentCurrency)
+    : finalPrice
+  const savings = convertPrice(discountInfo.savings, currentCurrency)
+
+  // Size configurations
   const sizeClasses = {
-    sm: 'text-sm',
-    md: 'text-base',
-    lg: 'text-lg',
-    xl: 'text-xl'
+    sm: {
+      price: 'text-sm',
+      originalPrice: 'text-xs',
+      badge: 'text-xs px-1.5 py-0.5',
+      savings: 'text-xs'
+    },
+    md: {
+      price: 'text-lg',
+      originalPrice: 'text-sm',
+      badge: 'text-xs px-2 py-1',
+      savings: 'text-sm'
+    },
+    lg: {
+      price: 'text-xl',
+      originalPrice: 'text-base',
+      badge: 'text-sm px-2.5 py-1',
+      savings: 'text-sm'
+    },
+    xl: {
+      price: 'text-2xl',
+      originalPrice: 'text-lg',
+      badge: 'text-sm px-3 py-1.5',
+      savings: 'text-base'
+    }
   }
 
-  if (isLoading) {
-    return (
-      <div className={`flex items-center gap-2 ${className}`}>
-        <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
-        <span className={`text-gray-400 ${sizeClasses[size]}`}>Loading price...</span>
-      </div>
-    )
-  }
-
-  const formattedPrice = formatPrice(priceUSD)
-  const formattedComparePrice = comparePrice ? formatPrice(comparePrice) : null
+  const classes = sizeClasses[size]
 
   return (
-    <div className={`${className}`}>
-      {/* Main Price */}
-      <div className="flex items-center gap-2">
-        {/* Compare Price (Original/Higher Price) */}
-        {formattedComparePrice && comparePrice! > priceUSD && (
-          <span className={`text-gray-400 line-through ${sizeClasses[size]}`}>
-            {formattedComparePrice}
-          </span>
-        )}
-        
-        {/* Current Price */}
-        <span className={`font-bold text-gray-900 ${sizeClasses[size]}`}>
-          {formattedPrice}
-        </span>
-
-        {/* Discount Badge */}
-        {formattedComparePrice && comparePrice! > priceUSD && (
-          <span className="bg-red-100 text-red-600 text-xs font-bold px-2 py-1 rounded-full">
-            {Math.round(((comparePrice! - priceUSD) / comparePrice!) * 100)}% OFF
+    <div className={`space-y-2 ${className}`}>
+      {/* Price Display */}
+      <div className="flex items-center gap-3 flex-wrap">
+        {discountInfo.shouldShowDiscount ? (
+          <>
+            {/* Original Price (Crossed Out) */}
+            <span className={`line-through text-gray-400 ${classes.originalPrice}`}>
+              {formatPrice(originalPrice, currentCurrency)}
+            </span>
+            
+            {/* Sale Price */}
+            <span className={`font-bold text-red-600 ${classes.price}`}>
+              {formatPrice(finalPrice, currentCurrency)}
+            </span>
+            
+            {/* Discount Badge */}
+            <span className={`bg-red-100 text-red-600 font-bold rounded-full flex items-center gap-1 ${classes.badge}`}>
+              <Percent className="h-3 w-3" />
+              {discountInfo.discountPercent}% OFF
+            </span>
+          </>
+        ) : (
+          /* Regular Price */
+          <span className={`font-bold text-gray-900 ${classes.price}`}>
+            {formatPrice(finalPrice, currentCurrency)}
           </span>
         )}
       </div>
 
-      {/* Show Original USD Price */}
-      {showOriginal && currency !== 'USD' && (
-        <div className="text-xs text-gray-500 mt-1">
-          Originally ${priceUSD.toFixed(2)} USD
+      {/* Savings Information */}
+      {discountInfo.shouldShowDiscount && showSavings && (
+        <div className={`text-green-600 font-medium ${classes.savings}`}>
+          🎉 You save {formatPrice(savings, currentCurrency)}
+        </div>
+      )}
+
+      {/* Discount Badge (Alternative Layout) */}
+      {discountInfo.shouldShowDiscount && size === 'xl' && (
+        <div className="inline-flex items-center gap-2 bg-red-50 text-red-700 px-4 py-2 rounded-lg border border-red-200">
+          <Tag className="h-4 w-4" />
+          <span className="font-medium">
+            Limited Time: {discountInfo.discountPercent}% Off
+          </span>
         </div>
       )}
     </div>
   )
 }
 
-// Specialized components for different use cases
-export function ProductPrice({ priceUSD, comparePrice, className = '' }: {
-  priceUSD: number
-  comparePrice?: number
-  className?: string
-}) {
-  return (
-    <PriceDisplay 
-      priceUSD={priceUSD}
-      comparePrice={comparePrice}
-      size="lg"
-      className={className}
-    />
-  )
-}
+// ✅ USAGE EXAMPLES:
+/*
+// Basic usage
+<PriceDisplay product={product} />
 
-export function CartPrice({ priceUSD, className = '' }: {
-  priceUSD: number
-  className?: string
-}) {
-  return (
-    <PriceDisplay 
-      priceUSD={priceUSD}
-      size="md"
-      className={className}
-    />
-  )
-}
+// Large size with savings
+<PriceDisplay 
+  product={product} 
+  size="xl" 
+  showSavings={true} 
+/>
 
-export function CardPrice({ priceUSD, className = '' }: {
-  priceUSD: number
-  className?: string
-}) {
-  return (
-    <PriceDisplay 
-      priceUSD={priceUSD}
-      size="md"
-      className={className}
-    />
-  )
-}
+// Small card version
+<PriceDisplay 
+  product={product} 
+  size="sm" 
+  showSavings={false} 
+  className="text-center"
+/>
+*/
