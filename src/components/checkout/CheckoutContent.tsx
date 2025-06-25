@@ -1,3 +1,8 @@
+// Updated src/components/checkout/CheckoutContent.tsx
+// =====================================
+// Dynamic shipping integrated checkout process
+// =====================================
+
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -16,9 +21,14 @@ import {
   Package,
   Truck,
   AlertCircle,
-  Check
+  Check,
+  RefreshCw
 } from 'lucide-react'
 import Image from 'next/image'
+
+// =================
+// INTERFACES
+// =================
 
 // Customer Information Interface
 interface CustomerInfo {
@@ -42,6 +52,19 @@ interface ShippingAddress {
 // Payment Method Type
 type PaymentMethod = 'card' | 'paypal' | 'bank_transfer'
 
+// Shipping calculation interface
+interface ShippingCalculationResult {
+  success: boolean
+  shippingCostUSD: number
+  shippingCostFormatted: string
+  isEligibleForFreeShipping: boolean
+  freeShippingThreshold?: number
+  remainingForFreeShipping?: number
+  shippingZoneName: string
+  estimatedDays?: string
+  error?: string
+}
+
 export default function CheckoutContent() {
   const router = useRouter()
   const { items, totalItems, totalPriceUSD, clearCart, validateCartStock, hasStockIssues } = useCart()
@@ -51,6 +74,11 @@ export default function CheckoutContent() {
   const [currentStep, setCurrentStep] = useState(1)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
+  
+  // Shipping calculation state
+  const [shippingData, setShippingData] = useState<ShippingCalculationResult | null>(null)
+  const [isLoadingShipping, setIsLoadingShipping] = useState(false)
+  const [shippingError, setShippingError] = useState<string | null>(null)
   
   // Form Data
   const [customerInfo, setCustomerInfo] = useState<CustomerInfo>({
@@ -73,9 +101,83 @@ export default function CheckoutContent() {
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('card')
   const [termsAccepted, setTermsAccepted] = useState(false)
   
-  // Calculated Values
+  // =================
+  // SHIPPING CALCULATION
+  // =================
+  
+  const calculateShipping = async (countryCode: string) => {
+    if (!countryCode || totalPriceUSD <= 0) {
+      setShippingData(null)
+      return
+    }
+
+    setIsLoadingShipping(true)
+    setShippingError(null)
+
+    try {
+      const response = await fetch('/api/shipping/calculate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          countryCode: countryCode.toUpperCase(),
+          subtotalUSD: totalPriceUSD,
+          currency
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`)
+      }
+
+      const result: ShippingCalculationResult = await response.json()
+      setShippingData(result)
+
+      if (!result.success) {
+        setShippingError(result.error || 'Failed to calculate shipping')
+      }
+
+    } catch (error) {
+      console.error('Shipping calculation error:', error)
+      setShippingError('Unable to calculate shipping costs')
+      
+      // Fallback shipping logic
+      setShippingData({
+        success: false,
+        shippingCostUSD: totalPriceUSD >= 100 ? 0 : 15,
+        shippingCostFormatted: totalPriceUSD >= 100 ? 'Free' : '$15.00',
+        isEligibleForFreeShipping: totalPriceUSD >= 100,
+        freeShippingThreshold: 100,
+        remainingForFreeShipping: totalPriceUSD >= 100 ? 0 : 100 - totalPriceUSD,
+        shippingZoneName: 'Standard',
+        error: 'Using fallback shipping rates'
+      })
+    } finally {
+      setIsLoadingShipping(false)
+    }
+  }
+
+  // Calculate shipping when country changes
+  useEffect(() => {
+    if (shippingAddress.country && totalPriceUSD > 0) {
+      calculateShipping(shippingAddress.country)
+    }
+  }, [shippingAddress.country, totalPriceUSD])
+
+  // Initial shipping calculation
+  useEffect(() => {
+    if (totalPriceUSD > 0) {
+      calculateShipping(shippingAddress.country || 'US')
+    }
+  }, [totalPriceUSD])
+
+  // =================
+  // CALCULATED VALUES
+  // =================
+  
   const subtotal = totalPriceUSD
-  const shippingCost = subtotal > 100 ? 0 : 15 // Free shipping over $100
+  const shippingCost = shippingData?.shippingCostUSD || 0
   const taxRate = 0.08 // 8% tax
   const taxAmount = subtotal * taxRate
   const totalAmount = subtotal + shippingCost + taxAmount
@@ -87,7 +189,10 @@ export default function CheckoutContent() {
     }
   }, [totalItems, router])
   
-  // Form Validation
+  // =================
+  // FORM VALIDATION
+  // =================
+  
   const isCustomerInfoValid = () => {
     return customerInfo.firstName.trim() !== '' &&
            customerInfo.lastName.trim() !== '' &&
@@ -106,13 +211,16 @@ export default function CheckoutContent() {
   const canProceedToNextStep = () => {
     switch (currentStep) {
       case 1: return isCustomerInfoValid()
-      case 2: return isShippingAddressValid()
-      case 3: return termsAccepted
+      case 2: return isShippingAddressValid() && !isLoadingShipping
+      case 3: return termsAccepted && !isLoadingShipping
       default: return false
     }
   }
   
-  // Handle Step Navigation
+  // =================
+  // STEP NAVIGATION
+  // =================
+  
   const nextStep = () => {
     if (canProceedToNextStep() && currentStep < 3) {
       setError('') // Clear any previous errors
@@ -127,7 +235,10 @@ export default function CheckoutContent() {
     }
   }
   
-  // Handle Order Submission with Enhanced Stock Validation
+  // =================
+  // ORDER SUBMISSION
+  // =================
+  
   const handleSubmitOrder = async () => {
     if (!canProceedToNextStep()) return
     
@@ -144,179 +255,186 @@ export default function CheckoutContent() {
         setIsLoading(false)
         return
       }
-      
+
+      // Ensure we have valid shipping data
+      if (!shippingData || isLoadingShipping) {
+        setError('Please wait for shipping calculation to complete.')
+        setIsLoading(false)
+        return
+      }
+
+      // Prepare order data with dynamic shipping
       const orderData = {
-        customerInfo,
-        shippingAddress,
-        paymentMethod,
+        customerInfo: {
+          firstName: customerInfo.firstName.trim(),
+          lastName: customerInfo.lastName.trim(),
+          email: customerInfo.email.trim(),
+          phone: customerInfo.phone.trim()
+        },
+        shippingAddress: {
+          street: shippingAddress.street.trim(),
+          city: shippingAddress.city.trim(),
+          state: shippingAddress.state.trim(),
+          postalCode: shippingAddress.postalCode.trim(),
+          country: shippingAddress.country.trim()
+        },
+        paymentMethod: paymentMethod === 'card' ? 'credit_card' : paymentMethod,
         items: items.map(item => ({
           productId: item.id,
           quantity: item.quantity,
           pricePerItem: item.priceUSD,
           totalPrice: item.priceUSD * item.quantity
         })),
-        subtotal,
-        shipping: shippingCost,
+        subtotal: subtotal,
+        shipping: shippingCost, // Dynamic shipping cost
         tax: taxAmount,
         total: totalAmount,
-        currency: currency.code
+        currency: currency
       }
+
+      console.log('Creating order with data:', orderData)
       
-      // Call Order Creation API
       const response = await fetch('/api/orders', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(orderData),
+        body: JSON.stringify(orderData)
       })
 
       const result = await response.json()
 
-      if (response.ok && result.success) {
-        // Order created successfully
-        console.log('Order created:', result.order)
-        
-        // Clear cart and redirect to success page with order number
-        clearCart()
-        router.push(`/checkout/success?orderNumber=${result.order.orderNumber}`)
-      } else {
-        // Handle API errors with specific stock-related messaging
-        let errorMessage = result.error || 'Failed to create order. Please try again.'
-        
-        // Enhanced error handling for stock issues
-        if (result.error && result.error.includes('stock')) {
-          errorMessage = 'Some items are no longer available. Please refresh your cart and try again.'
-        } else if (result.error && result.error.includes('Price has changed')) {
-          errorMessage = 'Product prices have been updated. Please refresh your cart to see current prices.'
-        }
-        
-        setError(errorMessage)
-        console.error('Order creation failed:', result.error)
+      if (!response.ok) {
+        throw new Error(result.error || `HTTP ${response.status}`)
       }
-      
+
+      if (result.success) {
+        console.log('Order created successfully:', result.order)
+        
+        // Clear the cart
+        clearCart()
+        
+        // Redirect to order confirmation
+        router.push(`/checkout/success?orderId=${result.order.id}`)
+      } else {
+        throw new Error(result.error || 'Order creation failed')
+      }
+
     } catch (error) {
-      console.error('Order submission failed:', error)
-      setError('Network error. Please check your connection and try again.')
+      console.error('Order submission error:', error)
+      setError(error instanceof Error ? error.message : 'Failed to create order. Please try again.')
     } finally {
       setIsLoading(false)
     }
   }
-  
-  // Steps Configuration
-  const steps = [
-    { number: 1, title: 'Customer Information', icon: User },
-    { number: 2, title: 'Shipping Address', icon: MapPin },
-    { number: 3, title: 'Payment & Review', icon: CreditCard }
-  ]
-  
-  if (totalItems === 0) {
-    return null // Will redirect
+
+  // =================
+  // RENDER HELPERS
+  // =================
+
+  const renderShippingInfo = () => {
+    if (isLoadingShipping) {
+      return (
+        <div className="flex items-center gap-2 text-sm text-gray-600">
+          <RefreshCw className="h-4 w-4 animate-spin" />
+          <span>Calculating shipping...</span>
+        </div>
+      )
+    }
+
+    if (shippingError) {
+      return (
+        <div className="text-sm text-orange-600">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="h-4 w-4" />
+            <span>{shippingError}</span>
+          </div>
+        </div>
+      )
+    }
+
+    if (shippingData) {
+      return (
+        <div className="text-sm text-gray-600">
+          <div className="flex items-center gap-2">
+            <Truck className="h-4 w-4" />
+            <span>{shippingData.shippingZoneName}</span>
+            {shippingData.estimatedDays && (
+              <span className="text-gray-500">• {shippingData.estimatedDays}</span>
+            )}
+          </div>
+        </div>
+      )
+    }
+
+    return null
   }
-  
+
+  // =================
+  // MAIN RENDER
+  // =================
+
   return (
     <div className="max-w-6xl mx-auto">
       {/* Header */}
       <div className="mb-8">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">Checkout</h1>
-            <p className="text-gray-600 mt-2">Complete your purchase securely</p>
-          </div>
-          <Button
-            variant="ghost"
-            onClick={() => router.push('/cart')}
-            className="flex items-center gap-2"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back to Cart
-          </Button>
-        </div>
-        
-        {/* Progress Steps */}
-        <div className="flex items-center space-x-4 mb-8">
-          {steps.map((step, index) => {
-            const Icon = step.icon
-            const isActive = currentStep === step.number
-            const isCompleted = currentStep > step.number
-            
-            return (
-              <div key={step.number} className="flex items-center">
-                <div className={`flex items-center gap-3 px-4 py-2 rounded-lg transition-colors ${
-                  isActive ? 'bg-purple-100 text-purple-700' :
-                  isCompleted ? 'bg-green-100 text-green-700' :
-                  'bg-gray-100 text-gray-500'
-                }`}>
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                    isActive ? 'bg-purple-600 text-white' :
-                    isCompleted ? 'bg-green-600 text-white' :
-                    'bg-gray-400 text-white'
-                  }`}>
-                    {isCompleted ? (
-                      <Check className="h-4 w-4" />
-                    ) : (
-                      <Icon className="h-4 w-4" />
-                    )}
-                  </div>
-                  <span className="font-medium hidden sm:block">{step.title}</span>
-                </div>
-                {index < steps.length - 1 && (
-                  <div className="w-8 h-px bg-gray-300 mx-2" />
-                )}
-              </div>
-            )
-          })}
-        </div>
-        
-        {/* Stock Issues Warning */}
-        {hasStockIssues && (
-          <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-lg">
-            <div className="flex items-center gap-2 text-amber-700">
-              <AlertCircle className="h-5 w-5" />
-              <span className="font-medium">Stock Alert</span>
-            </div>
-            <p className="text-amber-600 mt-1">
-              Some items in your cart have limited availability. Please review quantities before proceeding.
-            </p>
-            <button 
-              onClick={() => router.push('/cart')}
-              className="text-amber-700 hover:text-amber-800 underline text-sm mt-2"
-            >
-              Review Cart →
-            </button>
-          </div>
-        )}
-        
-        {/* Error Message */}
-        {error && (
-          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
-            <div className="flex items-center gap-2 text-red-700">
-              <AlertCircle className="h-5 w-5" />
-              <span className="font-medium">Error</span>
-            </div>
-            <p className="text-red-600 mt-1">{error}</p>
-          </div>
-        )}
+        <h1 className="text-3xl font-bold text-gray-900">Checkout</h1>
+        <p className="mt-2 text-gray-600">Complete your order securely</p>
       </div>
-      
+
+      {/* Progress Steps */}
+      <div className="mb-8">
+        <div className="flex items-center justify-center space-x-8">
+          {[1, 2, 3].map((step) => (
+            <div key={step} className="flex items-center">
+              <div className={`
+                w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium
+                ${currentStep >= step 
+                  ? 'bg-purple-600 text-white' 
+                  : 'bg-gray-200 text-gray-600'}
+              `}>
+                {currentStep > step ? <Check className="h-4 w-4" /> : step}
+              </div>
+              <span className={`ml-2 text-sm font-medium ${
+                currentStep >= step ? 'text-purple-600' : 'text-gray-500'
+              }`}>
+                {step === 1 && 'Customer Info'}
+                {step === 2 && 'Shipping'}
+                {step === 3 && 'Payment & Review'}
+              </span>
+              {step < 3 && (
+                <ArrowRight className="ml-8 h-4 w-4 text-gray-400" />
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+
       <div className="grid gap-8 lg:grid-cols-3">
         {/* Main Content */}
         <div className="lg:col-span-2">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                {(() => {
-                  const Icon = steps[currentStep - 1].icon
-                  return <Icon className="h-5 w-5" />
-                })()}
-                {steps[currentStep - 1].title}
+                {currentStep === 1 && <><User className="h-5 w-5" />Customer Information</>}
+                {currentStep === 2 && <><MapPin className="h-5 w-5" />Shipping Address</>}
+                {currentStep === 3 && <><CreditCard className="h-5 w-5" />Payment & Review</>}
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-6">
-              
+            <CardContent>
+              {/* Error Display */}
+              {error && (
+                <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <AlertCircle className="h-4 w-4 text-red-500" />
+                    <p className="text-sm text-red-600">{error}</p>
+                  </div>
+                </div>
+              )}
+
               {/* Step 1: Customer Information */}
               {currentStep === 1 && (
-                <div className="space-y-4">
+                <div className="space-y-6">
                   <div className="grid gap-4 sm:grid-cols-2">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -325,7 +443,7 @@ export default function CheckoutContent() {
                       <Input
                         value={customerInfo.firstName}
                         onChange={(e) => setCustomerInfo({...customerInfo, firstName: e.target.value})}
-                        placeholder="Enter your first name"
+                        placeholder="Enter first name"
                         required
                       />
                     </div>
@@ -336,7 +454,7 @@ export default function CheckoutContent() {
                       <Input
                         value={customerInfo.lastName}
                         onChange={(e) => setCustomerInfo({...customerInfo, lastName: e.target.value})}
-                        placeholder="Enter your last name"
+                        placeholder="Enter last name"
                         required
                       />
                     </div>
@@ -350,7 +468,7 @@ export default function CheckoutContent() {
                       type="email"
                       value={customerInfo.email}
                       onChange={(e) => setCustomerInfo({...customerInfo, email: e.target.value})}
-                      placeholder="Enter your email address"
+                      placeholder="Enter email address"
                       required
                     />
                   </div>
@@ -363,7 +481,7 @@ export default function CheckoutContent() {
                       type="tel"
                       value={customerInfo.phone}
                       onChange={(e) => setCustomerInfo({...customerInfo, phone: e.target.value})}
-                      placeholder="Enter your phone number"
+                      placeholder="Enter phone number"
                       required
                     />
                   </div>
@@ -373,17 +491,17 @@ export default function CheckoutContent() {
                       Company (Optional)
                     </label>
                     <Input
-                      value={customerInfo.company}
+                      value={customerInfo.company || ''}
                       onChange={(e) => setCustomerInfo({...customerInfo, company: e.target.value})}
                       placeholder="Enter company name"
                     />
                   </div>
                 </div>
               )}
-              
+
               {/* Step 2: Shipping Address */}
               {currentStep === 2 && (
-                <div className="space-y-4">
+                <div className="space-y-6">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Street Address *
@@ -398,10 +516,10 @@ export default function CheckoutContent() {
                   
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Apartment, suite, etc. (Optional)
+                      Apartment, Suite, etc. (Optional)
                     </label>
                     <Input
-                      value={shippingAddress.apartment}
+                      value={shippingAddress.apartment || ''}
                       onChange={(e) => setShippingAddress({...shippingAddress, apartment: e.target.value})}
                       placeholder="Apartment, suite, etc."
                     />
@@ -462,8 +580,17 @@ export default function CheckoutContent() {
                         <option value="AU">Australia</option>
                         <option value="DE">Germany</option>
                         <option value="FR">France</option>
+                        <option value="JP">Japan</option>
+                        <option value="BR">Brazil</option>
+                        <option value="MX">Mexico</option>
                       </select>
                     </div>
+                  </div>
+
+                  {/* Shipping Calculation Info */}
+                  <div className="bg-gray-50 p-4 rounded-lg">
+                    <h4 className="text-sm font-medium text-gray-900 mb-2">Shipping Information</h4>
+                    {renderShippingInfo()}
                   </div>
                 </div>
               )}
@@ -484,11 +611,8 @@ export default function CheckoutContent() {
                           onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod)}
                           className="mr-3"
                         />
-                        <CreditCard className="h-5 w-5 mr-3 text-gray-600" />
-                        <div>
-                          <div className="font-medium">Credit/Debit Card</div>
-                          <div className="text-sm text-gray-500">Visa, MasterCard, American Express</div>
-                        </div>
+                        <CreditCard className="h-5 w-5 mr-2 text-gray-600" />
+                        <span>Credit/Debit Card</span>
                       </label>
                       
                       <label className="flex items-center p-3 border rounded-lg cursor-pointer hover:bg-gray-50">
@@ -500,79 +624,86 @@ export default function CheckoutContent() {
                           onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod)}
                           className="mr-3"
                         />
-                        <div className="h-5 w-5 mr-3 bg-blue-600 rounded text-white flex items-center justify-center text-xs font-bold">
-                          PP
-                        </div>
-                        <div>
-                          <div className="font-medium">PayPal</div>
-                          <div className="text-sm text-gray-500">Pay with your PayPal account</div>
-                        </div>
+                        <Package className="h-5 w-5 mr-2 text-gray-600" />
+                        <span>PayPal</span>
                       </label>
                     </div>
                   </div>
-                  
-                  {/* Terms and Conditions */}
-                  <div className="bg-gray-50 p-4 rounded-lg">
-                    <label className="flex items-start space-x-3 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={termsAccepted}
-                        onChange={(e) => setTermsAccepted(e.target.checked)}
-                        className="mt-1"
-                        required
-                      />
-                      <div className="text-sm text-gray-700">
-                        I agree to the{' '}
-                        <a href="/terms" className="text-purple-600 hover:underline">Terms and Conditions</a>
-                        {' '}and{' '}
-                        <a href="/privacy" className="text-purple-600 hover:underline">Privacy Policy</a>
+
+                  {/* Order Review */}
+                  <div>
+                    <h3 className="text-lg font-medium text-gray-900 mb-4">Review Your Order</h3>
+                    <div className="bg-gray-50 p-4 rounded-lg space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span>Customer:</span>
+                        <span>{customerInfo.firstName} {customerInfo.lastName}</span>
                       </div>
-                    </label>
+                      <div className="flex justify-between text-sm">
+                        <span>Shipping to:</span>
+                        <span>{shippingAddress.city}, {shippingAddress.state}, {shippingAddress.country}</span>
+                      </div>
+                      {shippingData && (
+                        <div className="flex justify-between text-sm">
+                          <span>Shipping method:</span>
+                          <span>{shippingData.shippingZoneName} {shippingData.estimatedDays && `(${shippingData.estimatedDays})`}</span>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                  
-                  {/* Security Notice */}
-                  <div className="flex items-center gap-2 text-sm text-gray-600 bg-green-50 p-3 rounded-lg">
-                    <Lock className="h-4 w-4 text-green-600" />
-                    Your payment information is encrypted and secure
+
+                  {/* Terms and Conditions */}
+                  <div className="flex items-start space-x-3">
+                    <input
+                      type="checkbox"
+                      id="terms"
+                      checked={termsAccepted}
+                      onChange={(e) => setTermsAccepted(e.target.checked)}
+                      className="mt-1"
+                    />
+                    <label htmlFor="terms" className="text-sm text-gray-600">
+                      I agree to the Terms and Conditions and Privacy Policy. 
+                      I understand that my order will be processed securely.
+                    </label>
                   </div>
                 </div>
               )}
-              
+
               {/* Navigation Buttons */}
               <div className="flex justify-between pt-6 border-t">
-                <Button
-                  variant="ghost"
-                  onClick={prevStep}
-                  disabled={currentStep === 1}
-                  className="flex items-center gap-2"
-                >
-                  <ArrowLeft className="h-4 w-4" />
-                  Previous
-                </Button>
+                {currentStep > 1 && (
+                  <Button 
+                    variant="outline" 
+                    onClick={prevStep}
+                    disabled={isLoading}
+                  >
+                    <ArrowLeft className="h-4 w-4 mr-1" />
+                    Back
+                  </Button>
+                )}
                 
                 {currentStep < 3 ? (
-                  <Button
+                  <Button 
                     onClick={nextStep}
                     disabled={!canProceedToNextStep()}
-                    className="flex items-center gap-2"
+                    className={currentStep === 1 ? 'ml-auto' : ''}
                   >
-                    Next
-                    <ArrowRight className="h-4 w-4" />
+                    Continue
+                    <ArrowRight className="h-4 w-4 ml-1" />
                   </Button>
                 ) : (
-                  <Button
+                  <Button 
                     onClick={handleSubmitOrder}
                     disabled={!canProceedToNextStep() || isLoading}
-                    className="flex items-center gap-2 bg-green-600 hover:bg-green-700"
+                    className="ml-auto"
                   >
                     {isLoading ? (
                       <>
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
                         Processing...
                       </>
                     ) : (
                       <>
-                        <Lock className="h-4 w-4" />
+                        <Lock className="h-4 w-4 mr-1" />
                         Complete Order
                       </>
                     )}
@@ -629,9 +760,14 @@ export default function CheckoutContent() {
                   <span className="text-gray-900">{formatPrice(subtotal)}</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Shipping</span>
+                  <div className="flex items-center gap-1">
+                    <span className="text-gray-600">Shipping</span>
+                    {isLoadingShipping && <RefreshCw className="h-3 w-3 animate-spin text-gray-400" />}
+                  </div>
                   <span className="text-gray-900">
-                    {shippingCost === 0 ? 'Free' : formatPrice(shippingCost)}
+                    {isLoadingShipping ? '...' : (
+                      shippingData?.isEligibleForFreeShipping ? 'Free' : formatPrice(shippingCost)
+                    )}
                   </span>
                 </div>
                 <div className="flex justify-between text-sm">
@@ -640,16 +776,18 @@ export default function CheckoutContent() {
                 </div>
                 <div className="flex justify-between text-lg font-semibold pt-2 border-t">
                   <span className="text-gray-900">Total</span>
-                  <span className="text-gray-900">{formatPrice(totalAmount)}</span>
+                  <span className="text-gray-900">
+                    {isLoadingShipping ? '...' : formatPrice(totalAmount)}
+                  </span>
                 </div>
               </div>
               
               {/* Free Shipping Notice */}
-              {subtotal < 100 && (
+              {shippingData && !shippingData.isEligibleForFreeShipping && shippingData.remainingForFreeShipping && (
                 <div className="bg-blue-50 p-3 rounded-lg">
                   <div className="flex items-center gap-2 text-sm text-blue-700">
                     <Truck className="h-4 w-4" />
-                    Add {formatPrice(100 - subtotal)} more for free shipping!
+                    Add {formatPrice(shippingData.remainingForFreeShipping)} more for free shipping!
                   </div>
                 </div>
               )}
