@@ -24,16 +24,19 @@ export function calculateDiscountInfo(product: DiscountProduct): DiscountCalcula
   const hasDiscount = product.discountPercentage > 0
   const shouldShowDiscount = hasDiscount && product.showDiscountToCustomers
   
-  // Calculate original price (before discount)
-  const originalPrice = hasDiscount 
-    ? product.sellingPriceUSD / (1 - product.discountPercentage / 100)
-    : product.sellingPriceUSD
+  // ✅ CRITICAL FIX: sellingPriceUSD is the FINAL DISCOUNTED price
+  const discountedPrice = product.sellingPriceUSD  // This is what customer actually pays
   
-  const savings = originalPrice - product.sellingPriceUSD
+  // Calculate what the "original price" would be for display purposes
+  const originalPrice = hasDiscount 
+    ? discountedPrice / (1 - product.discountPercentage / 100)
+    : discountedPrice
+  
+  const savings = originalPrice - discountedPrice
   
   return {
     originalPrice,
-    discountedPrice: product.sellingPriceUSD,
+    discountedPrice,  // ✅ This should be the sellingPriceUSD (final price)
     savings,
     discountPercent: product.discountPercentage,
     hasDiscount,

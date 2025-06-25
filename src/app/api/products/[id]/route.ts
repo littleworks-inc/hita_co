@@ -1,6 +1,4 @@
-// =====================================
-// src/app/api/products/[id]/route.ts - CUSTOMER PRODUCT DETAIL API WITH DISCOUNT SYSTEM
-// =====================================
+// ✅ UPDATED: src/app/api/products/[id]/route.ts - Customer Product API with Discount Support
 
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
@@ -25,15 +23,19 @@ export async function GET(
         description: true,
         shortDescription: true,
         sellingPriceUSD: true,
+        // ✅ CRITICAL: Include discount fields for customer display
         discountPercentage: true,
-        showDiscountToCustomers: true, // 🎯 INCLUDE DISCOUNT VISIBILITY
+        showDiscountToCustomers: true,
         images: true,
         tags: true,
         stockQuantity: true,
+        lowStockAlert: true,
+        isFeatured: true,
         seoTitle: true,
         seoDescription: true,
         createdAt: true,
         updatedAt: true,
+        publishedAt: true,
         category: {
           select: {
             id: true,
@@ -44,9 +46,17 @@ export async function GET(
         },
         country: {
           select: {
+            id: true,
             name: true,
             currency: true,
             currencySymbol: true
+          }
+        },
+        supplier: {
+          select: {
+            id: true,
+            name: true,
+            country: true
           }
         }
       }
@@ -70,15 +80,33 @@ export async function GET(
         name: true,
         shortDescription: true,
         sellingPriceUSD: true,
+        // ✅ CRITICAL: Include discount fields for related products too
         discountPercentage: true,
-        showDiscountToCustomers: true, // 🎯 INCLUDE DISCOUNT VISIBILITY
+        showDiscountToCustomers: true,
         images: true,
-        stockQuantity: true
+        stockQuantity: true,
+        isFeatured: true,
+        category: {
+          select: {
+            id: true,
+            name: true,
+            slug: true
+          }
+        },
+        country: {
+          select: {
+            id: true,
+            name: true,
+            currency: true,
+            currencySymbol: true
+          }
+        }
       },
       take: 4,
-      orderBy: {
-        createdAt: 'desc'
-      }
+      orderBy: [
+        { isFeatured: 'desc' },
+        { createdAt: 'desc' }
+      ]
     })
 
     return NextResponse.json({ 
@@ -95,7 +123,7 @@ export async function GET(
   }
 }
 
-// GET /api/products/[id]/recommendations - Get product recommendations
+// GET /api/products/[id]/recommendations - Get product recommendations (optional endpoint)
 export async function getRecommendations(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -119,11 +147,9 @@ export async function getRecommendations(
       return NextResponse.json({ error: 'Product not found' }, { status: 404 })
     }
 
-    // Get recommendations based on category and similar price range
-    const priceRange = {
-      min: currentProduct.sellingPriceUSD * 0.7, // 30% lower
-      max: currentProduct.sellingPriceUSD * 1.3  // 30% higher
-    }
+    // Get recommendations based on similar price range and category
+    const priceMin = currentProduct.sellingPriceUSD * 0.7 // 30% below
+    const priceMax = currentProduct.sellingPriceUSD * 1.3 // 30% above
 
     const recommendations = await db.product.findMany({
       where: {
@@ -135,13 +161,13 @@ export async function getRecommendations(
           // Same category
           { categoryId: currentProduct.categoryId },
           // Similar price range
-          {
+          { 
             sellingPriceUSD: {
-              gte: priceRange.min,
-              lte: priceRange.max
+              gte: priceMin,
+              lte: priceMax
             }
           },
-          // Similar tags
+          // Shared tags
           {
             tags: {
               hasSome: currentProduct.tags
@@ -154,18 +180,29 @@ export async function getRecommendations(
         name: true,
         shortDescription: true,
         sellingPriceUSD: true,
+        // ✅ CRITICAL: Include discount fields
         discountPercentage: true,
-        showDiscountToCustomers: true, // 🎯 INCLUDE DISCOUNT VISIBILITY
+        showDiscountToCustomers: true,
         images: true,
         stockQuantity: true,
+        isFeatured: true,
         category: {
           select: {
+            id: true,
             name: true,
             slug: true
           }
+        },
+        country: {
+          select: {
+            id: true,
+            name: true,
+            currency: true,
+            currencySymbol: true
+          }
         }
       },
-      take: 6,
+      take: 8,
       orderBy: [
         { isFeatured: 'desc' },
         { stockQuantity: 'desc' },
@@ -173,7 +210,9 @@ export async function getRecommendations(
       ]
     })
 
-    return NextResponse.json({ recommendations })
+    return NextResponse.json({ 
+      recommendations
+    })
 
   } catch (error) {
     console.error('Error fetching recommendations:', error)
