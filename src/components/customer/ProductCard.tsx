@@ -1,4 +1,4 @@
-// ✅ FIXED: src/components/customer/ProductCard.tsx - WITH PROPER DISCOUNT DISPLAY
+// ✅ FIXED: src/components/customer/ProductCard.tsx - MATCHING ADMIN PREVIEW LOGIC
 
 'use client'
 
@@ -7,7 +7,6 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { useCurrency } from '@/contexts/CurrencyContext'
 import { formatPrice } from '@/lib/utils'
-import { calculateDiscountInfo, hasActiveCustomerDiscount } from '@/lib/discount-utils'
 import {
   Heart,
   Package,
@@ -59,12 +58,14 @@ export default function ProductCard({ product, className = '' }: ProductCardProp
   // Generate product slug for URL
   const productSlug = `${product.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${product.id.slice(-8)}`
 
-  // Calculate discount information
-  const discountInfo = calculateDiscountInfo({
-    sellingPriceUSD: product.sellingPriceUSD,
-    discountPercentage: product.discountPercentage,
-    showDiscountToCustomers: product.showDiscountToCustomers
-  })
+  // ✅ FIXED: Calculate discount information - MATCHING ADMIN PREVIEW LOGIC
+  const hasDiscount = product.discountPercentage > 0
+  const shouldShowDiscount = hasDiscount && product.showDiscountToCustomers
+
+  // ✅ CRITICAL FIX: Use the SAME logic as admin preview
+  const originalPrice = product.sellingPriceUSD  // $107.11 (crossed out)
+  const discountedPrice = originalPrice * (1 - product.discountPercentage / 100)  // $85.69 (what customer pays)
+  const savings = originalPrice - discountedPrice  // $21.42
 
   // Stock status
   const isOutOfStock = product.stockQuantity === 0
@@ -76,9 +77,9 @@ export default function ProductCard({ product, className = '' }: ProductCardProp
       <Link href={`/products/${productSlug}`} className="block">
         <div className="relative aspect-square overflow-hidden">
           {/* Discount Badge */}
-          {discountInfo.shouldShowDiscount && (
+          {shouldShowDiscount && (
             <div className="absolute top-3 left-3 z-10 bg-red-500 text-white px-2 py-1 rounded-full text-xs font-bold">
-              {discountInfo.discountPercent}% OFF
+              {product.discountPercentage}% OFF
             </div>
           )}
 
@@ -165,23 +166,23 @@ export default function ProductCard({ product, className = '' }: ProductCardProp
           </p>
         )}
 
-        {/* FIXED: Price Display Section - Proper spacing and layout */}
+        {/* ✅ FIXED: Price Display Section - MATCHING ADMIN PREVIEW EXACTLY */}
         <div className="space-y-2">
           {/* Price Row */}
           <div className="flex items-center gap-3 flex-wrap">
-            {discountInfo.shouldShowDiscount ? (
+            {shouldShowDiscount ? (
               <>
-                {/* Original price (crossed out) */}
+                {/* Original price (crossed out) - This is the sellingPriceUSD */}
                 <span className="text-base line-through text-gray-400">
-                  {formatPrice(convertPrice(discountInfo.originalPrice, currentCurrency), currentCurrency)}
+                  {formatPrice(convertPrice(originalPrice, currentCurrency), currentCurrency)}
                 </span>
-                {/* Final discounted price */}
+                {/* Final discounted price - What customer actually pays */}
                 <span className="text-xl font-bold text-red-600">
-                  {formatPrice(convertPrice(discountInfo.discountedPrice, currentCurrency), currentCurrency)}
+                  {formatPrice(convertPrice(discountedPrice, currentCurrency), currentCurrency)}
                 </span>
                 {/* Discount badge */}
                 <span className="bg-red-100 text-red-600 px-2 py-1 rounded-full text-xs font-bold">
-                  {discountInfo.discountPercent}% OFF
+                  {product.discountPercentage}% OFF
                 </span>
               </>
             ) : (
@@ -193,10 +194,10 @@ export default function ProductCard({ product, className = '' }: ProductCardProp
           </div>
 
           {/* Savings information on separate line */}
-          {discountInfo.shouldShowDiscount && (
+          {shouldShowDiscount && (
             <div className="text-sm">
               <span className="text-green-600 font-medium">
-                You save {formatPrice(convertPrice(discountInfo.savings, currentCurrency), currentCurrency)}
+                You save {formatPrice(convertPrice(savings, currentCurrency), currentCurrency)}
               </span>
             </div>
           )}
