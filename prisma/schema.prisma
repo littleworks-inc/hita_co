@@ -1,3 +1,4 @@
+// Enhanced prisma/schema.prisma with Shipping System
 generator client {
   provider = "prisma-client-js"
 }
@@ -45,6 +46,8 @@ model Country {
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
   products       Product[]
+  // FIXED: Explicit many-to-many relationship
+  countryZones   CountryShippingZone[]
 
   @@map("countries")
 }
@@ -198,30 +201,80 @@ model ExhibitionProduct {
 }
 
 model StoreSetting {
-  id             String   @id @default(cuid())
-  storeName      String   @default("Hita&Co")
-  tagline        String?
-  logo           String?
-  favicon        String?
-  primaryColor   String   @default("#000000")
-  secondaryColor String   @default("#ffffff")
-  accentColor    String   @default("#f59e0b")
-  email          String?
-  phone          String?
-  address        Json?
-  instagram      String?
-  facebook       String?
-  pinterest      String?
-  twitter        String?
-  aiProvider     String?
-  aiApiKey       String?
-  currency       String   @default("USD")
-  timezone       String   @default("America/New_York")
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-  aiModel        String?
+  id                    String        @id @default(cuid())
+  storeName             String        @default("LittleWorks Inc")
+  tagline               String?
+  logo                  String?
+  favicon               String?
+  primaryColor          String        @default("#000000")
+  secondaryColor        String        @default("#ffffff")
+  accentColor           String        @default("#f59e0b")
+  email                 String?
+  phone                 String?
+  address               Json?
+  instagram             String?
+  facebook              String?
+  pinterest             String?
+  twitter               String?
+  aiProvider            String?
+  aiApiKey              String?
+  aiModel               String?
+  currency              String        @default("USD")
+  timezone              String        @default("America/New_York")
+  defaultShippingZoneId String?
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+  defaultShippingZone   ShippingZone? @relation(fields: [defaultShippingZoneId], references: [id])
 
   @@map("store_settings")
+}
+
+// NEW: Shipping Zone Model (groups countries/regions)
+model ShippingZone {
+  id              String         @id @default(cuid())
+  name            String         @unique
+  description     String?
+  isDefault       Boolean        @default(false)
+  isActive        Boolean        @default(true)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  // FIXED: Explicit many-to-many relationship
+  zoneCountries   CountryShippingZone[]
+  shippingRates   ShippingRate[]
+  storeSettings   StoreSetting[]
+
+  @@map("shipping_zones")
+}
+
+model CountryShippingZone {
+  id              String       @id @default(cuid())
+  countryId       String
+  shippingZoneId  String
+  createdAt       DateTime     @default(now())
+  country         Country      @relation(fields: [countryId], references: [id], onDelete: Cascade)
+  shippingZone    ShippingZone @relation(fields: [shippingZoneId], references: [id], onDelete: Cascade)
+
+  @@unique([countryId, shippingZoneId])
+  @@map("country_shipping_zones")
+}
+
+// NEW: Shipping Rate Model (pricing rules per zone)
+model ShippingRate {
+  id                    String       @id @default(cuid())
+  shippingZoneId        String
+  name                  String
+  description           String?
+  flatRate              Float
+  freeShippingThreshold Float?
+  estimatedDays         String?
+  maxWeightKg           Float?
+  isActive              Boolean      @default(true)
+  createdAt             DateTime     @default(now())
+  updatedAt             DateTime     @updatedAt
+  shippingZone          ShippingZone @relation(fields: [shippingZoneId], references: [id], onDelete: Cascade)
+
+  @@unique([shippingZoneId, name])
+  @@map("shipping_rates")
 }
 
 model ExchangeRate {
