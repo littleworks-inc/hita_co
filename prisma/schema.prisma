@@ -106,7 +106,7 @@ model Product {
   
   // Barcode Information
   barcode           String?   @unique
-  barcodeType       String?   @default("CODE128") // CODE128, EAN13, UPC, CODE39
+  barcodeType       String?   @default("CODE128")
   
   // Images
   images            String[]  // Array of image URLs
@@ -138,10 +138,13 @@ model Product {
   costPriceUSD      Float     // Total cost in USD
   piecePriceUSD     Float     // Per piece cost in USD
   
-  // Selling Price
+  // Selling Price & Discount System
   profitMargin      Float     @default(0) // Percentage
   discountPercentage Float    @default(0)
   sellingPriceUSD   Float     // Final selling price in USD
+  
+  // 🎯 ADD THIS LINE - Discount Visibility Control
+  showDiscountToCustomers Boolean @default(false)
   
   // Inventory
   stockQuantity     Int       @default(0)
@@ -152,12 +155,12 @@ model Product {
   seoDescription    String?
   tags              String[]  // Array of tags
   
-  // 🚀 ENHANCED STATUS SYSTEM WITH DRAFT WORKFLOW
-  status            ProductStatus @default(DRAFT)    // New: Draft/Published/Archived
-  isActive          Boolean   @default(true)         // Keep for backward compatibility
-  isFeatured        Boolean   @default(false)        // Only applies to published products
-  publishedAt       DateTime? // When product was first published
-  archivedAt        DateTime? // When product was archived
+  // Status System
+  status            ProductStatus @default(DRAFT)
+  isActive          Boolean   @default(true)
+  isFeatured        Boolean   @default(false)
+  publishedAt       DateTime?
+  archivedAt        DateTime?
   
   // Tracking
   createdAt         DateTime  @default(now())

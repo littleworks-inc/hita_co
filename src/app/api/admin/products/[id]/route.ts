@@ -1,8 +1,12 @@
+// =====================================
+// src/app/api/admin/products/[id]/route.ts - COMPLETE WITH DISCOUNT SYSTEM
+// =====================================
+
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth'
 import { db } from '@/lib/db'
-import { calculateCostBreakdown, calculateSellingPrice } from '@/lib/utils'
 
+// GET /api/admin/products/[id] - Fetch single product
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -16,8 +20,30 @@ export async function GET(
     const product = await db.product.findUnique({
       where: { id: params.id },
       include: {
-        category: true,
-        country: true
+        category: { 
+          select: { 
+            id: true, 
+            name: true,
+            slug: true 
+          } 
+        },
+        country: { 
+          select: { 
+            id: true, 
+            name: true, 
+            currency: true,
+            currencySymbol: true 
+          } 
+        },
+        supplier: { 
+          select: { 
+            id: true, 
+            name: true,
+            contactPerson: true,
+            phone: true,
+            email: true 
+          } 
+        }
       }
     })
 
@@ -25,9 +51,10 @@ export async function GET(
       return NextResponse.json({ error: 'Product not found' }, { status: 404 })
     }
 
-    return NextResponse.json(product)
+    return NextResponse.json({ product })
+
   } catch (error) {
-    console.error('Product GET error:', error)
+    console.error('Error fetching product:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -35,6 +62,7 @@ export async function GET(
   }
 }
 
+// PUT /api/admin/products/[id] - Update product
 export async function PUT(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -49,93 +77,119 @@ export async function PUT(
 
     // Check if product exists
     const existingProduct = await db.product.findUnique({
-      where: { id: params.id }
+      where: { id: params.id },
+      select: { id: true, status: true, publishedAt: true }
     })
 
     if (!existingProduct) {
       return NextResponse.json({ error: 'Product not found' }, { status: 404 })
     }
 
-    // Check if SKU is being changed and already exists
-    if (data.sku !== existingProduct.sku) {
-      const skuExists = await db.product.findUnique({
-        where: { sku: data.sku }
-      })
+    // Extract discount fields and other data
+    const {
+      status,
+      publishedAt,
+      publishedBy,
+      showDiscountToCustomers, // 🎯 NEW: Extract discount visibility field
+      discountPercentage,      // 🎯 Extract discount percentage for validation
+      ...productData
+    } = data
 
-      if (skuExists) {
-        return NextResponse.json(
-          { error: 'SKU already exists' },
-          { status: 400 }
-        )
-      }
-    }
-
-    // Get country for exchange rate if country is being updated
-    let country = null
-    if (data.countryId) {
-      country = await db.country.findUnique({
-        where: { id: data.countryId }
-      })
-
-      if (!country || !country.exchangeRate) {
-        return NextResponse.json(
-          { error: 'Invalid country or missing exchange rate' },
-          { status: 400 }
-        )
-      }
-    }
-
-    // Recalculate costs if relevant fields changed
-    let updatedData = { ...data }
-    
-    if (country && (
-      data.originalPrice !== undefined ||
-      data.quantity !== undefined ||
-      data.gstPercentage !== undefined ||
-      data.shippingCost !== undefined ||
-      data.conversionCharges !== undefined ||
-      data.additionalExpenses !== undefined ||
-      data.profitMargin !== undefined ||
-      data.discountPercentage !== undefined
-    )) {
-      const costCalc = calculateCostBreakdown(
-        data.originalPrice ?? existingProduct.originalPrice,
-        data.quantity ?? existingProduct.quantity,
-        data.gstPercentage ?? existingProduct.gstPercentage,
-        data.shippingCost ?? existingProduct.shippingCost,
-        data.conversionCharges ?? existingProduct.conversionCharges,
-        data.additionalExpenses ?? existingProduct.additionalExpenses,
-        country.exchangeRate
+    // 🎯 NEW: Validate discount fields
+    if (discountPercentage !== undefined && (discountPercentage < 0 || discountPercentage >= 100)) {
+      return NextResponse.json(
+        { error: 'Discount percentage must be between 0 and 99.99' },
+        { status: 400 }
       )
+    }
 
-      const sellingPriceUSD = calculateSellingPrice(
-        costCalc.costPriceUSD,
-        data.profitMargin ?? existingProduct.profitMargin,
-        data.discountPercentage ?? existingProduct.discountPercentage
-      )
+    // Additional validation for publishing
+    if (status === 'PUBLISHED') {
+      const validationErrors = []
+      if (!data.name?.trim()) validationErrors.push('Product name is required')
+      if (!data.categoryId) validationErrors.push('Category must be selected')
+      if (!data.countryId) validationErrors.push('Country must be selected')
+      if (!data.supplierId) validationErrors.push('Supplier must be selected')
+      if (!data.sellingPriceUSD || data.sellingPriceUSD <= 0) validationErrors.push('Selling price must be greater than 0')
+      if (!data.images || data.images.length === 0) validationErrors.push('At least one product image is required')
 
-      updatedData = {
-        ...updatedData,
-        originalCurrency: country.currency,
-        costPriceUSD: costCalc.costPriceUSD,
-        piecePriceUSD: costCalc.piecePriceUSD,
-        sellingPriceUSD: sellingPriceUSD
+      if (validationErrors.length > 0) {
+        return NextResponse.json({
+          error: 'Cannot publish product',
+          validationErrors
+        }, { status: 400 })
       }
     }
+
+    // Prepare update data (INCLUDING DISCOUNT FIELDS)
+    const updateData = {
+      ...productData,
+      // 🎯 NEW: Include discount fields in update
+      discountPercentage: discountPercentage !== undefined ? parseFloat(discountPercentage) || 0 : undefined,
+      showDiscountToCustomers: showDiscountToCustomers !== undefined ? Boolean(showDiscountToCustomers) : undefined,
+      // Status and tracking fields
+      status: status || existingProduct.status,
+      lastEditedAt: new Date(),
+      // Set publishedAt when first published
+      publishedAt: status === 'PUBLISHED' && !existingProduct.publishedAt 
+        ? new Date() 
+        : (publishedAt ? new Date(publishedAt) : existingProduct.publishedAt),
+      publishedBy: status === 'PUBLISHED' && !existingProduct.publishedAt 
+        ? session.user.id 
+        : publishedBy,
+      // Handle date fields
+      purchaseDate: productData.purchaseDate ? new Date(productData.purchaseDate) : undefined
+    }
+
+    // Remove undefined values to avoid overwriting with undefined
+    Object.keys(updateData).forEach(key => {
+      if (updateData[key] === undefined) {
+        delete updateData[key]
+      }
+    })
 
     // Update product
     const product = await db.product.update({
       where: { id: params.id },
-      data: updatedData,
+      data: updateData,
       include: {
-        category: true,
-        country: true
+        category: { select: { name: true } },
+        country: { select: { name: true, currency: true } },
+        supplier: { select: { name: true } }
       }
     })
 
-    return NextResponse.json(product)
+    const actionText = status === 'PUBLISHED' ? 'published' : 
+                     status === 'DRAFT' ? 'saved as draft' : 
+                     status === 'ARCHIVED' ? 'archived' : 'updated'
+
+    console.log(`Product ${product.name} ${actionText} by user ${session.user.id}`)
+
+    return NextResponse.json({
+      success: true,
+      message: `Product ${actionText} successfully`,
+      product
+    })
+
   } catch (error) {
-    console.error('Product update error:', error)
+    console.error('Error updating product:', error)
+    
+    // Handle unique constraint violations
+    if (error instanceof Error && error.message.includes('Unique constraint')) {
+      if (error.message.includes('sku')) {
+        return NextResponse.json(
+          { error: 'A product with this SKU already exists' },
+          { status: 400 }
+        )
+      }
+      if (error.message.includes('barcode')) {
+        return NextResponse.json(
+          { error: 'A product with this barcode already exists' },
+          { status: 400 }
+        )
+      }
+    }
+
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -143,6 +197,7 @@ export async function PUT(
   }
 }
 
+// DELETE /api/admin/products/[id] - Delete product
 export async function DELETE(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -154,24 +209,25 @@ export async function DELETE(
     }
 
     // Check if product exists
-    const existingProduct = await db.product.findUnique({
-      where: { id: params.id }
+    const product = await db.product.findUnique({
+      where: { id: params.id },
+      select: { id: true, name: true }
     })
 
-    if (!existingProduct) {
+    if (!product) {
       return NextResponse.json({ error: 'Product not found' }, { status: 404 })
     }
 
-    // Check if product is used in any orders (optional safety check)
-    const orderItems = await db.orderItem.findFirst({
+    // Check if product has orders (prevent deletion if so)
+    const orderItemsCount = await db.orderItem.count({
       where: { productId: params.id }
     })
 
-    if (orderItems) {
-      return NextResponse.json(
-        { error: 'Cannot delete product that has been ordered. Consider marking it inactive instead.' },
-        { status: 400 }
-      )
+    if (orderItemsCount > 0) {
+      return NextResponse.json({
+        error: 'Cannot delete product with existing orders. Consider archiving instead.',
+        suggestion: 'Archive the product to hide it from customers while preserving order history.'
+      }, { status: 400 })
     }
 
     // Delete product
@@ -179,9 +235,15 @@ export async function DELETE(
       where: { id: params.id }
     })
 
-    return NextResponse.json({ message: 'Product deleted successfully' })
+    console.log(`Product ${product.name} deleted by user ${session.user.id}`)
+
+    return NextResponse.json({
+      success: true,
+      message: 'Product deleted successfully'
+    })
+
   } catch (error) {
-    console.error('Product deletion error:', error)
+    console.error('Error deleting product:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
