@@ -30,7 +30,6 @@ interface ThemeProviderProps {
 export function ThemeProvider({ children }: ThemeProviderProps) {
   const [mode, setModeState] = useState<ThemeMode>('system')
   const [systemTheme, setSystemTheme] = useState<ResolvedTheme>('light')
-  const [isClient, setIsClient] = useState(false)
   const [mounted, setMounted] = useState(false)
 
   // Calculate resolved theme based on mode and system preference
@@ -40,7 +39,6 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
   // Initialize client-side state (hydration safe)
   useEffect(() => {
     setMounted(true)
-    setIsClient(true)
     
     // Get system theme preference
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
@@ -56,11 +54,6 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
       console.warn('Failed to load theme preference:', error)
     }
   }, [])
-
-  // Don't render children until mounted to prevent hydration mismatch
-  if (!mounted) {
-    return <div style={{ visibility: 'hidden' }}>{children}</div>
-  }
 
   // Listen for system theme changes (only after mounted)
   useEffect(() => {
@@ -112,6 +105,11 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
     setTheme(nextMode)
   }, [mode, setTheme])
 
+  // Don't render children until mounted to prevent hydration mismatch
+  if (!mounted) {
+    return <div style={{ visibility: 'hidden' }}>{children}</div>
+  }
+
   return (
     <ThemeContext.Provider value={{
       mode,
@@ -120,7 +118,7 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
       toggleTheme,
       systemTheme,
       isSystemMode,
-      isClient: mounted // Use mounted instead of isClient for consistency
+      isClient: mounted
     }}>
       {children}
     </ThemeContext.Provider>
@@ -158,7 +156,7 @@ export function useThemeSafe() {
 
 // Hook for theme with loading state handling
 export function useThemeWithLoading() {
-  const theme = useTheme()
+  const theme = useThemeSafe()
   
   return {
     ...theme,
