@@ -1,6 +1,6 @@
 // =====================================
-// COMPLETE: Enhanced ProductForm with Integrated Barcode System
-// src/components/admin/ProductForm.tsx
+// src/components/admin/ProductForm.tsx - COMPLETE WITH DISCOUNT SYSTEM
+// Enhanced ProductForm with Integrated Barcode System + Discount Controls
 // =====================================
 
 'use client'
@@ -27,7 +27,9 @@ import {
   Settings,
   Tag,
   Search,
-  Globe
+  Globe,
+  EyeOff,
+  Info
 } from 'lucide-react'
 
 // Interfaces
@@ -79,11 +81,8 @@ interface Product {
   piecePriceUSD: number
   profitMargin: number
   discountPercentage: number
+  showDiscountToCustomers: boolean  // 🎯 DISCOUNT SYSTEM FIELD
   sellingPriceUSD: number
-  
-  // 🎯 NEW: Discount Visibility Control
-  showDiscountToCustomers: boolean
-  
   stockQuantity: number
   lowStockAlert: number
   isActive: boolean
@@ -92,6 +91,7 @@ interface Product {
   images: string[]
   seoTitle?: string
   seoDescription?: string
+  // Draft system fields
   status?: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED'
   publishedAt?: string | null
   archivedAt?: string | null
@@ -122,11 +122,14 @@ export default function ProductForm({ categories, countries, suppliers, product,
   const [successMessage, setSuccessMessage] = useState('')
   const [isGeneratingAI, setIsGeneratingAI] = useState(false)
   
-  // ✅ ENHANCED: Barcode-specific state
+  // Enhanced: Barcode-specific state
   const [barcodeNeedsUpdate, setBarcodeNeedsUpdate] = useState(false)
   const [originalSku, setOriginalSku] = useState(product?.sku || '')
 
-  // Form state
+  // 🎯 NEW: Discount preview state
+  const [showCustomerPreview, setShowCustomerPreview] = useState(false)
+
+  // Form state - INCLUDING DISCOUNT FIELD
   const [formData, setFormData] = useState<Product>({
     sku: product?.sku || '',
     name: product?.name || '',
@@ -150,6 +153,7 @@ export default function ProductForm({ categories, countries, suppliers, product,
     piecePriceUSD: product?.piecePriceUSD || 0,
     profitMargin: product?.profitMargin || 100,
     discountPercentage: product?.discountPercentage || 0,
+    showDiscountToCustomers: product?.showDiscountToCustomers ?? false,  // 🎯 DISCOUNT VISIBILITY
     sellingPriceUSD: product?.sellingPriceUSD || 0,
     stockQuantity: product?.stockQuantity || 0,
     lowStockAlert: product?.lowStockAlert || 5,
@@ -159,58 +163,30 @@ export default function ProductForm({ categories, countries, suppliers, product,
     images: product?.images || [],
     seoTitle: product?.seoTitle || '',
     seoDescription: product?.seoDescription || '',
-    // ✅ ADDED: Draft system initialization
     status: product?.status || 'DRAFT',
     publishedAt: product?.publishedAt || null,
-    archivedAt: product?.archivedAt || null,
-    discountPercentage: product?.discountPercentage || 0,
-    showDiscountToCustomers: product?.showDiscountToCustomers ?? false, // NEW FIELD
-    sellingPriceUSD: product?.sellingPriceUSD || 0,
+    archivedAt: product?.archivedAt || null
   })
 
-  // Get selected country for exchange rate
+  // Derived state
   const selectedCountry = countries.find(c => c.id === formData.countryId)
   const exchangeRate = selectedCountry?.exchangeRate || 1
 
-  // ✅ ENHANCED: Barcode change handler
-  const handleBarcodeGenerated = (barcode: string, barcodeType: string) => {
-    setFormData(prev => ({
-      ...prev,
-      barcode,
-      barcodeType
-    }))
-    setBarcodeNeedsUpdate(false)
-  }
-
-  // ✅ ENHANCED: SKU change detection for barcode updates
+  // Generate SKU when name changes
   useEffect(() => {
-    if (formData.sku && originalSku && formData.sku !== originalSku) {
-      const needsUpdate = shouldUpdateBarcode(formData.barcode, originalSku, formData.sku)
-      setBarcodeNeedsUpdate(needsUpdate)
-    }
-  }, [formData.sku, originalSku, formData.barcode])
-
-  // ✅ ENHANCED: Initialize barcode for existing products
-  useEffect(() => {
-    if (mode === 'edit' && product) {
-      setOriginalSku(product.sku)
-      
-      // If product has no barcode but has SKU, offer to generate one
-      if (!product.barcode && product.sku) {
-        setBarcodeNeedsUpdate(true)
-      }
-    }
-  }, [mode, product])
-
-  // Auto-generate SKU when name changes (only for new products)
-  useEffect(() => {
-    if (mode === 'create' && formData.name && !formData.sku) {
-      setFormData(prev => ({
-        ...prev,
-        sku: generateSKU(formData.name)
-      }))
+    if (formData.name && mode === 'create') {
+      const generatedSku = generateSKU(formData.name)
+      setFormData(prev => ({ ...prev, sku: generatedSku }))
     }
   }, [formData.name, mode])
+
+  // Check if barcode needs update when SKU changes
+  useEffect(() => {
+    if (mode === 'edit' && formData.sku !== originalSku) {
+      const needsUpdate = shouldUpdateBarcode(originalSku, formData.sku, formData.barcode)
+      setBarcodeNeedsUpdate(needsUpdate)
+    }
+  }, [formData.sku, originalSku, formData.barcode, mode])
 
   // Calculate costs automatically when relevant fields change
   useEffect(() => {
@@ -257,7 +233,7 @@ export default function ProductForm({ categories, countries, suppliers, product,
     }
   }
 
-  // ✅ ENHANCED: Form validation including barcode and draft status
+  // Enhanced: Form validation including barcode and draft status
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {}
 
@@ -266,146 +242,202 @@ export default function ProductForm({ categories, countries, suppliers, product,
     if (!formData.categoryId) newErrors.categoryId = 'Category is required'
     if (!formData.countryId) newErrors.countryId = 'Country is required'
     if (!formData.supplierId) newErrors.supplierId = 'Supplier is required'
-    if (!formData.barcode.trim()) newErrors.barcode = 'Barcode is required'
     if (formData.originalPrice <= 0) newErrors.originalPrice = 'Original price must be greater than 0'
+    if (formData.quantity <= 0) newErrors.quantity = 'Quantity must be greater than 0'
     if (formData.stockQuantity < 0) newErrors.stockQuantity = 'Stock quantity cannot be negative'
 
-    // ✅ ADDED: Additional validation for publishing
+    // 🎯 NEW: Discount validation
+    if (formData.discountPercentage < 0 || formData.discountPercentage >= 100) {
+      newErrors.discountPercentage = 'Discount must be between 0% and 99.99%'
+    }
+
+    // Additional validation for publishing
     if (formData.status === 'PUBLISHED') {
-      if (!formData.description?.trim()) newErrors.description = 'Description is required for published products'
-      if (!formData.shortDescription?.trim()) newErrors.shortDescription = 'Short description is required for published products'
-      if (!formData.images || formData.images.length === 0) newErrors.images = 'At least one image is required for published products'
-      if (formData.sellingPriceUSD <= 0) newErrors.sellingPriceUSD = 'Selling price must be greater than 0 for published products'
+      if (!formData.images || formData.images.length === 0) {
+        newErrors.images = 'At least one image is required for published products'
+      }
+      if (formData.sellingPriceUSD <= 0) {
+        newErrors.sellingPriceUSD = 'Selling price must be greater than 0 for published products'
+      }
     }
 
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }
 
-  // ✅ ENHANCED: AI Generation Handler
-  const handleAIGeneration = async (type: string, aiInputData: AIInputData) => {
-    setIsGeneratingAI(true)
-    setErrors(prev => ({ ...prev, aiGeneration: '' }))
-
-    try {
-      const response = await fetch('/api/admin/ai/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          type,
-          productName: formData.name,
-          categoryName: categories.find(c => c.id === formData.categoryId)?.name || '',
-          currentDescription: formData.description,
-          currentShortDescription: formData.shortDescription,
-          images: formData.images,
-          ...aiInputData,
-          maxTokens: type === 'product_description' ? 300 : type === 'seo_content' ? 80 : 200
-        })
-      })
-
-      const data = await response.json()
-
-      if (data.success) {
-        if (type === 'short_description') {
-          handleInputChange('shortDescription', data.content)
-        } else if (type === 'product_description') {
-          handleInputChange('description', data.content)
-        } else if (type === 'seo_content') {
-          if (data.content.title) handleInputChange('seoTitle', data.content.title)
-          if (data.content.description) handleInputChange('seoDescription', data.content.description)
-        }
-        
-        setSuccessMessage(`${type.replace('_', ' ')} generated successfully!`)
-        setTimeout(() => setSuccessMessage(''), 3000)
-      } else {
-        setErrors(prev => ({ ...prev, aiGeneration: data.error }))
-      }
-    } catch (error) {
-      setErrors(prev => ({
-        ...prev,
-        aiGeneration: `Failed to generate content: ${error instanceof Error ? error.message : 'Unknown error'}`
-      }))
-    } finally {
-      setIsGeneratingAI(false)
-    }
-  }
-
-  // ✅ ENHANCED: Form submission with draft system
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    
-    if (!validateForm()) {
-      return
-    }
+  const handleSubmit = async (actionType: 'save' | 'publish' | 'archive') => {
+    if (!validateForm()) return
 
     setLoading(true)
     setErrors({})
 
     try {
-      const url = mode === 'create' 
-        ? '/api/admin/products' 
-        : `/api/admin/products/${product?.id}`
-      
-      const method = mode === 'create' ? 'POST' : 'PUT'
+      // Determine status based on action
+      let status = formData.status
+      if (actionType === 'publish') status = 'PUBLISHED'
+      if (actionType === 'archive') status = 'ARCHIVED'
 
-      // ✅ ADDED: Handle draft system timestamps
-      const submitData = { ...formData }
-      
-      // Set publishedAt timestamp if publishing for the first time
-      if (formData.status === 'PUBLISHED' && !formData.publishedAt) {
-        submitData.publishedAt = new Date().toISOString()
+      const submissionData = {
+        ...formData,
+        status,
+        tags: Array.isArray(formData.tags) ? formData.tags : formData.tags.toString().split(',').map(tag => tag.trim()).filter(Boolean)
       }
-      
-      // Set archivedAt timestamp if archiving
-      if (formData.status === 'ARCHIVED' && !formData.archivedAt) {
-        submitData.archivedAt = new Date().toISOString()
-      }
-      
-      // Clear archivedAt if moving from archived to draft/published
-      if (formData.status !== 'ARCHIVED') {
-        submitData.archivedAt = null
-      }
+
+      const url = mode === 'edit' ? `/api/admin/products/${product?.id}` : '/api/admin/products'
+      const method = mode === 'edit' ? 'PUT' : 'POST'
 
       const response = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(submitData)
+        body: JSON.stringify(submissionData)
       })
 
-      const data = await response.json()
+      const result = await response.json()
 
-      if (data.success) {
-        const statusText = formData.status === 'DRAFT' ? 'saved as draft' : 
-                          formData.status === 'PUBLISHED' ? 'published' : 'archived'
-        setSuccessMessage(`Product ${mode === 'create' ? 'created' : 'updated'} and ${statusText} successfully!`)
-        if (mode === 'create') {
-          setTimeout(() => router.push('/admin/products'), 1500)
+      if (!response.ok) {
+        if (result.validationErrors) {
+          const validationErrors: Record<string, string> = {}
+          result.validationErrors.forEach((error: string) => {
+            const field = error.toLowerCase().includes('name') ? 'name' :
+                         error.toLowerCase().includes('category') ? 'categoryId' :
+                         error.toLowerCase().includes('image') ? 'images' :
+                         error.toLowerCase().includes('price') ? 'sellingPriceUSD' : 'general'
+            validationErrors[field] = error
+          })
+          setErrors(validationErrors)
+        } else {
+          setErrors({ general: result.error || 'Something went wrong' })
         }
-      } else {
-        setErrors({ submit: data.error || 'Failed to save product' })
+        return
+      }
+
+      setSuccessMessage(result.message || `Product ${actionType === 'publish' ? 'published' : actionType === 'archive' ? 'archived' : 'saved'} successfully!`)
+      
+      if (mode === 'create') {
+        setTimeout(() => router.push('/admin/products'), 1500)
       }
     } catch (error) {
-      setErrors({ submit: 'Network error occurred' })
+      console.error('Error submitting form:', error)
+      setErrors({ general: 'Network error. Please try again.' })
     } finally {
       setLoading(false)
     }
   }
 
+  // AI Generation Handler
+  const handleAIGeneration = async (type: 'short_description' | 'product_description' | 'seo_content', userInput: AIInputData) => {
+    if (!formData.name.trim()) {
+      setErrors({ name: 'Product name is required for AI generation' })
+      return
+    }
+
+    setIsGeneratingAI(true)
+    
+    try {
+      const context = {
+        name: formData.name.trim(),
+        category: categories.find(c => c.id === formData.categoryId)?.name,
+        price: formData.sellingPriceUSD,
+        currency: 'USD',
+        tags: formData.tags,
+        images: formData.images,
+        userInput
+      }
+
+      const response = await fetch('/api/admin/ai/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type,
+          context,
+          options: {
+            tone: 'elegant',
+            maxTokens: type === 'short_description' ? 100 : type === 'product_description' ? 500 : 300,
+            length: type === 'short_description' ? 'short' : 'medium'
+          }
+        })
+      })
+
+      const result = await response.json()
+
+      if (!response.ok) {
+        throw new Error(result.error || 'AI generation failed')
+      }
+
+      // Update form based on generated content
+      if (type === 'short_description') {
+        handleInputChange('shortDescription', result.content)
+      } else if (type === 'product_description') {
+        handleInputChange('description', result.content)
+      } else if (type === 'seo_content') {
+        handleInputChange('seoTitle', result.content.title)
+        handleInputChange('seoDescription', result.content.description)
+      }
+
+      setSuccessMessage('AI content generated successfully!')
+    } catch (error) {
+      console.error('AI generation error:', error)
+      setErrors({ ai: error instanceof Error ? error.message : 'AI generation failed' })
+    } finally {
+      setIsGeneratingAI(false)
+    }
+  }
+
+  // 🎯 NEW: Calculate discount display values
+  const calculateDiscountDisplay = () => {
+    if (!formData.discountPercentage || formData.discountPercentage === 0) {
+      return null
+    }
+
+    const originalPriceForDisplay = formData.sellingPriceUSD / (1 - formData.discountPercentage / 100)
+    const savings = originalPriceForDisplay - formData.sellingPriceUSD
+
+    return {
+      originalPrice: originalPriceForDisplay.toFixed(2),
+      savings: savings.toFixed(2),
+      discountPercent: Math.round(formData.discountPercentage)
+    }
+  }
+
+  const discountDisplay = calculateDiscountDisplay()
+
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <div className="max-w-4xl mx-auto p-6 space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">
+            {mode === 'edit' ? 'Edit Product' : 'Add New Product'}
+          </h1>
+          <p className="text-gray-600 mt-2">
+            {mode === 'edit' ? 'Update product information' : 'Create a new product for your store'}
+          </p>
+        </div>
+        <Link href="/admin/products">
+          <Button variant="outline">
+            <Package className="w-4 h-4 mr-2" />
+            Back to Products
+          </Button>
+        </Link>
+      </div>
+
       {/* Success Message */}
       {successMessage && (
-        <div className="flex items-center gap-2 p-4 bg-green-50 border border-green-200 rounded-lg">
-          <CheckCircle className="h-5 w-5 text-green-600" />
-          <span className="text-green-800">{successMessage}</span>
+        <div className="bg-green-50 border border-green-200 rounded-md p-4">
+          <div className="flex items-center">
+            <CheckCircle className="h-4 w-4 text-green-400 mr-2" />
+            <p className="text-sm font-medium text-green-800">{successMessage}</p>
+          </div>
         </div>
       )}
 
       {/* Error Messages */}
-      {errors.submit && (
-        <div className="flex items-center gap-2 p-4 bg-red-50 border border-red-200 rounded-lg">
-          <AlertTriangle className="h-5 w-5 text-red-600" />
-          <span className="text-red-800">{errors.submit}</span>
+      {errors.general && (
+        <div className="bg-red-50 border border-red-200 rounded-md p-4">
+          <div className="flex items-center">
+            <AlertTriangle className="h-4 w-4 text-red-400 mr-2" />
+            <p className="text-sm font-medium text-red-800">{errors.general}</p>
+          </div>
         </div>
       )}
 
@@ -466,7 +498,7 @@ export default function ProductForm({ categories, countries, suppliers, product,
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="countryId">Country of Origin *</Label>
+              <Label htmlFor="countryId">Country *</Label>
               <select
                 id="countryId"
                 value={formData.countryId}
@@ -543,118 +575,42 @@ export default function ProductForm({ categories, countries, suppliers, product,
             maxVideos={2}
             disabled={loading}
           />
+          {errors.images && <p className="text-sm text-red-500 mt-2">{errors.images}</p>}
         </CardContent>
       </Card>
 
-      {/* 3. ✅ ENHANCED: Barcode System with SKU Change Detection */}
+      {/* 3. Enhanced Barcode System */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <BarChart3 className="h-5 w-5" />
-            Product Barcode
+            <Tag className="h-5 w-5" />
+            Barcode System
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {/* SKU Change Alert */}
-          {barcodeNeedsUpdate && (
-            <div className="mb-6 flex items-center gap-3 p-4 bg-amber-50 border border-amber-200 rounded-lg">
-              <AlertTriangle className="h-5 w-5 text-amber-600 flex-shrink-0" />
-              <div className="flex-1">
-                <div className="font-medium text-amber-800">SKU Updated</div>
-                <div className="text-sm text-amber-700">
-                  Your SKU changed from "{originalSku}" to "{formData.sku}". 
-                  Regenerate barcode to match the new SKU?
-                </div>
-              </div>
-              <div className="flex gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setBarcodeNeedsUpdate(false)}
-                  className="border-amber-300 text-amber-700 hover:bg-amber-100"
-                >
-                  Keep Current
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    handleBarcodeGenerated('', formData.barcodeType || 'CODE128')
-                    setOriginalSku(formData.sku)
-                  }}
-                  className="border-amber-300 text-amber-700 hover:bg-amber-100 font-medium"
-                >
-                  Regenerate
-                </Button>
-              </div>
-            </div>
-          )}
-
-          {/* Enhanced Auto Barcode Generator */}
           <AutoBarcodeGenerator
             sku={formData.sku}
-            currentBarcode={formData.barcode}
-            currentBarcodeType={formData.barcodeType || 'CODE128'}
-            onBarcodeGenerated={handleBarcodeGenerated}
             productName={formData.name}
+            barcode={formData.barcode}
+            barcodeType={formData.barcodeType}
+            onBarcodeChange={(barcode) => handleInputChange('barcode', barcode)}
+            onBarcodeTypeChange={(type) => handleInputChange('barcodeType', type)}
+            needsUpdate={barcodeNeedsUpdate}
+            onUpdateComplete={() => setBarcodeNeedsUpdate(false)}
           />
-          
-          {errors.barcode && (
-            <p className="text-sm text-red-500 mt-2">{errors.barcode}</p>
-          )}
         </CardContent>
       </Card>
 
-      {/* 4. AI Generation Panel */}
-      <AIGenerationPanel
-        productName={formData.name}
-        categoryName={categories.find(c => c.id === formData.categoryId)?.name || ''}
-        images={formData.images}
-        onGenerate={handleAIGeneration}
-        isGenerating={isGeneratingAI}
-      />
-
-      {/* 5. Product Descriptions */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Product Descriptions</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="shortDescription">Short Description</Label>
-            <Textarea
-              id="shortDescription"
-              value={formData.shortDescription}
-              onChange={(e) => handleInputChange('shortDescription', e.target.value)}
-              placeholder="Brief product summary for listings"
-              rows={3}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="description">Full Description</Label>
-            <Textarea
-              id="description"
-              value={formData.description}
-              onChange={(e) => handleInputChange('description', e.target.value)}
-              placeholder="Detailed product description"
-              rows={6}
-            />
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* 6. Pricing & Costs */}
+      {/* 4. Cost & Pricing Information */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <DollarSign className="h-5 w-5" />
-            Pricing & Costs
+            Cost & Pricing
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
+          {/* Original Purchase Details */}
           <div className="grid gap-4 md:grid-cols-3">
             <div className="space-y-2">
               <Label htmlFor="originalPrice">Original Price *</Label>
@@ -664,7 +620,7 @@ export default function ProductForm({ categories, countries, suppliers, product,
                 step="0.01"
                 value={formData.originalPrice}
                 onChange={(e) => handleInputChange('originalPrice', parseFloat(e.target.value) || 0)}
-                placeholder="0.00"
+                placeholder="1000"
                 className={errors.originalPrice ? 'border-red-500' : ''}
               />
               {errors.originalPrice && <p className="text-sm text-red-500">{errors.originalPrice}</p>}
@@ -734,8 +690,20 @@ export default function ProductForm({ categories, countries, suppliers, product,
               />
             </div>
           </div>
+        </CardContent>
+      </Card>
 
-          <div className="grid gap-4 md:grid-cols-3">
+      {/* 5. 🎯 ENHANCED PRICING & DISCOUNT SYSTEM */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <DollarSign className="h-5 w-5" />
+            Pricing & Discount System
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Profit and Discount Inputs */}
+          <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="profitMargin">Profit Margin %</Label>
               <Input
@@ -757,21 +725,168 @@ export default function ProductForm({ categories, countries, suppliers, product,
                 value={formData.discountPercentage}
                 onChange={(e) => handleInputChange('discountPercentage', parseFloat(e.target.value) || 0)}
                 placeholder="0"
+                className={errors.discountPercentage ? 'border-red-500' : ''}
               />
-            </div>
-
-            <div className="space-y-2">
-              <Label>Selling Price (USD)</Label>
-              <div className="text-lg font-semibold text-green-600">
-                ${formData.sellingPriceUSD.toFixed(2)}
-              </div>
-              <p className="text-xs text-gray-500">Auto-calculated</p>
+              {errors.discountPercentage && <p className="text-sm text-red-500">{errors.discountPercentage}</p>}
             </div>
           </div>
+
+          {/* 🎯 DISCOUNT VISIBILITY CONTROL */}
+          {formData.discountPercentage > 0 && (
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-start gap-3">
+                  <div className="flex-1">
+                    <Label className="text-yellow-800 font-medium">Customer Discount Display</Label>
+                    <p className="text-sm text-yellow-700 mt-1">
+                      Control whether customers see the discount on your store
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  {/* Toggle Switch */}
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={formData.showDiscountToCustomers}
+                      onChange={(e) => handleInputChange('showDiscountToCustomers', e.target.checked)}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-yellow-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-yellow-600"></div>
+                  </label>
+                  <span className="text-sm font-medium text-yellow-800">
+                    {formData.showDiscountToCustomers ? 'Visible' : 'Hidden'}
+                  </span>
+                </div>
+              </div>
+
+              {/* 🎯 CUSTOMER PREVIEW */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-medium text-yellow-900 flex items-center gap-2">
+                    👥 Customer Preview
+                  </h4>
+                  <button
+                    type="button"
+                    onClick={() => setShowCustomerPreview(!showCustomerPreview)}
+                    className="flex items-center gap-2 text-sm text-yellow-700 hover:text-yellow-800"
+                  >
+                    {showCustomerPreview ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    {showCustomerPreview ? 'Hide' : 'Show'} Preview
+                  </button>
+                </div>
+                
+                {showCustomerPreview && (
+                  <div className="space-y-3">
+                    {/* When discount is visible to customers */}
+                    {formData.showDiscountToCustomers ? (
+                      <div className="bg-white p-4 rounded border">
+                        <p className="text-xs text-gray-500 mb-2">Customer sees:</p>
+                        <div className="flex items-center gap-3 flex-wrap">
+                          <span className="text-gray-400 line-through text-xl">
+                            ${discountDisplay?.originalPrice}
+                          </span>
+                          <span className="text-3xl font-bold text-gray-900">
+                            ${formData.sellingPriceUSD.toFixed(2)}
+                          </span>
+                          <span className="bg-red-100 text-red-600 text-sm font-bold px-3 py-1 rounded-full">
+                            {discountDisplay?.discountPercent}% OFF
+                          </span>
+                        </div>
+                        <p className="text-sm text-green-600 mt-2 font-medium">
+                          You save ${discountDisplay?.savings}!
+                        </p>
+                      </div>
+                    ) : (
+                      /* When discount is hidden from customers */
+                      <div className="bg-white p-4 rounded border">
+                        <p className="text-xs text-gray-500 mb-2">Customer sees:</p>
+                        <div className="flex items-center gap-3">
+                          <span className="text-3xl font-bold text-gray-900">
+                            ${formData.sellingPriceUSD.toFixed(2)}
+                          </span>
+                        </div>
+                        <p className="text-xs text-gray-600 mt-2">
+                          No discount information shown (but they still get the discounted price)
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Business info */}
+                    <div className="bg-gray-100 p-3 rounded text-sm text-gray-600">
+                      <div className="flex items-start gap-2">
+                        <Info className="h-4 w-4 text-gray-500 mt-0.5 flex-shrink-0" />
+                        <div>
+                          <strong>Business Logic:</strong> Customers pay ${formData.sellingPriceUSD.toFixed(2)} regardless of visibility setting. 
+                          {formData.showDiscountToCustomers 
+                            ? ' They see the savings they\'re getting, which can increase conversions.' 
+                            : ' They don\'t see discount details, giving a cleaner price presentation.'}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Price Summary */}
+          <div className="grid gap-4 md:grid-cols-3">
+            <div className="bg-blue-50 p-4 rounded-md">
+              <Label>Final Selling Price (USD)</Label>
+              <div className="text-2xl font-bold text-blue-600">
+                ${(formData.sellingPriceUSD || 0).toFixed(2)}
+              </div>
+              <p className="text-sm text-gray-600 mt-1">
+                What customer pays
+              </p>
+            </div>
+
+            <div className="bg-green-50 p-4 rounded-md">
+              <Label>Total Cost (USD)</Label>
+              <div className="text-xl font-bold text-green-600">
+                ${(formData.costPriceUSD || 0).toFixed(2)}
+              </div>
+              <p className="text-sm text-gray-600 mt-1">
+                Your total cost
+              </p>
+            </div>
+
+            <div className="bg-purple-50 p-4 rounded-md">
+              <Label>Profit (USD)</Label>
+              <div className="text-xl font-bold text-purple-600">
+                ${((formData.sellingPriceUSD || 0) - (formData.costPriceUSD || 0)).toFixed(2)}
+              </div>
+              <p className="text-sm text-gray-600 mt-1">
+                {formData.costPriceUSD > 0 ? (((formData.sellingPriceUSD - formData.costPriceUSD) / formData.costPriceUSD * 100)).toFixed(1) : '0'}% margin
+              </p>
+            </div>
+          </div>
+
+          {/* Discount Breakdown (when discount exists) */}
+          {formData.discountPercentage > 0 && discountDisplay && (
+            <div className="bg-gray-50 p-4 rounded-md">
+              <h4 className="font-medium text-gray-900 mb-3">Discount Breakdown</h4>
+              <div className="grid gap-3 md:grid-cols-3 text-sm">
+                <div>
+                  <span className="text-gray-600">Original Price:</span>
+                  <span className="ml-2 font-semibold">${discountDisplay.originalPrice}</span>
+                </div>
+                <div>
+                  <span className="text-gray-600">Discount:</span>
+                  <span className="ml-2 font-semibold text-red-600">-{formData.discountPercentage}%</span>
+                </div>
+                <div>
+                  <span className="text-gray-600">Customer Saves:</span>
+                  <span className="ml-2 font-semibold text-green-600">${discountDisplay.savings}</span>
+                </div>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
-      {/* 7. Inventory Management */}
+      {/* 6. Inventory Management */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -803,117 +918,71 @@ export default function ProductForm({ categories, countries, suppliers, product,
                 onChange={(e) => handleInputChange('lowStockAlert', parseInt(e.target.value) || 5)}
                 min="0"
               />
+              <p className="text-xs text-gray-500">
+                Alert when stock falls below this number
+              </p>
             </div>
           </div>
 
-          <div className="flex gap-4">
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={formData.isActive}
-                onChange={(e) => handleInputChange('isActive', e.target.checked)}
-                className="rounded"
-              />
-              <span className="text-sm">Active Product</span>
-            </label>
-
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={formData.isFeatured}
-                onChange={(e) => handleInputChange('isFeatured', e.target.checked)}
-                className="rounded"
-              />
-              <span className="text-sm">Featured Product</span>
-            </label>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* 8. ✅ SIMPLIFIED: Product Status Display (Read-only) */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Settings className="h-5 w-5" />
-            Product Settings
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {/* Current Status Display (Read-only) */}
-          <div className="bg-gray-50 p-3 rounded-lg">
-            <div className="flex items-center justify-between">
-              <Label>Current Status</Label>
-              <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm font-medium ${
-                formData.status === 'DRAFT' ? 'bg-yellow-100 text-yellow-800 border border-yellow-200' :
-                formData.status === 'PUBLISHED' ? 'bg-green-100 text-green-800 border border-green-200' :
-                'bg-gray-100 text-gray-800 border border-gray-200'
-              }`}>
-                {formData.status === 'DRAFT' && <RefreshCw className="h-3 w-3" />}
-                {formData.status === 'PUBLISHED' && <CheckCircle className="h-3 w-3" />}
-                {formData.status === 'ARCHIVED' && <AlertTriangle className="h-3 w-3" />}
-                {formData.status || 'Draft'}
-              </div>
-            </div>
-            <p className="text-sm text-gray-600 mt-2">
-              Use the action buttons below to change the product status.
-            </p>
-          </div>
-
-          {/* Product Settings */}
-          <div className="space-y-4">
-            <Label>Product Settings</Label>
-            <div className="grid gap-4 md:grid-cols-2">
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={formData.isActive}
-                  onChange={(e) => handleInputChange('isActive', e.target.checked)}
-                  className="rounded"
-                />
-                <span className="text-sm">Active Product (Legacy)</span>
-              </label>
-
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={formData.isFeatured}
-                  onChange={(e) => handleInputChange('isFeatured', e.target.checked)}
-                  className="rounded"
-                  disabled={formData.status !== 'PUBLISHED'}
-                />
-                <span className="text-sm">
-                  Featured Product
-                  {formData.status !== 'PUBLISHED' && (
-                    <span className="text-gray-400"> (only for published products)</span>
-                  )}
-                </span>
-              </label>
+          {/* Stock Status Indicator */}
+          <div className="bg-gray-50 p-3 rounded-md">
+            <div className="flex items-center gap-2">
+              {formData.stockQuantity === 0 ? (
+                <>
+                  <AlertTriangle className="h-4 w-4 text-red-500" />
+                  <span className="text-red-700 font-medium">Out of Stock</span>
+                </>
+              ) : formData.stockQuantity <= formData.lowStockAlert ? (
+                <>
+                  <AlertTriangle className="h-4 w-4 text-yellow-500" />
+                  <span className="text-yellow-700 font-medium">Low Stock Warning</span>
+                </>
+              ) : (
+                <>
+                  <CheckCircle className="h-4 w-4 text-green-500" />
+                  <span className="text-green-700 font-medium">In Stock</span>
+                </>
+              )}
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* 9. Tags & SEO */}
+      {/* 7. Product Content & SEO */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Tag className="h-5 w-5" />
-            Tags & SEO
+            <Globe className="h-5 w-5" />
+            Product Content & SEO
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Tags */}
+          {/* Short Description */}
           <div className="space-y-2">
-            <Label htmlFor="tags">Product Tags</Label>
-            <Input
-              id="tags"
-              value={formData.tags.join(', ')}
-              onChange={(e) => handleInputChange('tags', e.target.value.split(',').map(tag => tag.trim()).filter(Boolean))}
-              placeholder="silk, handmade, festive, traditional"
+            <Label htmlFor="shortDescription">Short Description</Label>
+            <Textarea
+              id="shortDescription"
+              value={formData.shortDescription}
+              onChange={(e) => handleInputChange('shortDescription', e.target.value)}
+              placeholder="Brief product description for listings"
+              rows={2}
+              maxLength={200}
             />
             <p className="text-xs text-gray-500">
-              Separate tags with commas. Used for search and filtering.
+              {formData.shortDescription.length}/200 characters
             </p>
+          </div>
+
+          {/* Full Description */}
+          <div className="space-y-2">
+            <Label htmlFor="description">Full Description</Label>
+            <Textarea
+              id="description"
+              value={formData.description}
+              onChange={(e) => handleInputChange('description', e.target.value)}
+              placeholder="Detailed product description"
+              rows={4}
+            />
           </div>
 
           {/* SEO Title */}
@@ -946,329 +1015,131 @@ export default function ProductForm({ categories, countries, suppliers, product,
               {formData.seoDescription.length}/160 characters. Keep under 160 for best SEO.
             </p>
           </div>
+
+          {/* Tags */}
+          <div className="space-y-2">
+            <Label htmlFor="tags">Tags</Label>
+            <Input
+              id="tags"
+              value={Array.isArray(formData.tags) ? formData.tags.join(', ') : formData.tags}
+              onChange={(e) => handleInputChange('tags', e.target.value.split(',').map(tag => tag.trim()))}
+              placeholder="traditional, handmade, ethnic (comma separated)"
+            />
+            <p className="text-xs text-gray-500">
+              Separate tags with commas for better search visibility
+            </p>
+          </div>
         </CardContent>
       </Card>
 
-      {/* 9. Cost Breakdown Summary */}
+      {/* 8. AI Content Generation */}
+      <AIGenerationPanel
+        productName={formData.name}
+        categoryName={categories.find(c => c.id === formData.categoryId)?.name || ''}
+        images={formData.images}
+        onGenerate={handleAIGeneration}
+        isGenerating={isGeneratingAI}
+      />
+
+      {/* 9. Product Status & Settings */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <DollarSign className="h-5 w-5" />
-            Cost Breakdown Summary
+            <Settings className="h-5 w-5" />
+            Product Status & Settings
           </CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <div className="bg-blue-50 p-3 rounded-lg">
-              <div className="text-sm text-blue-600 font-medium">Total Cost (USD)</div>
-              <div className="text-lg font-bold text-blue-800">
-                ${(formData.costPriceUSD || 0).toFixed(2)}
-              </div>
+        <CardContent className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id="isActive"
+                checked={formData.isActive}
+                onChange={(e) => handleInputChange('isActive', e.target.checked)}
+                className="rounded"
+              />
+              <Label htmlFor="isActive">Active Product</Label>
             </div>
-            
-            <div className="bg-green-50 p-3 rounded-lg">
-              <div className="text-sm text-green-600 font-medium">Per Piece (USD)</div>
-              <div className="text-lg font-bold text-green-800">
-                ${(formData.piecePriceUSD || 0).toFixed(2)}
-              </div>
-            </div>
-            
-            <div className="bg-purple-50 p-3 rounded-lg">
-              <div className="text-sm text-purple-600 font-medium">Selling Price (USD)</div>
-              <div className="text-lg font-bold text-purple-800">
-                ${(formData.sellingPriceUSD || 0).toFixed(2)}
-              </div>
-            </div>
-            
-            <div className="bg-yellow-50 p-3 rounded-lg">
-              <div className="text-sm text-yellow-600 font-medium">Profit Margin</div>
-              <div className="text-lg font-bold text-yellow-800">
-                {(formData.profitMargin || 0).toFixed(1)}%
-              </div>
+
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id="isFeatured"
+                checked={formData.isFeatured}
+                onChange={(e) => handleInputChange('isFeatured', e.target.checked)}
+                className="rounded"
+              />
+              <Label htmlFor="isFeatured">Featured Product</Label>
             </div>
           </div>
 
-          {/* Exchange Rate Info */}
-          {selectedCountry && (
-            <div className="mt-4 p-3 bg-gray-50 rounded-lg">
-              <div className="text-sm text-gray-600">
-                <strong>Exchange Rate:</strong> 1 {selectedCountry.currency} = ${(1/exchangeRate).toFixed(4)} USD
-                <br />
-                <strong>Original Price:</strong> {selectedCountry.currencySymbol}{formData.originalPrice.toFixed(2)} {selectedCountry.currency}
-              </div>
+          {/* Current Status Display */}
+          <div className="bg-gray-50 p-3 rounded-md">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium text-gray-700">Current Status:</span>
+              <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                formData.status === 'PUBLISHED' ? 'bg-green-100 text-green-800' :
+                formData.status === 'ARCHIVED' ? 'bg-red-100 text-red-800' :
+                'bg-yellow-100 text-yellow-800'
+              }`}>
+                {formData.status || 'DRAFT'}
+              </span>
             </div>
-          )}
+          </div>
         </CardContent>
       </Card>
 
-      {/* ✅ ENHANCED: Action Buttons with Draft System Workflow */}
-      <div className="flex justify-between items-center pt-6 border-t bg-gray-50 p-4 rounded-lg">
-        {/* Left side - Cancel */}
+      {/* Action Buttons */}
+      <div className="flex items-center justify-end space-x-4 pt-6">
         <Link href="/admin/products">
-          <Button type="button" variant="outline" size="lg">
+          <Button variant="outline" disabled={loading}>
             Cancel
           </Button>
         </Link>
 
-        {/* Right side - Draft/Publish Actions */}
-        <div className="flex gap-3">
-          {/* Preview Button (for existing products) */}
-          {mode === 'edit' && product?.id && (
-            <Link href={`/admin/products/${product.id}`}>
-              <Button type="button" variant="outline" size="lg">
-                <Eye className="h-4 w-4 mr-2" />
-                Preview
-              </Button>
-            </Link>
-          )}
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => handleSubmit('save')}
+          disabled={loading}
+        >
+          {loading ? <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
+          Save as Draft
+        </Button>
 
-          {/* Save as Draft Button */}
-          <Button 
-            type="button" 
-            variant="outline"
-            size="lg"
-            onClick={async (e) => {
-              e.preventDefault()
-              const previousStatus = formData.status
-              handleInputChange('status', 'DRAFT')
-              
-              // Wait a moment for state to update, then submit
-              setTimeout(async () => {
-                const form = document.querySelector('form') as HTMLFormElement
-                if (form) {
-                  const formEvent = new Event('submit', { bubbles: true, cancelable: true })
-                  form.dispatchEvent(formEvent)
-                }
-              }, 100)
-            }}
-            disabled={loading}
-            className="border-yellow-300 text-yellow-700 hover:bg-yellow-50 hover:border-yellow-400"
-          >
-            {loading && formData.status === 'DRAFT' ? (
-              <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-            ) : (
-              <RefreshCw className="h-4 w-4 mr-2" />
-            )}
-            Save as Draft
-          </Button>
-
-          {/* Publish Button */}
-          <Button 
-            type="button"
-            size="lg"
-            onClick={async (e) => {
-              e.preventDefault()
-              handleInputChange('status', 'PUBLISHED')
-              
-              // Wait a moment for state to update, then submit
-              setTimeout(async () => {
-                const form = document.querySelector('form') as HTMLFormElement
-                if (form) {
-                  const formEvent = new Event('submit', { bubbles: true, cancelable: true })
-                  form.dispatchEvent(formEvent)
-                }
-              }, 100)
-            }}
-            disabled={loading}
-            className="bg-green-600 hover:bg-green-700 text-white"
-          >
-            {loading && formData.status === 'PUBLISHED' ? (
-              <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-            ) : (
-              <CheckCircle className="h-4 w-4 mr-2" />
-            )}
-            {mode === 'create' ? 'Create & Publish' : 'Save & Publish'}
-          </Button>
-
-          {/* Archive Button (only for existing products) */}
-          {mode === 'edit' && (
-            <Button 
-              type="button"
-              variant="outline"
-              size="lg"
-              onClick={async (e) => {
-                e.preventDefault()
-                if (confirm('Are you sure you want to archive this product? It will be hidden from customers.')) {
-                  handleInputChange('status', 'ARCHIVED')
-                  
-                  // Wait a moment for state to update, then submit
-                  setTimeout(async () => {
-                    const form = document.querySelector('form') as HTMLFormElement
-                    if (form) {
-                      const formEvent = new Event('submit', { bubbles: true, cancelable: true })
-                      form.dispatchEvent(formEvent)
-                    }
-                  }, 100)
-                }
-              }}
-              disabled={loading}
-              className="border-gray-400 text-gray-700 hover:bg-gray-50 hover:border-gray-500"
-            >
-              {loading && formData.status === 'ARCHIVED' ? (
-                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <AlertTriangle className="h-4 w-4 mr-2" />
-              )}
-              Archive
-            </Button>
-          )}
-        </div>
-      </div>
-
-      {/* Status Information Panel */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-        <div className="flex items-center gap-2 mb-2">
-          <div className={`w-3 h-3 rounded-full ${
-            formData.status === 'DRAFT' ? 'bg-yellow-500' :
-            formData.status === 'PUBLISHED' ? 'bg-green-500' :
-            'bg-gray-500'
-          }`}></div>
-          <span className="text-sm font-medium text-blue-900">
-            Current Status: {formData.status || 'DRAFT'}
-          </span>
-        </div>
-        
-        <div className="text-sm text-blue-700">
-          {formData.status === 'DRAFT' && (
-            <>
-              <strong>Draft:</strong> This product is being created or edited. It's not visible to customers.
-              You can save changes without validation requirements.
-            </>
-          )}
-          {formData.status === 'PUBLISHED' && (
-            <>
-              <strong>Published:</strong> This product is live and visible to customers.
-              {formData.publishedAt && (
-                <span className="block text-xs text-blue-600 mt-1">
-                  Published: {new Date(formData.publishedAt).toLocaleDateString()}
-                </span>
-              )}
-            </>
-          )}
-          {formData.status === 'ARCHIVED' && (
-            <>
-              <strong>Archived:</strong> This product is hidden from customers but preserved in the system.
-              {formData.archivedAt && (
-                <span className="block text-xs text-blue-600 mt-1">
-                  Archived: {new Date(formData.archivedAt).toLocaleDateString()}
-                </span>
-              )}
-            </>
-          )}
-        </div>
-
-        {/* Publishing Requirements Check */}
-        {formData.status === 'PUBLISHED' && (
-          <div className="mt-3 p-3 bg-white border border-blue-200 rounded">
-            <div className="text-xs font-medium text-blue-900 mb-2">Publishing Requirements:</div>
-            <div className="grid grid-cols-2 gap-2 text-xs">
-              <div className={`flex items-center gap-1 ${formData.name ? 'text-green-700' : 'text-red-700'}`}>
-                {formData.name ? '✓' : '✗'} Product name
-              </div>
-              <div className={`flex items-center gap-1 ${formData.description ? 'text-green-700' : 'text-red-700'}`}>
-                {formData.description ? '✓' : '✗'} Description
-              </div>
-              <div className={`flex items-center gap-1 ${formData.images?.length ? 'text-green-700' : 'text-red-700'}`}>
-                {formData.images?.length ? '✓' : '✗'} Images
-              </div>
-              <div className={`flex items-center gap-1 ${formData.sellingPriceUSD > 0 ? 'text-green-700' : 'text-red-700'}`}>
-                {formData.sellingPriceUSD > 0 ? '✓' : '✗'} Pricing
-              </div>
-            </div>
-          </div>
-        )}
+        <Button
+          type="button"
+          onClick={() => handleSubmit('publish')}
+          disabled={loading}
+          className="bg-green-600 hover:bg-green-700"
+        >
+          {loading ? <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> : <Eye className="w-4 h-4 mr-2" />}
+          {formData.status === 'PUBLISHED' ? 'Update & Keep Published' : 'Publish Product'}
+        </Button>
       </div>
 
       {/* Debug Information (Development Only) */}
       {process.env.NODE_ENV === 'development' && (
         <Card className="border-dashed">
           <CardHeader>
-            <CardTitle className="text-sm text-gray-500">Debug Information</CardTitle>
+            <CardTitle className="text-sm text-gray-500">Debug Info (Dev Only)</CardTitle>
           </CardHeader>
           <CardContent>
-            <details className="text-xs text-gray-600">
-              <summary className="cursor-pointer font-medium mb-2">Form Data</summary>
-              <pre className="bg-gray-100 p-2 rounded overflow-auto max-h-40">
-                {JSON.stringify({
-                  mode,
-                  formDataPreview: {
-                    name: formData.name,
-                    sku: formData.sku,
-                    barcode: formData.barcode,
-                    barcodeType: formData.barcodeType,
-                    originalPrice: formData.originalPrice,
-                    sellingPriceUSD: formData.sellingPriceUSD,
-                    stockQuantity: formData.stockQuantity,
-                    isActive: formData.isActive
-                  },
-                  barcodeState: {
-                    originalSku,
-                    barcodeNeedsUpdate,
-                    currentBarcode: formData.barcode
-                  },
-                  selectedCountry: selectedCountry?.name,
-                  exchangeRate,
-                  errors: Object.keys(errors)
-                }, null, 2)}
-              </pre>
-            </details>
+            <pre className="text-xs bg-gray-100 p-2 rounded overflow-auto max-h-40">
+              {JSON.stringify({
+                sellingPriceUSD: formData.sellingPriceUSD,
+                costPriceUSD: formData.costPriceUSD,
+                discountPercentage: formData.discountPercentage,
+                showDiscountToCustomers: formData.showDiscountToCustomers,
+                discountDisplay,
+                exchangeRate,
+                selectedCountry: selectedCountry?.name
+              }, null, 2)}
+            </pre>
           </CardContent>
         </Card>
       )}
-    </form>
+    </div>
   )
 }
-
-/*
-🎯 USAGE INSTRUCTIONS:
-
-1. **Import Required Components:**
-   Make sure these components exist or create them:
-   - AutoBarcodeGenerator (✅ provided)
-   - ImageUpload 
-   - AIGenerationPanel
-
-2. **Install Dependencies:**
-   ```bash
-   npm install jsbarcode
-   ```
-
-3. **Required Utility Functions:**
-   Make sure these exist in src/lib/utils.ts:
-   - generateSKU()
-   - calculateCostBreakdown()
-   - calculateSellingPrice()
-
-4. **Required Utility Functions for Barcode:**
-   Make sure src/lib/barcode-utils.ts exists with:
-   - shouldUpdateBarcode()
-
-5. **API Endpoints:**
-   - POST /api/admin/products (create)
-   - PUT /api/admin/products/[id] (update)
-   - POST /api/admin/ai/generate (AI generation)
-
-6. **Database Schema:**
-   Ensure your Product model includes all fields used in the form
-
-🚀 FEATURES INCLUDED:
-
-✅ Complete product form with all sections
-✅ Enhanced barcode system with auto-generation
-✅ SKU change detection and barcode regeneration alerts
-✅ AI content generation integration
-✅ Real-time cost calculations
-✅ Currency conversion support
-✅ Form validation with error handling
-✅ Image upload support
-✅ SEO optimization fields
-✅ Inventory management
-✅ Tags and categorization
-✅ Cost breakdown summary
-✅ Debug information (development)
-✅ Responsive design
-✅ Loading states and success messages
-
-This is a production-ready ProductForm component that integrates all your existing systems
-with the enhanced barcode functionality! 🎉
-*/

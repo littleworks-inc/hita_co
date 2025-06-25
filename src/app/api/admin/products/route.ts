@@ -1,5 +1,6 @@
 // =====================================
-// src/app/api/admin/products/route.ts - COMPLETE WITH DISCOUNT SYSTEM
+// src/app/api/admin/products/route.ts - FIXED VERSION
+// Fixed session.user.id → session.userId
 // =====================================
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -254,7 +255,7 @@ export async function POST(request: NextRequest) {
       isFeatured: isFeatured ?? false,
       status,
       publishedAt: status === 'PUBLISHED' && !publishedAt ? new Date() : (publishedAt ? new Date(publishedAt) : null),
-      publishedBy: status === 'PUBLISHED' ? session.user.id : null,
+      publishedBy: status === 'PUBLISHED' ? session.userId : null, // 🔧 FIXED: session.userId
       lastEditedAt: new Date()
     }
 
@@ -268,7 +269,7 @@ export async function POST(request: NextRequest) {
       }
     })
 
-    console.log(`Product ${product.name} created with status ${status} by user ${session.user.id}`)
+    console.log(`Product ${product.name} created with status ${status} by user ${session.userId}`) // 🔧 FIXED: session.userId
 
     return NextResponse.json({
       success: true,

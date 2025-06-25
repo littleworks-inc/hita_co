@@ -1,5 +1,6 @@
 // =====================================
-// src/app/api/admin/products/[id]/route.ts - COMPLETE WITH DISCOUNT SYSTEM
+// src/app/api/admin/products/[id]/route.ts - FIXED VERSION
+// Fixed session.user.id → session.userId
 // =====================================
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -135,7 +136,7 @@ export async function PUT(
         ? new Date() 
         : (publishedAt ? new Date(publishedAt) : existingProduct.publishedAt),
       publishedBy: status === 'PUBLISHED' && !existingProduct.publishedAt 
-        ? session.user.id 
+        ? session.userId  // 🔧 FIXED: session.userId
         : publishedBy,
       // Handle date fields
       purchaseDate: productData.purchaseDate ? new Date(productData.purchaseDate) : undefined
@@ -163,7 +164,7 @@ export async function PUT(
                      status === 'DRAFT' ? 'saved as draft' : 
                      status === 'ARCHIVED' ? 'archived' : 'updated'
 
-    console.log(`Product ${product.name} ${actionText} by user ${session.user.id}`)
+    console.log(`Product ${product.name} ${actionText} by user ${session.userId}`) // 🔧 FIXED: session.userId
 
     return NextResponse.json({
       success: true,
@@ -235,7 +236,7 @@ export async function DELETE(
       where: { id: params.id }
     })
 
-    console.log(`Product ${product.name} deleted by user ${session.user.id}`)
+    console.log(`Product ${product.name} deleted by user ${session.userId}`) // 🔧 FIXED: session.userId
 
     return NextResponse.json({
       success: true,
