@@ -1,6 +1,5 @@
 // =====================================
-// src/app/api/admin/products/[id]/route.ts - FIXED VERSION
-// Fixed session.user.id → session.userId
+// src/app/api/admin/products/[id]/route.ts - COMPLETE FIXED VERSION
 // =====================================
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -75,10 +74,11 @@ export async function PUT(
     }
 
     const data = await request.json()
+    const { id } = params
 
     // Check if product exists
     const existingProduct = await db.product.findUnique({
-      where: { id: params.id },
+      where: { id },
       select: { id: true, status: true, publishedAt: true }
     })
 
@@ -86,17 +86,26 @@ export async function PUT(
       return NextResponse.json({ error: 'Product not found' }, { status: 404 })
     }
 
-    // Extract discount fields and other data
+    // Extract and validate required fields
     const {
-      status,
-      publishedAt,
-      publishedBy,
-      showDiscountToCustomers, // 🎯 NEW: Extract discount visibility field
-      discountPercentage,      // 🎯 Extract discount percentage for validation
-      ...productData
+      sku, name, description, shortDescription, categoryId, countryId, supplierId,
+      barcode, barcodeType, originalPrice, originalCurrency, quantity, gstPercentage,
+      shippingCost, conversionCharges, additionalExpenses, costPriceUSD, piecePriceUSD,
+      profitMargin, discountPercentage, showDiscountToCustomers, sellingPriceUSD,
+      stockQuantity, lowStockAlert, tags, images, seoTitle, seoDescription,
+      purchaseDate, invoiceNumber, isActive, isFeatured, status, publishedAt
     } = data
 
-    // 🎯 NEW: Validate discount fields
+    // Basic validation
+    if (!sku?.trim() || !name?.trim()) {
+      return NextResponse.json({ error: 'SKU and name are required' }, { status: 400 })
+    }
+
+    if (!categoryId || !countryId || !supplierId) {
+      return NextResponse.json({ error: 'Category, country, and supplier are required' }, { status: 400 })
+    }
+
+    // Validate discount percentage
     if (discountPercentage !== undefined && (discountPercentage < 0 || discountPercentage >= 100)) {
       return NextResponse.json(
         { error: 'Discount percentage must be between 0 and 99.99' },
@@ -107,51 +116,66 @@ export async function PUT(
     // Additional validation for publishing
     if (status === 'PUBLISHED') {
       const validationErrors = []
-      if (!data.name?.trim()) validationErrors.push('Product name is required')
-      if (!data.categoryId) validationErrors.push('Category must be selected')
-      if (!data.countryId) validationErrors.push('Country must be selected')
-      if (!data.supplierId) validationErrors.push('Supplier must be selected')
-      if (!data.sellingPriceUSD || data.sellingPriceUSD <= 0) validationErrors.push('Selling price must be greater than 0')
-      if (!data.images || data.images.length === 0) validationErrors.push('At least one product image is required')
+      if (!name?.trim()) validationErrors.push('Product name is required')
+      if (!description?.trim()) validationErrors.push('Product description is required')
+      if (!categoryId) validationErrors.push('Category is required')
+      if (!supplierId) validationErrors.push('Supplier is required')
+      if (!countryId) validationErrors.push('Country is required')
+      if (!sellingPriceUSD || sellingPriceUSD <= 0) validationErrors.push('Selling price must be greater than 0')
+      if (!images || images.length === 0) validationErrors.push('At least one product image is required')
 
       if (validationErrors.length > 0) {
         return NextResponse.json({
-          error: 'Cannot publish product',
+          error: 'Cannot publish product with validation errors',
           validationErrors
         }, { status: 400 })
       }
     }
 
-    // Prepare update data (INCLUDING DISCOUNT FIELDS)
+    // ✅ FIXED: Use connect syntax for relations and remove non-existent fields
     const updateData = {
-      ...productData,
-      // 🎯 NEW: Include discount fields in update
-      discountPercentage: discountPercentage !== undefined ? parseFloat(discountPercentage) || 0 : undefined,
-      showDiscountToCustomers: showDiscountToCustomers !== undefined ? Boolean(showDiscountToCustomers) : undefined,
-      // Status and tracking fields
-      status: status || existingProduct.status,
-      lastEditedAt: new Date(),
-      // Set publishedAt when first published
-      publishedAt: status === 'PUBLISHED' && !existingProduct.publishedAt 
-        ? new Date() 
-        : (publishedAt ? new Date(publishedAt) : existingProduct.publishedAt),
-      publishedBy: status === 'PUBLISHED' && !existingProduct.publishedAt 
-        ? session.userId  // 🔧 FIXED: session.userId
-        : publishedBy,
-      // Handle date fields
-      purchaseDate: productData.purchaseDate ? new Date(productData.purchaseDate) : undefined
+      sku: sku.trim(),
+      name: name.trim(),
+      description: description || '',
+      shortDescription: shortDescription || '',
+      // ✅ FIX: Use connect syntax for relations
+      category: { connect: { id: categoryId } },
+      country: { connect: { id: countryId } },
+      supplier: { connect: { id: supplierId } },
+      barcode: barcode || '',
+      barcodeType: barcodeType || 'CODE128',
+      originalPrice: parseFloat(originalPrice) || 0,
+      originalCurrency: originalCurrency || 'INR',
+      quantity: parseInt(quantity) || 1,
+      gstPercentage: parseFloat(gstPercentage) || 0,
+      shippingCost: parseFloat(shippingCost) || 0,
+      conversionCharges: parseFloat(conversionCharges) || 0,
+      additionalExpenses: parseFloat(additionalExpenses) || 0,
+      costPriceUSD: parseFloat(costPriceUSD) || 0,
+      piecePriceUSD: parseFloat(piecePriceUSD) || 0,
+      profitMargin: parseFloat(profitMargin) || 0,
+      discountPercentage: parseFloat(discountPercentage) || 0,
+      showDiscountToCustomers: Boolean(showDiscountToCustomers),
+      sellingPriceUSD: parseFloat(sellingPriceUSD) || 0,
+      stockQuantity: parseInt(stockQuantity) || 0,
+      lowStockAlert: parseInt(lowStockAlert) || 5,
+      tags: tags || [],
+      images: images || [],
+      seoTitle: seoTitle || '',
+      seoDescription: seoDescription || '',
+      purchaseDate: purchaseDate ? new Date(purchaseDate) : null,
+      invoiceNumber: invoiceNumber || '',
+      isActive: isActive ?? true,
+      isFeatured: isFeatured ?? false,
+      status,
+      publishedAt: status === 'PUBLISHED' && !publishedAt ? new Date() : (publishedAt ? new Date(publishedAt) : null)
+      // ✅ REMOVED: lastEditedAt (doesn't exist in schema)
+      // ✅ REMOVED: publishedBy (doesn't exist in schema)
     }
-
-    // Remove undefined values to avoid overwriting with undefined
-    Object.keys(updateData).forEach(key => {
-      if (updateData[key] === undefined) {
-        delete updateData[key]
-      }
-    })
 
     // Update product
     const product = await db.product.update({
-      where: { id: params.id },
+      where: { id },
       data: updateData,
       include: {
         category: { select: { name: true } },
@@ -164,7 +188,7 @@ export async function PUT(
                      status === 'DRAFT' ? 'saved as draft' : 
                      status === 'ARCHIVED' ? 'archived' : 'updated'
 
-    console.log(`Product ${product.name} ${actionText} by user ${session.userId}`) // 🔧 FIXED: session.userId
+    console.log(`Product ${product.name} ${actionText} successfully`)
 
     return NextResponse.json({
       success: true,
@@ -236,7 +260,7 @@ export async function DELETE(
       where: { id: params.id }
     })
 
-    console.log(`Product ${product.name} deleted by user ${session.userId}`) // 🔧 FIXED: session.userId
+    console.log(`Product ${product.name} deleted successfully`)
 
     return NextResponse.json({
       success: true,

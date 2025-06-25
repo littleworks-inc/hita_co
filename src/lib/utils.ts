@@ -76,10 +76,28 @@ export function calculateSellingPrice(
   profitMargin: number,
   discountPercentage: number
 ) {
-  const priceWithProfit = costPriceUSD * (1 + profitMargin / 100)
-  const sellingPriceUSD = priceWithProfit * (1 - discountPercentage / 100)
+  // Step 1: Calculate base price with profit margin
+  const basePriceWithProfit = costPriceUSD * (1 + profitMargin / 100)
   
-  return sellingPriceUSD
+  // Step 2: If there's a discount, the user wants to offer that discount to customers
+  // So we need to calculate what the "original price" should be so that after discount,
+  // we still get a reasonable margin
+  
+  if (discountPercentage > 0) {
+    // If user wants 10% discount, the displayed "original price" should be higher
+    // so that after 10% discount, we get a good selling price
+    // 
+    // Logic: If final_price = original_price * (1 - discount/100)
+    // Then: original_price = final_price / (1 - discount/100)
+    // But we want to maintain our profit, so:
+    const originalPriceForDisplay = basePriceWithProfit / (1 - discountPercentage / 100)
+    const finalSellingPrice = originalPriceForDisplay * (1 - discountPercentage / 100)
+    
+    return finalSellingPrice  // This should equal basePriceWithProfit
+  }
+  
+  // No discount, just return base price with profit
+  return basePriceWithProfit
 }
 
 export function slugify(text: string): string {
