@@ -824,92 +824,33 @@ export default function ProductForm({ categories, countries, suppliers, product,
         </CardContent>
       </Card>
 
-      {/* 8. ✅ ADDED: Product Status & Draft System */}
+      {/* 8. ✅ SIMPLIFIED: Product Status Display (Read-only) */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Settings className="h-5 w-5" />
-            Product Status & Settings
+            Product Settings
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-6">
-          {/* Product Status Section */}
-          <div className="space-y-4">
+        <CardContent className="space-y-4">
+          {/* Current Status Display (Read-only) */}
+          <div className="bg-gray-50 p-3 rounded-lg">
             <div className="flex items-center justify-between">
-              <Label htmlFor="status">Publication Status</Label>
-              {/* Current Status Badge */}
+              <Label>Current Status</Label>
               <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm font-medium ${
                 formData.status === 'DRAFT' ? 'bg-yellow-100 text-yellow-800 border border-yellow-200' :
                 formData.status === 'PUBLISHED' ? 'bg-green-100 text-green-800 border border-green-200' :
                 'bg-gray-100 text-gray-800 border border-gray-200'
               }`}>
-                {formData.status === 'DRAFT' && <Eye className="h-3 w-3" />}
+                {formData.status === 'DRAFT' && <RefreshCw className="h-3 w-3" />}
                 {formData.status === 'PUBLISHED' && <CheckCircle className="h-3 w-3" />}
                 {formData.status === 'ARCHIVED' && <AlertTriangle className="h-3 w-3" />}
                 {formData.status || 'Draft'}
               </div>
             </div>
-
-            <select
-              id="status"
-              value={formData.status}
-              onChange={(e) => handleInputChange('status', e.target.value as 'DRAFT' | 'PUBLISHED' | 'ARCHIVED')}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
-              <option value="DRAFT">Draft - Work in progress, not visible to customers</option>
-              <option value="PUBLISHED">Published - Live and visible to customers</option>
-              <option value="ARCHIVED">Archived - Hidden but preserved in system</option>
-            </select>
-
-            {/* Status Information */}
-            <div className="bg-gray-50 p-3 rounded-lg">
-              <div className="text-sm text-gray-700">
-                {formData.status === 'DRAFT' && (
-                  <>
-                    <strong>Draft Status:</strong> This product is being created or edited. It's not visible to customers and can be freely modified.
-                  </>
-                )}
-                {formData.status === 'PUBLISHED' && (
-                  <>
-                    <strong>Published Status:</strong> This product is live and visible to customers. Additional validation is required.
-                    {formData.publishedAt && (
-                      <div className="text-xs text-gray-500 mt-1">
-                        First published: {new Date(formData.publishedAt).toLocaleDateString()}
-                      </div>
-                    )}
-                  </>
-                )}
-                {formData.status === 'ARCHIVED' && (
-                  <>
-                    <strong>Archived Status:</strong> This product is hidden from customers but preserved in the system for reference.
-                    {formData.archivedAt && (
-                      <div className="text-xs text-gray-500 mt-1">
-                        Archived: {new Date(formData.archivedAt).toLocaleDateString()}
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
-            </div>
-
-            {/* Publishing Requirements Alert */}
-            {formData.status === 'PUBLISHED' && (
-              <div className="flex items-start gap-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                <AlertTriangle className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
-                <div className="flex-1">
-                  <div className="font-medium text-blue-800">Publishing Requirements</div>
-                  <div className="text-sm text-blue-700 mt-1">
-                    To publish this product, ensure you have:
-                    <ul className="list-disc list-inside mt-1 space-y-1">
-                      <li>Product name and descriptions</li>
-                      <li>At least one product image</li>
-                      <li>Valid pricing information</li>
-                      <li>Stock quantity set</li>
-                    </ul>
-                  </div>
-                </div>
-              </div>
-            )}
+            <p className="text-sm text-gray-600 mt-2">
+              Use the action buttons below to change the product status.
+            </p>
           </div>
 
           {/* Product Settings */}
@@ -1054,70 +995,21 @@ export default function ProductForm({ categories, countries, suppliers, product,
         </CardContent>
       </Card>
 
-      {/* 10. Cost Breakdown Summary */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <DollarSign className="h-5 w-5" />
-            Cost Breakdown Summary
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <div className="bg-blue-50 p-3 rounded-lg">
-              <div className="text-sm text-blue-600 font-medium">Total Cost (USD)</div>
-              <div className="text-lg font-bold text-blue-800">
-                ${(formData.costPriceUSD || 0).toFixed(2)}
-              </div>
-            </div>
-            
-            <div className="bg-green-50 p-3 rounded-lg">
-              <div className="text-sm text-green-600 font-medium">Per Piece (USD)</div>
-              <div className="text-lg font-bold text-green-800">
-                ${(formData.piecePriceUSD || 0).toFixed(2)}
-              </div>
-            </div>
-            
-            <div className="bg-purple-50 p-3 rounded-lg">
-              <div className="text-sm text-purple-600 font-medium">Selling Price (USD)</div>
-              <div className="text-lg font-bold text-purple-800">
-                ${(formData.sellingPriceUSD || 0).toFixed(2)}
-              </div>
-            </div>
-            
-            <div className="bg-yellow-50 p-3 rounded-lg">
-              <div className="text-sm text-yellow-600 font-medium">Profit Margin</div>
-              <div className="text-lg font-bold text-yellow-800">
-                {(formData.profitMargin || 0).toFixed(1)}%
-              </div>
-            </div>
-          </div>
-
-          {/* Exchange Rate Info */}
-          {selectedCountry && (
-            <div className="mt-4 p-3 bg-gray-50 rounded-lg">
-              <div className="text-sm text-gray-600">
-                <strong>Exchange Rate:</strong> 1 {selectedCountry.currency} = ${(1/(exchangeRate || 1)).toFixed(4)} USD
-                <br />
-                <strong>Original Price:</strong> {selectedCountry.currencySymbol}{(formData.originalPrice || 0).toFixed(2)} {selectedCountry.currency}
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* ✅ ENHANCED: Action Buttons with Draft System */}
-      <div className="flex justify-between items-center pt-6 border-t">
+      {/* ✅ ENHANCED: Action Buttons with Draft System Workflow */}
+      <div className="flex justify-between items-center pt-6 border-t bg-gray-50 p-4 rounded-lg">
+        {/* Left side - Cancel */}
         <Link href="/admin/products">
-          <Button type="button" variant="outline">
+          <Button type="button" variant="outline" size="lg">
             Cancel
           </Button>
         </Link>
 
-        <div className="flex gap-2">
-          {mode === 'edit' && (
-            <Link href={`/admin/products/${product?.id}`}>
-              <Button type="button" variant="outline">
+        {/* Right side - Draft/Publish Actions */}
+        <div className="flex gap-3">
+          {/* Preview Button (for existing products) */}
+          {mode === 'edit' && product?.id && (
+            <Link href={`/admin/products/${product.id}`}>
+              <Button type="button" variant="outline" size="lg">
                 <Eye className="h-4 w-4 mr-2" />
                 Preview
               </Button>
@@ -1128,36 +1020,157 @@ export default function ProductForm({ categories, countries, suppliers, product,
           <Button 
             type="button" 
             variant="outline"
-            onClick={() => {
+            size="lg"
+            onClick={async (e) => {
+              e.preventDefault()
+              const previousStatus = formData.status
               handleInputChange('status', 'DRAFT')
-              // Trigger form submission after state update
-              setTimeout(() => {
+              
+              // Wait a moment for state to update, then submit
+              setTimeout(async () => {
                 const form = document.querySelector('form') as HTMLFormElement
-                form?.requestSubmit()
+                if (form) {
+                  const formEvent = new Event('submit', { bubbles: true, cancelable: true })
+                  form.dispatchEvent(formEvent)
+                }
               }, 100)
             }}
-            disabled={loading || formData.status === 'DRAFT'}
-            className="border-yellow-300 text-yellow-700 hover:bg-yellow-50"
+            disabled={loading}
+            className="border-yellow-300 text-yellow-700 hover:bg-yellow-50 hover:border-yellow-400"
           >
-            <RefreshCw className="h-4 w-4 mr-2" />
+            {loading && formData.status === 'DRAFT' ? (
+              <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <RefreshCw className="h-4 w-4 mr-2" />
+            )}
             Save as Draft
           </Button>
 
-          {/* Main Submit Button - Dynamic based on status */}
-          <Button type="submit" disabled={loading}>
-            {loading ? (
+          {/* Publish Button */}
+          <Button 
+            type="button"
+            size="lg"
+            onClick={async (e) => {
+              e.preventDefault()
+              handleInputChange('status', 'PUBLISHED')
+              
+              // Wait a moment for state to update, then submit
+              setTimeout(async () => {
+                const form = document.querySelector('form') as HTMLFormElement
+                if (form) {
+                  const formEvent = new Event('submit', { bubbles: true, cancelable: true })
+                  form.dispatchEvent(formEvent)
+                }
+              }, 100)
+            }}
+            disabled={loading}
+            className="bg-green-600 hover:bg-green-700 text-white"
+          >
+            {loading && formData.status === 'PUBLISHED' ? (
               <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
             ) : (
-              <Save className="h-4 w-4 mr-2" />
+              <CheckCircle className="h-4 w-4 mr-2" />
             )}
-            {formData.status === 'PUBLISHED' ? 
-              (mode === 'create' ? 'Create & Publish' : 'Update & Publish') :
-              formData.status === 'ARCHIVED' ?
-              (mode === 'create' ? 'Create & Archive' : 'Update & Archive') :
-              (mode === 'create' ? 'Create Draft' : 'Update Draft')
-            }
+            {mode === 'create' ? 'Create & Publish' : 'Save & Publish'}
           </Button>
+
+          {/* Archive Button (only for existing products) */}
+          {mode === 'edit' && (
+            <Button 
+              type="button"
+              variant="outline"
+              size="lg"
+              onClick={async (e) => {
+                e.preventDefault()
+                if (confirm('Are you sure you want to archive this product? It will be hidden from customers.')) {
+                  handleInputChange('status', 'ARCHIVED')
+                  
+                  // Wait a moment for state to update, then submit
+                  setTimeout(async () => {
+                    const form = document.querySelector('form') as HTMLFormElement
+                    if (form) {
+                      const formEvent = new Event('submit', { bubbles: true, cancelable: true })
+                      form.dispatchEvent(formEvent)
+                    }
+                  }, 100)
+                }
+              }}
+              disabled={loading}
+              className="border-gray-400 text-gray-700 hover:bg-gray-50 hover:border-gray-500"
+            >
+              {loading && formData.status === 'ARCHIVED' ? (
+                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <AlertTriangle className="h-4 w-4 mr-2" />
+              )}
+              Archive
+            </Button>
+          )}
         </div>
+      </div>
+
+      {/* Status Information Panel */}
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <div className="flex items-center gap-2 mb-2">
+          <div className={`w-3 h-3 rounded-full ${
+            formData.status === 'DRAFT' ? 'bg-yellow-500' :
+            formData.status === 'PUBLISHED' ? 'bg-green-500' :
+            'bg-gray-500'
+          }`}></div>
+          <span className="text-sm font-medium text-blue-900">
+            Current Status: {formData.status || 'DRAFT'}
+          </span>
+        </div>
+        
+        <div className="text-sm text-blue-700">
+          {formData.status === 'DRAFT' && (
+            <>
+              <strong>Draft:</strong> This product is being created or edited. It's not visible to customers.
+              You can save changes without validation requirements.
+            </>
+          )}
+          {formData.status === 'PUBLISHED' && (
+            <>
+              <strong>Published:</strong> This product is live and visible to customers.
+              {formData.publishedAt && (
+                <span className="block text-xs text-blue-600 mt-1">
+                  Published: {new Date(formData.publishedAt).toLocaleDateString()}
+                </span>
+              )}
+            </>
+          )}
+          {formData.status === 'ARCHIVED' && (
+            <>
+              <strong>Archived:</strong> This product is hidden from customers but preserved in the system.
+              {formData.archivedAt && (
+                <span className="block text-xs text-blue-600 mt-1">
+                  Archived: {new Date(formData.archivedAt).toLocaleDateString()}
+                </span>
+              )}
+            </>
+          )}
+        </div>
+
+        {/* Publishing Requirements Check */}
+        {formData.status === 'PUBLISHED' && (
+          <div className="mt-3 p-3 bg-white border border-blue-200 rounded">
+            <div className="text-xs font-medium text-blue-900 mb-2">Publishing Requirements:</div>
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div className={`flex items-center gap-1 ${formData.name ? 'text-green-700' : 'text-red-700'}`}>
+                {formData.name ? '✓' : '✗'} Product name
+              </div>
+              <div className={`flex items-center gap-1 ${formData.description ? 'text-green-700' : 'text-red-700'}`}>
+                {formData.description ? '✓' : '✗'} Description
+              </div>
+              <div className={`flex items-center gap-1 ${formData.images?.length ? 'text-green-700' : 'text-red-700'}`}>
+                {formData.images?.length ? '✓' : '✗'} Images
+              </div>
+              <div className={`flex items-center gap-1 ${formData.sellingPriceUSD > 0 ? 'text-green-700' : 'text-red-700'}`}>
+                {formData.sellingPriceUSD > 0 ? '✓' : '✗'} Pricing
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Debug Information (Development Only) */}
