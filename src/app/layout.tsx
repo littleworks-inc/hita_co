@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import { CurrencyProvider } from '@/contexts/CurrencyContext'
 import { CartProvider } from '@/contexts/CartContext'
+import { ThemeProvider } from '@/contexts/ThemeContext' // ✅ NEW - Theme system
 import CartDrawer from '@/components/cart/CartDrawer'
 import './globals.css'
 
@@ -90,7 +91,8 @@ async function getInitialCurrencyData() {
       next: { revalidate: 3600 } // Cache for 1 hour
     })
     
-    const initialRates = response.ok ? await response.json() : {}
+    const initialRates = response.ok ? 
+      await response.json() : {}
     
     return { initialCurrency, initialRates }
   } catch (error) {
@@ -110,38 +112,61 @@ export default async function RootLayout({ children }: RootLayoutProps) {
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        {/* Theme detection script */}
+        {/* ✅ ENHANCED - Better theme detection script */}
         <script
           dangerouslySetInnerHTML={{
             __html: `
-              try {
-                if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-                  document.documentElement.classList.add('dark')
-                } else {
-                  document.documentElement.classList.remove('dark')
+              (function() {
+                try {
+                  // Prevent flash of wrong theme
+                  var savedTheme = null;
+                  var systemPrefersDark = false;
+                  
+                  try {
+                    savedTheme = localStorage.getItem('theme-mode');
+                  } catch (e) {
+                    // localStorage might not be available
+                  }
+                  
+                  try {
+                    systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                  } catch (e) {
+                    // matchMedia might not be available
+                  }
+                  
+                  // Apply theme immediately
+                  if (savedTheme === 'dark' || (savedTheme === 'system' && systemPrefersDark) || (!savedTheme && systemPrefersDark)) {
+                    document.documentElement.classList.add('dark');
+                  } else {
+                    document.documentElement.classList.remove('dark');
+                  }
+                } catch (error) {
+                  // Fallback to light theme - don't log errors during hydration
                 }
-              } catch (_) {}
+              })();
             `,
           }}
         />
       </head>
       <body className={`${inter.className} font-sans antialiased`}>
-        {/* Enhanced Provider wrapper with Cart and Currency */}
-        <CurrencyProvider 
-          initialCurrency={initialCurrency}
-          initialRates={initialRates}
-        >
-          <CartProvider>
-            <div className="flex min-h-screen flex-col">
-              <main className="flex-1">
-                {children}
-              </main>
-            </div>
-            
-            {/* Global Cart Drawer - Available on all pages */}
-            <CartDrawer />
-          </CartProvider>
-        </CurrencyProvider>
+        {/* ✅ ENHANCED - Multi-provider wrapper with Theme system */}
+        <ThemeProvider>
+          <CurrencyProvider 
+            initialCurrency={initialCurrency}
+            initialRates={initialRates}
+          >
+            <CartProvider>
+              <div className="flex min-h-screen flex-col">
+                <main className="flex-1">
+                  {children}
+                </main>
+              </div>
+              
+              {/* Global Cart Drawer - Available on all pages */}
+              <CartDrawer />
+            </CartProvider>
+          </CurrencyProvider>
+        </ThemeProvider>
         
         {/* Analytics scripts would go here */}
         {process.env.NODE_ENV === 'production' && (
