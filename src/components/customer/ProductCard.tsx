@@ -1,4 +1,4 @@
-// ✅ FIXED: src/components/customer/ProductCard.tsx - WITH DISCOUNT DISPLAY
+// ✅ FIXED: src/components/customer/ProductCard.tsx - WITH PROPER DISCOUNT DISPLAY
 
 'use client'
 
@@ -14,7 +14,8 @@ import {
   Eye,
   Tag,
   Star,
-  Percent
+  Percent,
+  ShoppingCart
 } from 'lucide-react'
 
 interface Product {
@@ -58,77 +59,43 @@ export default function ProductCard({ product, className = '' }: ProductCardProp
   // Generate product slug for URL
   const productSlug = `${product.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${product.id.slice(-8)}`
 
-  // ✅ DISCOUNT CALCULATION: Calculate discount information
+  // Calculate discount information
   const discountInfo = calculateDiscountInfo({
     sellingPriceUSD: product.sellingPriceUSD,
     discountPercentage: product.discountPercentage,
     showDiscountToCustomers: product.showDiscountToCustomers
   })
 
-  // Convert prices to current currency
-  const finalPrice = convertPrice(product.sellingPriceUSD, currentCurrency)
-  const originalPrice = discountInfo.shouldShowDiscount
-    ? convertPrice(discountInfo.originalPrice, currentCurrency)
-    : finalPrice
-
   // Stock status
   const isOutOfStock = product.stockQuantity === 0
   const isLowStock = product.stockQuantity <= 5 && product.stockQuantity > 0
 
   return (
-    <div className={`group bg-white rounded-xl shadow-sm hover:shadow-lg transition-all duration-300 overflow-hidden border border-gray-100 ${className}`}>
-
-      {/* Product Link */}
+    <div className={`group bg-white rounded-xl shadow-sm hover:shadow-lg transition-all duration-300 overflow-hidden ${className}`}>
+      {/* Product Image Container */}
       <Link href={`/products/${productSlug}`} className="block">
-
-        {/* Badge Container */}
-        <div className="absolute top-3 left-3 z-10 flex flex-col gap-1">
-          {/* ✅ DISCOUNT BADGE: Show when discount is visible to customers */}
+        <div className="relative aspect-square overflow-hidden">
+          {/* Discount Badge */}
           {discountInfo.shouldShowDiscount && (
-            <div className="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full flex items-center gap-1">
-              <Percent className="h-3 w-3" />
+            <div className="absolute top-3 left-3 z-10 bg-red-500 text-white px-2 py-1 rounded-full text-xs font-bold">
               {discountInfo.discountPercent}% OFF
             </div>
           )}
 
-          {/* Featured badge */}
-          {product.isFeatured && (
-            <div className="bg-purple-500 text-white text-xs font-bold px-2 py-1 rounded-full flex items-center gap-1">
-              <Star className="h-3 w-3" />
-              Featured
+          {/* Stock Status Badge */}
+          {isLowStock && !isOutOfStock && (
+            <div className="absolute top-3 right-3 z-10 bg-orange-500 text-white px-2 py-1 rounded-full text-xs font-medium">
+              Only {product.stockQuantity} left
             </div>
           )}
 
-          {/* Stock status badges */}
           {isOutOfStock && (
-            <div className="bg-gray-500 text-white text-xs font-bold px-2 py-1 rounded-full">
+            <div className="absolute top-3 right-3 z-10 bg-gray-500 text-white px-2 py-1 rounded-full text-xs font-medium">
               Out of Stock
             </div>
           )}
-          {isLowStock && (
-            <div className="bg-orange-500 text-white text-xs font-bold px-2 py-1 rounded-full">
-              Low Stock
-            </div>
-          )}
-        </div>
 
-        {/* Wishlist Button */}
-        <button
-          onClick={(e) => {
-            e.preventDefault()
-            setIsWishlisted(!isWishlisted)
-          }}
-          className="absolute top-3 right-3 z-10 p-2 bg-white/80 backdrop-blur-sm rounded-full hover:bg-white transition-colors"
-        >
-          <Heart
-            className={`h-4 w-4 transition-colors ${isWishlisted ? 'fill-red-500 text-red-500' : 'text-gray-600'
-              }`}
-          />
-        </button>
-
-        {/* Image Container */}
-        <div className="relative aspect-square overflow-hidden bg-gray-100">
-          {/* Product Image */}
+          {/* Product Images */}
           {primaryImage && !imageError ? (
             <>
               {/* Primary Image */}
@@ -136,8 +103,9 @@ export default function ProductCard({ product, className = '' }: ProductCardProp
                 src={primaryImage}
                 alt={product.name}
                 fill
-                className={`object-cover transition-all duration-500 ${imageLoading ? 'scale-110 blur-sm' : 'scale-100 blur-0'
-                  } ${secondaryImage ? 'group-hover:opacity-0' : ''}`}
+                className={`object-cover transition-all duration-500 ${
+                  imageLoading ? 'scale-110 blur-sm' : 'scale-100 blur-0'
+                } ${secondaryImage ? 'group-hover:opacity-0' : ''}`}
                 onLoad={() => setImageLoading(false)}
                 onError={() => setImageError(true)}
                 sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
@@ -197,18 +165,23 @@ export default function ProductCard({ product, className = '' }: ProductCardProp
           </p>
         )}
 
-        {/* ✅ PRICE DISPLAY WITH DISCOUNT */}
+        {/* FIXED: Price Display Section - Proper spacing and layout */}
         <div className="space-y-2">
-          <div className="flex items-center gap-2">
+          {/* Price Row */}
+          <div className="flex items-center gap-3 flex-wrap">
             {discountInfo.shouldShowDiscount ? (
               <>
-        // ✅ Original price (calculated for display)
-                <span className="text-lg line-through text-gray-400">
+                {/* Original price (crossed out) */}
+                <span className="text-base line-through text-gray-400">
                   {formatPrice(convertPrice(discountInfo.originalPrice, currentCurrency), currentCurrency)}
                 </span>
-        // ✅ Final price (what customer actually pays - from sellingPriceUSD)
+                {/* Final discounted price */}
                 <span className="text-xl font-bold text-red-600">
                   {formatPrice(convertPrice(discountInfo.discountedPrice, currentCurrency), currentCurrency)}
+                </span>
+                {/* Discount badge */}
+                <span className="bg-red-100 text-red-600 px-2 py-1 rounded-full text-xs font-bold">
+                  {discountInfo.discountPercent}% OFF
                 </span>
               </>
             ) : (
@@ -219,14 +192,11 @@ export default function ProductCard({ product, className = '' }: ProductCardProp
             )}
           </div>
 
-          {/* Savings information */}
+          {/* Savings information on separate line */}
           {discountInfo.shouldShowDiscount && (
-            <div className="flex items-center gap-2 text-sm">
+            <div className="text-sm">
               <span className="text-green-600 font-medium">
                 You save {formatPrice(convertPrice(discountInfo.savings, currentCurrency), currentCurrency)}
-              </span>
-              <span className="bg-green-100 text-green-700 px-2 py-0.5 rounded-full text-xs font-bold">
-                {discountInfo.discountPercent}% OFF
               </span>
             </div>
           )}
@@ -240,23 +210,16 @@ export default function ProductCard({ product, className = '' }: ProductCardProp
             console.log('Add to cart:', product.id)
           }}
           disabled={isOutOfStock}
-          className={`w-full py-2 px-4 rounded-lg font-medium transition-colors ${isOutOfStock
+          className={`w-full py-2 px-4 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 ${
+            isOutOfStock
               ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
               : 'bg-purple-600 text-white hover:bg-purple-700'
-            }`}
+          }`}
         >
+          <ShoppingCart className="h-4 w-4" />
           {isOutOfStock ? 'Out of Stock' : 'Add to Cart'}
         </button>
       </div>
     </div>
   )
 }
-
-// ✅ FEATURES ADDED:
-// 1. Discount badge showing percentage off
-// 2. Original price crossed out when discount is visible
-// 3. Sale price in red when discount is active
-// 4. Savings amount display
-// 5. Proper discount visibility based on showDiscountToCustomers
-// 6. Integration with existing currency conversion
-// 7. Responsive design with proper mobile support
