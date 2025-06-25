@@ -136,6 +136,26 @@ export function useTheme() {
   return context
 }
 
+// Safe theme hook that doesn't throw errors (for optional theme usage)
+export function useThemeSafe() {
+  const context = useContext(ThemeContext)
+  
+  // Return safe defaults if no provider
+  if (context === undefined) {
+    return {
+      mode: 'system' as ThemeMode,
+      resolvedTheme: 'light' as ResolvedTheme,
+      setTheme: () => {},
+      toggleTheme: () => {},
+      systemTheme: 'light' as ResolvedTheme,
+      isSystemMode: true,
+      isClient: false
+    }
+  }
+  
+  return context
+}
+
 // Hook for theme with loading state handling
 export function useThemeWithLoading() {
   const theme = useTheme()
