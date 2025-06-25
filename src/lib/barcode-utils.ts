@@ -1,203 +1,124 @@
-// ✅ FIXED: src/lib/discount-utils.ts - Matching Admin Preview Logic
-
-export interface DiscountProduct {
-  sellingPriceUSD: number
-  discountPercentage: number
-  showDiscountToCustomers: boolean
-}
-
-export interface DiscountCalculation {
-  originalPrice: number
-  discountedPrice: number
-  savings: number
-  discountPercent: number
-  hasDiscount: boolean
-  shouldShowDiscount: boolean
-}
+// ✅ FIXED: src/lib/barcode-utils.ts - Add Missing shouldUpdateBarcode Function
 
 /**
- * Calculate discount information for a product
- * ✅ FIXED: This now matches the admin preview logic exactly
+ * Determine if barcode should be updated when SKU changes
  */
-export function calculateDiscountInfo(product: DiscountProduct): DiscountCalculation {
-  const hasDiscount = product.discountPercentage > 0
-  const shouldShowDiscount = hasDiscount && product.showDiscountToCustomers
+export function shouldUpdateBarcode(
+  originalSku: string, 
+  newSku: string, 
+  currentBarcode: string
+): boolean {
+  // Don't update if SKU hasn't actually changed
+  if (originalSku === newSku) {
+    return false
+  }
+
+  // Don't update if there's no current barcode (will auto-generate)
+  if (!currentBarcode || currentBarcode.trim() === '') {
+    return false
+  }
+
+  // Don't update if SKU change is minimal (just case or spacing)
+  const cleanOriginal = originalSku.toLowerCase().replace(/[\s\-]/g, '')
+  const cleanNew = newSku.toLowerCase().replace(/[\s\-]/g, '')
   
-  if (!hasDiscount) {
-    // No discount - everything is the same
-    return {
-      originalPrice: product.sellingPriceUSD,
-      discountedPrice: product.sellingPriceUSD,
-      savings: 0,
-      discountPercent: 0,
-      hasDiscount: false,
-      shouldShowDiscount: false
-    }
+  if (cleanOriginal === cleanNew) {
+    return false
   }
 
-  // ✅ CRITICAL FIX: When there's a discount, the sellingPriceUSD is treated as the "original price"
-  // The customer actually pays LESS than sellingPriceUSD
-  const originalPrice = product.sellingPriceUSD  // This becomes the crossed-out price
-  const discountedPrice = originalPrice * (1 - product.discountPercentage / 100)  // This is what customer pays
-  const savings = originalPrice - discountedPrice
-  
-  return {
-    originalPrice,      // $107.11 (crossed out)
-    discountedPrice,    // $85.69 (what customer pays - shown in green/red)
-    savings,            // $21.42
-    discountPercent: product.discountPercentage,  // 20
-    hasDiscount: true,
-    shouldShowDiscount
-  }
+  // Update if SKU has meaningful changes
+  return true
 }
 
 /**
- * Calculate selling price with discount applied
+ * Generate barcode from SKU for different formats
  */
-export function calculateSellingPriceWithDiscount(
-  basePrice: number, 
-  discountPercentage: number
-): number {
-  if (discountPercentage <= 0) return basePrice
-  return basePrice * (1 - discountPercentage / 100)
-}
-
-/**
- * Calculate original price from discounted price (for admin calculations)
- */
-export function calculateOriginalFromDiscounted(
-  discountedPrice: number, 
-  discountPercentage: number
-): number {
-  if (discountPercentage <= 0) return discountedPrice
-  return discountedPrice / (1 - discountPercentage / 100)
-}
-
-/**
- * Validate discount percentage
- */
-export function validateDiscountPercentage(discount: number): {
-  isValid: boolean
-  error?: string
-} {
-  if (discount < 0) {
-    return { isValid: false, error: 'Discount cannot be negative' }
-  }
-  if (discount >= 100) {
-    return { isValid: false, error: 'Discount cannot be 100% or more' }
-  }
-  return { isValid: true }
-}
-
-/**
- * Format discount percentage for display
- */
-export function formatDiscountPercent(discount: number): string {
-  return `${Math.round(discount)}%`
-}
-
-/**
- * Check if product has active discount for customers
- */
-export function hasActiveCustomerDiscount(product: DiscountProduct): boolean {
-  return product.discountPercentage > 0 && product.showDiscountToCustomers
-}
-
-/**
- * Calculate bulk discount for multiple items
- */
-export function calculateBulkDiscount(
-  items: Array<{ price: number; quantity: number; discountPercent: number }>
-): {
-  subtotal: number
-  totalSavings: number
-  finalTotal: number
-} {
-  let subtotal = 0
-  let totalSavings = 0
-  
-  items.forEach(item => {
-    const itemTotal = item.price * item.quantity
-    const discountedPrice = item.price * (1 - item.discountPercent / 100)
-    const discountedTotal = discountedPrice * item.quantity
-    const itemSavings = itemTotal - discountedTotal
-    
-    subtotal += discountedTotal  // Use discounted total
-    totalSavings += itemSavings
-  })
-  
-  return {
-    subtotal,
-    totalSavings,
-    finalTotal: subtotal
-  }
-}
-
-/**
- * Generate discount summary text
- */
-export function generateDiscountSummary(discount: DiscountCalculation): string {
-  if (!discount.shouldShowDiscount) {
+export function generateBarcodeFromSKU(sku: string, format: string): string {
+  if (!sku || sku.trim() === '') {
     return ''
   }
-  
-  return `Save ${formatDiscountPercent(discount.discountPercent)} • Original price was $${discount.originalPrice.toFixed(2)}`
-}
 
-/**
- * Check if discount is significant enough to highlight
- */
-export function isSignificantDiscount(discountPercent: number, threshold = 10): boolean {
-  return discountPercent >= threshold
-}
+  const cleanSKU = sku.replace(/[^A-Z0-9]/g, '').toUpperCase()
+  const timestamp = Date.now().toString().slice(-6)
+  const randomSuffix = Math.floor(Math.random() * 1000).toString().padStart(3, '0')
 
-/**
- * Calculate discount tier (for different UI treatments)
- */
-export function getDiscountTier(discountPercent: number): 'low' | 'medium' | 'high' | 'mega' {
-  if (discountPercent < 10) return 'low'
-  if (discountPercent < 25) return 'medium'
-  if (discountPercent < 50) return 'high'
-  return 'mega'
-}
-
-/**
- * Generate discount badge color based on percentage
- */
-export function getDiscountBadgeColor(discountPercent: number): {
-  bg: string
-  text: string
-  border: string
-} {
-  const tier = getDiscountTier(discountPercent)
-  
-  const colors = {
-    low: { bg: 'bg-blue-100', text: 'text-blue-600', border: 'border-blue-200' },
-    medium: { bg: 'bg-orange-100', text: 'text-orange-600', border: 'border-orange-200' },
-    high: { bg: 'bg-red-100', text: 'text-red-600', border: 'border-red-200' },
-    mega: { bg: 'bg-purple-100', text: 'text-purple-600', border: 'border-purple-200' }
+  switch (format.toUpperCase()) {
+    case 'UPC':
+      // Generate 11 digits for UPC
+      let upcBase = cleanSKU.replace(/[^0-9]/g, '')
+      if (upcBase.length < 11) {
+        upcBase = (upcBase + timestamp + randomSuffix).replace(/[^0-9]/g, '').slice(0, 11).padStart(11, '0')
+      } else {
+        upcBase = upcBase.slice(0, 11)
+      }
+      return upcBase
+      
+    case 'EAN13':
+      // Generate 12 digits for EAN13
+      let eanBase = cleanSKU.replace(/[^0-9]/g, '')
+      if (eanBase.length < 12) {
+        eanBase = (eanBase + timestamp + randomSuffix).replace(/[^0-9]/g, '').slice(0, 12).padStart(12, '0')
+      } else {
+        eanBase = eanBase.slice(0, 12)
+      }
+      return eanBase
+      
+    case 'CODE39':
+      // Use SKU directly (limited to valid CODE39 characters)
+      return cleanSKU.replace(/[^A-Z0-9\-\.\ \$\/\+\%]/g, '').slice(0, 20)
+      
+    case 'CODE128':
+    default:
+      // Most flexible - use SKU with timestamp
+      return `${cleanSKU}-${timestamp}`.slice(0, 30)
   }
-  
-  return colors[tier]
 }
 
-// 🚀 EXAMPLE WITH YOUR DATA:
-/*
-const product = {
-  sellingPriceUSD: 107.11,    // This is the "original price" for display
-  discountPercentage: 20,
-  showDiscountToCustomers: true
+/**
+ * Validate barcode format
+ */
+export function validateBarcodeFormat(code: string, format: string): { isValid: boolean; error?: string } {
+  if (!code || code.trim() === '') {
+    return { isValid: false, error: 'Barcode cannot be empty' }
+  }
+
+  switch (format.toUpperCase()) {
+    case 'UPC':
+      const upcClean = code.replace(/[\s\-]/g, '')
+      if (!/^\d+$/.test(upcClean)) {
+        return { isValid: false, error: 'UPC must contain only numbers' }
+      }
+      if (upcClean.length !== 11 && upcClean.length !== 12) {
+        return { isValid: false, error: 'UPC must be 11 or 12 digits' }
+      }
+      return { isValid: true }
+      
+    case 'EAN13':
+      const eanClean = code.replace(/[\s\-]/g, '')
+      if (!/^\d+$/.test(eanClean)) {
+        return { isValid: false, error: 'EAN13 must contain only numbers' }
+      }
+      if (eanClean.length !== 12 && eanClean.length !== 13) {
+        return { isValid: false, error: 'EAN13 must be 12 or 13 digits' }
+      }
+      return { isValid: true }
+      
+    case 'CODE39':
+      if (!/^[A-Z0-9\-\.\ \$\/\+\%]*$/.test(code)) {
+        return { isValid: false, error: 'CODE39 contains invalid characters' }
+      }
+      if (code.length > 43) {
+        return { isValid: false, error: 'CODE39 too long (max 43 characters)' }
+      }
+      return { isValid: true }
+      
+    case 'CODE128':
+      if (code.length > 80) {
+        return { isValid: false, error: 'CODE128 too long (max 80 characters)' }
+      }
+      return { isValid: true }
+      
+    default:
+      return { isValid: false, error: `Unknown barcode format: ${format}` }
+  }
 }
-
-const discountInfo = calculateDiscountInfo(product)
-// Result: {
-//   originalPrice: 107.11,    // ← Crossed out price
-//   discountedPrice: 85.69,   // ← What customer actually pays  
-//   savings: 21.42,
-//   discountPercent: 20,
-//   hasDiscount: true,
-//   shouldShowDiscount: true
-// }
-
-// Customer sees: ~~$107.11~~ $85.69 (20% OFF) You save $21.42
-*/
