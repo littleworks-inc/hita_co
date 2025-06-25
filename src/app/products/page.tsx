@@ -1,18 +1,23 @@
-// File: app/products/page.tsx - Enhanced with Draft System Protection
+// ✅ FIXED: src/app/products/page.tsx
 
 import { Suspense } from 'react'
+import Link from 'next/link'
+import { notFound } from 'next/navigation'
 import { db } from '@/lib/db'
-import { generateStoreMetadata } from '@/lib/seo'
-import CustomerNavigation from '@/components/customer/CustomerNavigation'
 import ProductCard from '@/components/customer/ProductCard'
 import ProductFilters from '@/components/customer/ProductFilters'
 import LoadingSpinner from '@/components/customer/LoadingSpinner'
-import {
-  Grid3X3,
-  Package,
-  ArrowLeft
+import CustomerNavigation from '@/components/customer/CustomerNavigation'
+import { 
+  Package, 
+  ArrowLeft, 
+  Grid3X3, 
+  Filter,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react'
 
+// Page props interface
 interface ProductsPageProps {
   searchParams: {
     search?: string
@@ -25,132 +30,26 @@ interface ProductsPageProps {
   }
 }
 
-// ---------- Enhanced Data Fetching with Draft System Protection ----------
-
-async function getStoreSettings() {
-  return await db.storeSetting.findFirst({ where: { id: 'default' } })
-}
-
-// Get only categories that have published products
-async function getCategories() {
-  return await db.category.findMany({
-    where: {
-      products: {
-        some: { 
-          // Only published products with stock
-          OR: [
-            { status: 'PUBLISHED' },
-            { 
-              AND: [
-                { status: null }, // Legacy products
-                { isActive: true }
-              ]
-            }
-          ],
-          stockQuantity: { gt: 0 }
-        }
-      }
-    },
-    include: {
-      _count: {
-        select: {
-          products: {
-            where: {
-              OR: [
-                { status: 'PUBLISHED' },
-                { 
-                  AND: [
-                    { status: null },
-                    { isActive: true }
-                  ]
-                }
-              ],
-              stockQuantity: { gt: 0 }
-            }
-          }
-        }
-      }
-    },
-    orderBy: { name: 'asc' }
-  })
-}
-
-// Get only countries that have published products
-async function getCountries() {
-  return await db.country.findMany({
-    where: {
-      products: {
-        some: { 
-          OR: [
-            { status: 'PUBLISHED' },
-            { 
-              AND: [
-                { status: null },
-                { isActive: true }
-              ]
-            }
-          ],
-          stockQuantity: { gt: 0 }
-        }
-      }
-    },
-    include: {
-      _count: {
-        select: {
-          products: {
-            where: {
-              OR: [
-                { status: 'PUBLISHED' },
-                { 
-                  AND: [
-                    { status: null },
-                    { isActive: true }
-                  ]
-                }
-              ],
-              stockQuantity: { gt: 0 }
-            }
-          }
-        }
-      }
-    },
-    orderBy: { name: 'asc' }
-  })
-}
-
-// Enhanced product fetching with draft system protection
+// ✅ FIXED: Simplified and corrected getProducts function
 async function getProducts(searchParams: ProductsPageProps['searchParams']) {
   const page = parseInt(searchParams.page || '1')
   const pageSize = 12
   const skip = (page - 1) * pageSize
 
-  // Base where clause - ONLY PUBLISHED PRODUCTS
+  // ✅ FIXED: Build where clause correctly
   const where: any = {
-    // Draft System Protection: Only show published products to customers
-    OR: [
-      { status: 'PUBLISHED' },
-      { 
-        AND: [
-          { status: null }, // Legacy products without status field
-          { isActive: true } // But must be active
-        ]
-      }
-    ],
-    stockQuantity: { gt: 0 } // Must have stock
+    // Only show published products to customers
+    status: 'PUBLISHED',
+    stockQuantity: { gt: 0 } // Only show products in stock
   }
 
-  // Search functionality (enhanced)
+  // Search functionality
   if (searchParams.search) {
-    const searchTerms = searchParams.search.toLowerCase().split(' ').filter(term => term.length > 0)
-    where.AND = [
-      {
-        OR: [
-          { name: { contains: searchParams.search, mode: 'insensitive' } },
-          { description: { contains: searchParams.search, mode: 'insensitive' } },
-          { shortDescription: { contains: searchParams.search, mode: 'insensitive' } },
-          { tags: { hasSome: searchTerms } }
-        ]
-      }
+    where.OR = [
+      { name: { contains: searchParams.search, mode: 'insensitive' } },
+      { description: { contains: searchParams.search, mode: 'insensitive' } },
+      { shortDescription: { contains: searchParams.search, mode: 'insensitive' } },
+      { tags: { has: searchParams.search } }
     ]
   }
 
@@ -165,17 +64,14 @@ async function getProducts(searchParams: ProductsPageProps['searchParams']) {
   }
 
   // Price filters
-  if (searchParams.minPrice || searchParams.maxPrice) {
-    where.sellingPriceUSD = {}
-    if (searchParams.minPrice) {
-      where.sellingPriceUSD.gte = parseFloat(searchParams.minPrice)
-    }
-    if (searchParams.maxPrice) {
-      where.sellingPriceUSD.lte = parseFloat(searchParams.maxPrice)
-    }
+  if (searchParams.minPrice) {
+    where.sellingPriceUSD = { ...where.sellingPriceUSD, gte: parseFloat(searchParams.minPrice) }
+  }
+  if (searchParams.maxPrice) {
+    where.sellingPriceUSD = { ...where.sellingPriceUSD, lte: parseFloat(searchParams.maxPrice) }
   }
 
-  // Sorting logic
+  // Sort options
   let orderBy: any = []
   switch (searchParams.sort) {
     case 'price-low':
@@ -202,41 +98,109 @@ async function getProducts(searchParams: ProductsPageProps['searchParams']) {
       ]
   }
 
-  // Fetch products and total count
-  const [products, totalCount] = await Promise.all([
-    db.product.findMany({
-      where,
-      include: {
-        category: {
-          select: {
-            id: true,
-            name: true,
-            slug: true
+  try {
+    // ✅ FIXED: Separate queries to avoid complex count issues
+    const [products, totalCount] = await Promise.all([
+      db.product.findMany({
+        where,
+        include: {
+          category: {
+            select: {
+              id: true,
+              name: true,
+              slug: true
+            }
+          },
+          country: {
+            select: {
+              id: true,
+              name: true,
+              currency: true,
+              currencySymbol: true
+            }
           }
         },
-        country: {
+        orderBy,
+        skip,
+        take: pageSize
+      }),
+      // ✅ FIXED: Simple count query
+      db.product.count({ where })
+    ])
+
+    return {
+      products,
+      totalCount,
+      totalPages: Math.ceil(totalCount / pageSize),
+      currentPage: page,
+      hasNextPage: page < Math.ceil(totalCount / pageSize),
+      hasPrevPage: page > 1
+    }
+  } catch (error) {
+    console.error('Error fetching products:', error)
+    // Return empty results instead of throwing
+    return {
+      products: [],
+      totalCount: 0,
+      totalPages: 0,
+      currentPage: 1,
+      hasNextPage: false,
+      hasPrevPage: false
+    }
+  }
+}
+
+// Get categories for filters
+async function getCategories() {
+  try {
+    return await db.category.findMany({
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        _count: {
           select: {
-            id: true,
-            name: true,
-            currency: true,
-            currencySymbol: true
+            products: {
+              where: {
+                status: 'PUBLISHED',
+                stockQuantity: { gt: 0 }
+              }
+            }
           }
         }
       },
-      orderBy,
-      skip,
-      take: pageSize
-    }),
-    db.product.count({ where })
-  ])
+      orderBy: { name: 'asc' }
+    })
+  } catch (error) {
+    console.error('Error fetching categories:', error)
+    return []
+  }
+}
 
-  return {
-    products,
-    totalCount,
-    totalPages: Math.ceil(totalCount / pageSize),
-    currentPage: page,
-    hasNextPage: page < Math.ceil(totalCount / pageSize),
-    hasPrevPage: page > 1
+// Get countries for filters
+async function getCountries() {
+  try {
+    return await db.country.findMany({
+      select: {
+        id: true,
+        name: true,
+        code: true,
+        _count: {
+          select: {
+            products: {
+              where: {
+                status: 'PUBLISHED',
+                stockQuantity: { gt: 0 }
+              }
+            }
+          }
+        }
+      },
+      orderBy: { name: 'asc' }
+    })
+  } catch (error) {
+    console.error('Error fetching countries:', error)
+    return []
   }
 }
 
@@ -247,7 +211,7 @@ interface ProductsGridProps {
 }
 
 async function ProductsGrid({ searchParams }: ProductsGridProps) {
-  const { products, totalCount, currentPage } = await getProducts(searchParams)
+  const { products, totalCount, currentPage, totalPages, hasNextPage, hasPrevPage } = await getProducts(searchParams)
 
   if (totalCount === 0) {
     return (
@@ -259,9 +223,9 @@ async function ProductsGrid({ searchParams }: ProductsGridProps) {
             ? `No matches for "${searchParams.search}"`
             : 'No products match your current filters'}
         </p>
-        <a href="/products" className="text-purple-600 hover:underline flex items-center gap-1 justify-center">
+        <Link href="/products" className="text-purple-600 hover:underline flex items-center gap-1 justify-center">
           <ArrowLeft className="h-4 w-4" /> Clear Filters
-        </a>
+        </Link>
       </div>
     )
   }
@@ -270,125 +234,122 @@ async function ProductsGrid({ searchParams }: ProductsGridProps) {
     <>
       <div className="mb-6">
         <h2 className="text-2xl font-bold">
-          {searchParams.search ? `Search Results for "${searchParams.search}"` : 'All Products'}
+          {searchParams.search 
+            ? `Search results for "${searchParams.search}"` 
+            : 'All Products'}
         </h2>
-        <p className="text-gray-500">
-          Showing {((currentPage - 1) * 12) + 1}-{Math.min(currentPage * 12, totalCount)} of {totalCount} published products
+        <p className="text-gray-600 mt-1">
+          Showing {products.length} of {totalCount} products
         </p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+      {/* Products Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-8">
         {products.map((product) => (
           <ProductCard key={product.id} product={product} />
         ))}
       </div>
 
-      {/* Enhanced Pagination with SEO considerations */}
-      {totalCount > 12 && (
-        <div className="mt-8 flex justify-center">
-          <nav className="flex items-center gap-2">
-            {/* Pagination controls would go here */}
-            <span className="text-sm text-gray-500">
-              Page {currentPage} of {Math.ceil(totalCount / 12)}
-            </span>
-          </nav>
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center gap-2">
+          <Link
+            href={{
+              pathname: '/products',
+              query: { ...searchParams, page: (currentPage - 1).toString() }
+            }}
+            className={`flex items-center gap-1 px-4 py-2 rounded-lg ${
+              hasPrevPage 
+                ? 'bg-gray-100 hover:bg-gray-200 text-gray-700' 
+                : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+            }`}
+          >
+            <ChevronLeft className="h-4 w-4" />
+            Previous
+          </Link>
+
+          <span className="px-4 py-2 text-gray-600">
+            Page {currentPage} of {totalPages}
+          </span>
+
+          <Link
+            href={{
+              pathname: '/products',
+              query: { ...searchParams, page: (currentPage + 1).toString() }
+            }}
+            className={`flex items-center gap-1 px-4 py-2 rounded-lg ${
+              hasNextPage 
+                ? 'bg-gray-100 hover:bg-gray-200 text-gray-700' 
+                : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+            }`}
+          >
+            Next
+            <ChevronRight className="h-4 w-4" />
+          </Link>
         </div>
       )}
     </>
   )
 }
 
-// ---------- Metadata Generation with Draft System ----------
-
+// Page metadata
 export async function generateMetadata({ searchParams }: ProductsPageProps) {
-  const storeSettings = await getStoreSettings()
-  const { totalCount } = await getProducts(searchParams)
-  
   const title = searchParams.search 
-    ? `Search Results for "${searchParams.search}" - ${storeSettings?.storeName || 'Store'}`
-    : `Products - ${storeSettings?.storeName || 'Store'}`
-    
-  const description = searchParams.search
-    ? `Found ${totalCount} products matching "${searchParams.search}". Shop our curated collection of authentic products.`
-    : `Browse our collection of ${totalCount} authentic products. Find unique, handcrafted items with worldwide shipping.`
-
-  return generateStoreMetadata({
+    ? `Search: ${searchParams.search} - Products` 
+    : 'All Products - Shop Indian Ethnic Wear'
+  
+  return {
     title,
-    description,
-    keywords: searchParams.search 
-      ? `${searchParams.search}, products, shop, buy`
-      : 'products, shop, authentic, handcrafted, unique',
-    canonical: `/products${searchParams.search ? `?search=${encodeURIComponent(searchParams.search)}` : ''}`,
-    openGraph: {
-      type: 'website',
-      title,
-      description
-    }
-  })
+    description: 'Browse our complete collection of authentic Indian ethnic wear, jewelry, and lifestyle products.',
+  }
 }
 
-// ---------- Main Page Component ----------
-
+// Main page component
 export default async function ProductsPage({ searchParams }: ProductsPageProps) {
-  const [storeSettings, categories, countries] = await Promise.all([
-    getStoreSettings(),
+  // Fetch data in parallel
+  const [categories, countries] = await Promise.all([
     getCategories(),
     getCountries()
   ])
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <CustomerNavigation storeSettings={storeSettings} />
-      <main className="max-w-7xl mx-auto px-4 py-8">
-        <header className="mb-8">
+      <CustomerNavigation />
+      
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Page Header */}
+        <div className="mb-8">
           <div className="flex items-center gap-2 mb-4">
             <Grid3X3 className="h-6 w-6 text-purple-600" />
-            <h1 className="text-3xl font-bold">
-              {searchParams.search ? 'Search Products' : 'Products'}
+            <h1 className="text-3xl font-bold text-gray-900">
+              Products
             </h1>
           </div>
-          <p className="text-lg text-gray-600">
-            {searchParams.search
-              ? 'Find your perfect piece from our search results'
-              : 'Discover our collection of handcrafted products'}
+          <p className="text-gray-600">
+            Discover our authentic collection of Indian ethnic wear and lifestyle products
           </p>
-        </header>
+        </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-          <aside className="lg:col-span-1">
-            <Suspense fallback={<div className="h-96 bg-gray-100 animate-pulse rounded-lg" />}>
-              <ProductFilters 
-                categories={categories} 
-                countries={countries} 
-                searchParams={searchParams} 
+        <div className="lg:grid lg:grid-cols-4 lg:gap-8">
+          {/* Filters Sidebar */}
+          <div className="lg:col-span-1">
+            <Suspense fallback={<div className="h-96 bg-gray-200 rounded-lg animate-pulse" />}>
+              <ProductFilters
+                categories={categories}
+                countries={countries}
+                searchParams={searchParams}
               />
             </Suspense>
-          </aside>
-          <section className="lg:col-span-3">
-            <Suspense fallback={<LoadingSpinner size="lg" text="Loading products..." />}>
+          </div>
+
+          {/* Products Grid */}
+          <div className="lg:col-span-3 mt-8 lg:mt-0">
+            <Suspense fallback={<LoadingSpinner />}>
               <ProductsGrid searchParams={searchParams} />
             </Suspense>
-          </section>
+          </div>
         </div>
-      </main>
-      
-      {/* Enhanced Structured Data for SEO */}
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{
-          __html: JSON.stringify({
-            "@context": "https://schema.org",
-            "@type": "CollectionPage",
-            "name": searchParams.search ? `Search Results: ${searchParams.search}` : "Products",
-            "description": "Browse our collection of authentic, handcrafted products",
-            "url": `${process.env.NEXT_PUBLIC_APP_URL}/products`,
-            "mainEntity": {
-              "@type": "ItemList",
-              "numberOfItems": "Published products only"
-            }
-          })
-        }}
-      />
+      </div>
     </div>
   )
 }

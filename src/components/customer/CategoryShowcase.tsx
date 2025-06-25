@@ -1,3 +1,5 @@
+// ✅ FIXED: src/components/customer/CategoryShowcase.tsx
+
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -15,10 +17,10 @@ interface Category {
   name: string
   slug: string
   description: string | null
-  products: Array<{
+  products?: Array<{
     id: string
     images: string[]
-  }>
+  }> | null
   _count: {
     products: number
   }
@@ -88,8 +90,14 @@ export default function CategoryShowcase() {
         {/* Categories Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
           {categories.map((category, index) => {
-            const hasProductImage = category.products.length > 0 && category.products[0].images.length > 0
-            const productImage = hasProductImage ? category.products[0].images[0] : null
+            // ✅ SAFE CHECK: Handle cases where products might be undefined/null
+            const hasProducts = category.products && Array.isArray(category.products) && category.products.length > 0
+            const hasProductImage = hasProducts && 
+              category.products![0] && 
+              Array.isArray(category.products![0].images) && 
+              category.products![0].images.length > 0
+            
+            const productImage = hasProductImage ? category.products![0].images[0] : null
 
             return (
               <Link
@@ -122,7 +130,8 @@ export default function CategoryShowcase() {
                     {/* Product Count Badge */}
                     <div className="absolute top-4 right-4">
                       <span className="bg-white/20 backdrop-blur-sm text-white text-xs font-bold px-3 py-1 rounded-full">
-                        {category._count.products} items
+                        {/* ✅ SAFE ACCESS: Use _count.products instead of products.length */}
+                        {category._count?.products || 0} items
                       </span>
                     </div>
 
