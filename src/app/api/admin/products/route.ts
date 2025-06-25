@@ -1,11 +1,12 @@
-// Updated Product API Routes with Draft Support
-// src/app/api/admin/products/route.ts
+// =====================================
+// src/app/api/admin/products/route.ts - COMPLETE WITH DISCOUNT SYSTEM
+// =====================================
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth'
 import { db } from '@/lib/db'
 
-// GET /api/admin/products
+// GET /api/admin/products - Fetch products with filtering and pagination
 export async function GET(request: NextRequest) {
   try {
     const session = await getSession()
@@ -14,42 +15,105 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url)
-    const status = searchParams.get('status')
-    const search = searchParams.get('search')
     const page = parseInt(searchParams.get('page') || '1')
-    const limit = parseInt(searchParams.get('limit') || '20')
+    const limit = parseInt(searchParams.get('limit') || '10')
+    const search = searchParams.get('search')
+    const category = searchParams.get('category')
+    const status = searchParams.get('status') // DRAFT, PUBLISHED, ARCHIVED
+    const lowStock = searchParams.get('lowStock') === 'true'
+    const featured = searchParams.get('featured') === 'true'
+    const sortBy = searchParams.get('sortBy') || 'updatedAt'
+    const sortOrder = searchParams.get('sortOrder') || 'desc'
 
-    const whereConditions: any = {}
+    // Build where clause
+    const whereClause: any = {}
 
-    if (status && ['DRAFT', 'PUBLISHED', 'ARCHIVED'].includes(status)) {
-      whereConditions.status = status
-    }
-
+    // Search functionality
     if (search) {
-      whereConditions.OR = [
+      whereClause.OR = [
         { name: { contains: search, mode: 'insensitive' } },
         { sku: { contains: search, mode: 'insensitive' } },
-        { description: { contains: search, mode: 'insensitive' } }
+        { description: { contains: search, mode: 'insensitive' } },
+        { tags: { has: search } }
       ]
     }
 
-    const [products, totalCount] = await Promise.all([
-      db.product.findMany({
-        where: whereConditions,
-        include: {
-          category: { select: { name: true } },
-          country: { select: { name: true, currency: true } },
-          supplier: { select: { name: true } }
+    // Filter by category
+    if (category) {
+      whereClause.categoryId = category
+    }
+
+    // Filter by status (enhanced for draft system)
+    if (status) {
+      if (status === 'ACTIVE') {
+        // Backward compatibility: show published products
+        whereClause.OR = [
+          { status: 'PUBLISHED' },
+          { AND: [{ status: null }, { isActive: true }] }
+        ]
+      } else if (status === 'INACTIVE') {
+        // Backward compatibility: show archived products
+        whereClause.OR = [
+          { status: 'ARCHIVED' },
+          { AND: [{ status: null }, { isActive: false }] }
+        ]
+      } else {
+        whereClause.status = status
+      }
+    }
+
+    // Filter by featured products
+    if (featured) {
+      whereClause.isFeatured = true
+    }
+
+    // Low stock filter
+    if (lowStock) {
+      whereClause.stockQuantity = {
+        lte: db.raw('products."lowStockAlert"')
+      }
+    }
+
+    // Count total products
+    const totalCount = await db.product.count({ where: whereClause })
+
+    // Fetch products with relationships
+    const products = await db.product.findMany({
+      where: whereClause,
+      include: {
+        category: {
+          select: {
+            id: true,
+            name: true,
+            slug: true
+          }
         },
-        orderBy: [
-          { status: 'asc' },
-          { updatedAt: 'desc' }
-        ],
-        skip: (page - 1) * limit,
-        take: limit
-      }),
-      db.product.count({ where: whereConditions })
-    ])
+        country: {
+          select: {
+            id: true,
+            name: true,
+            currency: true,
+            currencySymbol: true
+          }
+        },
+        supplier: {
+          select: {
+            id: true,
+            name: true
+          }
+        }
+      },
+      orderBy: [
+        // Sort by status (Published first, then Draft, then Archived)
+        { status: 'asc' },
+        // Then by the requested sort field
+        { [sortBy]: sortOrder },
+        // Finally by creation date as tiebreaker
+        { createdAt: 'desc' }
+      ],
+      skip: (page - 1) * limit,
+      take: limit
+    })
 
     return NextResponse.json({
       products,
@@ -80,7 +144,7 @@ export async function POST(request: NextRequest) {
 
     const data = await request.json()
 
-    // Extract and validate required fields
+    // Extract and validate required fields (INCLUDING DISCOUNT FIELDS)
     const {
       sku,
       name,
@@ -102,6 +166,7 @@ export async function POST(request: NextRequest) {
       piecePriceUSD,
       profitMargin,
       discountPercentage,
+      showDiscountToCustomers, // 🎯 NEW: Discount visibility control
       sellingPriceUSD,
       stockQuantity,
       lowStockAlert,
@@ -113,7 +178,7 @@ export async function POST(request: NextRequest) {
       invoiceNumber,
       isActive,
       isFeatured,
-      // 🆕 Draft system fields
+      // Draft system fields
       status = 'DRAFT',
       publishedAt,
       publishedBy
@@ -127,23 +192,33 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // 🎯 NEW: Validate discount fields
+    if (discountPercentage && (discountPercentage < 0 || discountPercentage >= 100)) {
+      return NextResponse.json(
+        { error: 'Discount percentage must be between 0 and 99.99' },
+        { status: 400 }
+      )
+    }
+
     // Additional validation for publishing
     if (status === 'PUBLISHED') {
       const validationErrors = []
       if (!name?.trim()) validationErrors.push('Product name is required')
       if (!categoryId) validationErrors.push('Category must be selected')
+      if (!countryId) validationErrors.push('Country must be selected')
+      if (!supplierId) validationErrors.push('Supplier must be selected')
       if (!sellingPriceUSD || sellingPriceUSD <= 0) validationErrors.push('Selling price must be greater than 0')
       if (!images || images.length === 0) validationErrors.push('At least one product image is required')
 
       if (validationErrors.length > 0) {
         return NextResponse.json({
-          error: 'Cannot publish product',
+          error: 'Cannot publish product with validation errors',
           validationErrors
         }, { status: 400 })
       }
     }
 
-    // Prepare product data
+    // Prepare product data (INCLUDING DISCOUNT FIELDS)
     const productData = {
       sku,
       name,
@@ -154,20 +229,21 @@ export async function POST(request: NextRequest) {
       supplierId,
       barcode: barcode || '',
       barcodeType: barcodeType || 'CODE128',
-      originalPrice: originalPrice || 0,
+      originalPrice: parseFloat(originalPrice) || 0,
       originalCurrency: originalCurrency || 'INR',
-      quantity: quantity || 1,
-      gstPercentage: gstPercentage || 0,
-      shippingCost: shippingCost || 0,
-      conversionCharges: conversionCharges || 0,
-      additionalExpenses: additionalExpenses || 0,
-      costPriceUSD: costPriceUSD || 0,
-      piecePriceUSD: piecePriceUSD || 0,
-      profitMargin: profitMargin || 0,
-      discountPercentage: discountPercentage || 0,
-      sellingPriceUSD: sellingPriceUSD || 0,
-      stockQuantity: stockQuantity || 0,
-      lowStockAlert: lowStockAlert || 5,
+      quantity: parseInt(quantity) || 1,
+      gstPercentage: parseFloat(gstPercentage) || 0,
+      shippingCost: parseFloat(shippingCost) || 0,
+      conversionCharges: parseFloat(conversionCharges) || 0,
+      additionalExpenses: parseFloat(additionalExpenses) || 0,
+      costPriceUSD: parseFloat(costPriceUSD) || 0,
+      piecePriceUSD: parseFloat(piecePriceUSD) || 0,
+      profitMargin: parseFloat(profitMargin) || 0,
+      discountPercentage: parseFloat(discountPercentage) || 0,
+      showDiscountToCustomers: Boolean(showDiscountToCustomers), // 🎯 NEW FIELD
+      sellingPriceUSD: parseFloat(sellingPriceUSD) || 0,
+      stockQuantity: parseInt(stockQuantity) || 0,
+      lowStockAlert: parseInt(lowStockAlert) || 5,
       tags: tags || [],
       images: images || [],
       seoTitle: seoTitle || '',
@@ -176,9 +252,8 @@ export async function POST(request: NextRequest) {
       invoiceNumber: invoiceNumber || '',
       isActive: isActive ?? true,
       isFeatured: isFeatured ?? false,
-      // 🆕 Draft system fields
       status,
-      publishedAt: status === 'PUBLISHED' ? (publishedAt ? new Date(publishedAt) : new Date()) : null,
+      publishedAt: status === 'PUBLISHED' && !publishedAt ? new Date() : (publishedAt ? new Date(publishedAt) : null),
       publishedBy: status === 'PUBLISHED' ? session.user.id : null,
       lastEditedAt: new Date()
     }
@@ -220,199 +295,6 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
-  }
-}
-
-// src/app/api/admin/products/[id]/route.ts
-
-import { NextRequest, NextResponse } from 'next/server'
-import { getSession } from '@/lib/auth'
-import { db } from '@/lib/db'
-
-// GET /api/admin/products/[id]
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
-  try {
-    const session = await getSession()
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const product = await db.product.findUnique({
-      where: { id: params.id },
-      include: {
-        category: { select: { name: true } },
-        country: { select: { name: true, currency: true } },
-        supplier: { select: { name: true } }
-      }
-    })
-
-    if (!product) {
-      return NextResponse.json({ error: 'Product not found' }, { status: 404 })
-    }
-
-    return NextResponse.json({ product })
-
-  } catch (error) {
-    console.error('Error fetching product:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
-  }
-}
-
-// PUT /api/admin/products/[id] - Update product
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
-  try {
-    const session = await getSession()
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const data = await request.json()
-
-    // Check if product exists
-    const existingProduct = await db.product.findUnique({
-      where: { id: params.id },
-      select: { id: true, status: true, publishedAt: true }
-    })
-
-    if (!existingProduct) {
-      return NextResponse.json({ error: 'Product not found' }, { status: 404 })
-    }
-
-    const {
-      status,
-      publishedAt,
-      publishedBy,
-      ...productData
-    } = data
-
-    // Additional validation for publishing
-    if (status === 'PUBLISHED') {
-      const validationErrors = []
-      if (!data.name?.trim()) validationErrors.push('Product name is required')
-      if (!data.categoryId) validationErrors.push('Category must be selected')
-      if (!data.sellingPriceUSD || data.sellingPriceUSD <= 0) validationErrors.push('Selling price must be greater than 0')
-      if (!data.images || data.images.length === 0) validationErrors.push('At least one product image is required')
-
-      if (validationErrors.length > 0) {
-        return NextResponse.json({
-          error: 'Cannot publish product',
-          validationErrors
-        }, { status: 400 })
-      }
-    }
-
-    // Prepare update data
-    const updateData = {
-      ...productData,
-      status: status || existingProduct.status,
-      lastEditedAt: new Date(),
-      // Set publishedAt when first published
-      publishedAt: status === 'PUBLISHED' && !existingProduct.publishedAt 
-        ? new Date() 
-        : (publishedAt ? new Date(publishedAt) : existingProduct.publishedAt),
-      publishedBy: status === 'PUBLISHED' && !existingProduct.publishedAt 
-        ? session.user.id 
-        : publishedBy,
-      // Handle date fields
-      purchaseDate: productData.purchaseDate ? new Date(productData.purchaseDate) : null
-    }
-
-    // Update product
-    const product = await db.product.update({
-      where: { id: params.id },
-      data: updateData,
-      include: {
-        category: { select: { name: true } },
-        country: { select: { name: true, currency: true } },
-        supplier: { select: { name: true } }
-      }
-    })
-
-    const actionText = status === 'PUBLISHED' ? 'published' : 
-                     status === 'DRAFT' ? 'saved as draft' : 'updated'
-
-    console.log(`Product ${product.name} ${actionText} by user ${session.user.id}`)
-
-    return NextResponse.json({
-      success: true,
-      message: `Product ${actionText} successfully`,
-      product
-    })
-
-  } catch (error) {
-    console.error('Error updating product:', error)
-    
-    // Handle unique constraint violations
-    if (error instanceof Error && error.message.includes('Unique constraint')) {
-      if (error.message.includes('sku')) {
-        return NextResponse.json(
-          { error: 'A product with this SKU already exists' },
-          { status: 400 }
-        )
-      }
-      if (error.message.includes('barcode')) {
-        return NextResponse.json(
-          { error: 'A product with this barcode already exists' },
-          { status: 400 }
-        )
-      }
-    }
-
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
-  }
-}
-
-// DELETE /api/admin/products/[id]
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
-  try {
-    const session = await getSession()
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    // Check if product exists
-    const product = await db.product.findUnique({
-      where: { id: params.id },
-      select: { id: true, name: true }
-    })
-
-    if (!product) {
-      return NextResponse.json({ error: 'Product not found' }, { status: 404 })
-    }
-
-    // Delete product
-    await db.product.delete({
-      where: { id: params.id }
-    })
-
-    console.log(`Product ${product.name} deleted by user ${session.user.id}`)
-
-    return NextResponse.json({
-      success: true,
-      message: 'Product deleted successfully'
-    })
-
-  } catch (error) {
-    console.error('Error deleting product:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

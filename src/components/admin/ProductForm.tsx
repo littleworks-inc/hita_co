@@ -80,6 +80,10 @@ interface Product {
   profitMargin: number
   discountPercentage: number
   sellingPriceUSD: number
+  
+  // 🎯 NEW: Discount Visibility Control
+  showDiscountToCustomers: boolean
+  
   stockQuantity: number
   lowStockAlert: number
   isActive: boolean
@@ -88,7 +92,6 @@ interface Product {
   images: string[]
   seoTitle?: string
   seoDescription?: string
-  // ✅ ADDED: Draft system fields
   status?: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED'
   publishedAt?: string | null
   archivedAt?: string | null
@@ -159,7 +162,10 @@ export default function ProductForm({ categories, countries, suppliers, product,
     // ✅ ADDED: Draft system initialization
     status: product?.status || 'DRAFT',
     publishedAt: product?.publishedAt || null,
-    archivedAt: product?.archivedAt || null
+    archivedAt: product?.archivedAt || null,
+    discountPercentage: product?.discountPercentage || 0,
+    showDiscountToCustomers: product?.showDiscountToCustomers ?? false, // NEW FIELD
+    sellingPriceUSD: product?.sellingPriceUSD || 0,
   })
 
   // Get selected country for exchange rate
