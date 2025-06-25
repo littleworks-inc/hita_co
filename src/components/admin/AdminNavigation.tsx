@@ -1,10 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter, usePathname } from 'next/navigation'
 import { Button } from '@/components/ui'
-import ThemeToggle from '@/components/ThemeToggle' // ✅ NEW - Theme toggle for admin
+import ThemeToggle from '@/components/ThemeToggle'
 import {
   LayoutDashboard,
   Package,
@@ -34,10 +34,47 @@ const navigation = [
   { name: 'Settings', href: '/admin/settings', icon: Settings },
 ]
 
+interface StoreSettings {
+  storeName: string
+  logo?: string | null
+  primaryColor?: string
+}
+
 export default function AdminNavigation() {
   const router = useRouter()
   const pathname = usePathname()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [storeSettings, setStoreSettings] = useState<StoreSettings>({
+    storeName: 'LittleWorks Inc', // Default company name
+    primaryColor: '#1f2937'
+  })
+  const [isLoading, setIsLoading] = useState(true)
+
+  // Fetch store settings on component mount
+  useEffect(() => {
+    const fetchStoreSettings = async () => {
+      try {
+        const response = await fetch('/api/admin/settings')
+        if (response.ok) {
+          const data = await response.json()
+          if (data.success && data.storeSettings) {
+            setStoreSettings({
+              storeName: data.storeSettings.storeName || 'LittleWorks Inc',
+              logo: data.storeSettings.logo,
+              primaryColor: data.storeSettings.primaryColor || '#1f2937'
+            })
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch store settings:', error)
+        // Keep default values on error
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchStoreSettings()
+  }, [])
 
   const handleLogout = async () => {
     try {
@@ -51,16 +88,53 @@ export default function AdminNavigation() {
     }
   }
 
+  // Generate company initials for logo fallback
+  const getCompanyInitials = (name: string) => {
+    return name
+      .split(' ')
+      .map(word => word.charAt(0))
+      .join('')
+      .substring(0, 2)
+      .toUpperCase()
+  }
+
   return (
     <>
       {/* Desktop Sidebar */}
       <div className="hidden lg:fixed lg:inset-y-0 lg:flex lg:w-64 lg:flex-col">
         <div className="flex min-h-0 flex-1 flex-col bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700 transition-colors duration-300">
           <div className="flex flex-1 flex-col overflow-y-auto pt-5 pb-4">
-            {/* Header with Theme Toggle */}
+            {/* Dynamic Header with Store Name */}
             <div className="flex flex-shrink-0 items-center justify-between px-4">
-              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Hita&Co</h1>
-              {/* ✅ NEW - Theme toggle in admin sidebar */}
+              <div className="flex items-center gap-3">
+                {/* Logo or Initials */}
+                {storeSettings.logo ? (
+                  <img
+                    src={storeSettings.logo}
+                    alt={storeSettings.storeName}
+                    className="h-8 w-8 rounded object-cover"
+                  />
+                ) : (
+                  <div 
+                    className="w-8 h-8 rounded flex items-center justify-center text-white font-bold text-sm"
+                    style={{ backgroundColor: storeSettings.primaryColor }}
+                  >
+                    {getCompanyInitials(storeSettings.storeName)}
+                  </div>
+                )}
+                
+                {/* Company Name */}
+                <div>
+                  <h1 className="text-lg font-bold text-gray-900 dark:text-white">
+                    {isLoading ? 'Loading...' : storeSettings.storeName}
+                  </h1>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    Admin Panel
+                  </p>
+                </div>
+              </div>
+              
+              {/* Theme Toggle */}
               <ThemeToggle size="sm" />
             </div>
             
@@ -110,9 +184,30 @@ export default function AdminNavigation() {
       <div className="lg:hidden">
         {/* Mobile menu bar */}
         <div className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 px-4 py-2 flex items-center justify-between transition-colors duration-300">
-          <h1 className="text-xl font-bold text-gray-900 dark:text-white">Hita&Co</h1>
+          <div className="flex items-center gap-3">
+            {/* Mobile Logo/Initials */}
+            {storeSettings.logo ? (
+              <img
+                src={storeSettings.logo}
+                alt={storeSettings.storeName}
+                className="h-6 w-6 rounded object-cover"
+              />
+            ) : (
+              <div 
+                className="w-6 h-6 rounded flex items-center justify-center text-white font-bold text-xs"
+                style={{ backgroundColor: storeSettings.primaryColor }}
+              >
+                {getCompanyInitials(storeSettings.storeName)}
+              </div>
+            )}
+            
+            <h1 className="text-lg font-bold text-gray-900 dark:text-white">
+              {isLoading ? 'Loading...' : storeSettings.storeName}
+            </h1>
+          </div>
+          
           <div className="flex items-center gap-2">
-            {/* ✅ NEW - Mobile theme toggle */}
+            {/* Mobile theme toggle */}
             <ThemeToggle size="sm" showTooltip={false} />
             <Button
               variant="ghost"
@@ -146,7 +241,32 @@ export default function AdminNavigation() {
               
               {/* Mobile menu header */}
               <div className="flex flex-shrink-0 items-center justify-between px-4 py-4 border-b border-gray-200 dark:border-gray-700">
-                <h1 className="text-xl font-bold text-gray-900 dark:text-white">Hita&Co Admin</h1>
+                <div className="flex items-center gap-3">
+                  {/* Mobile menu logo */}
+                  {storeSettings.logo ? (
+                    <img
+                      src={storeSettings.logo}
+                      alt={storeSettings.storeName}
+                      className="h-6 w-6 rounded object-cover"
+                    />
+                  ) : (
+                    <div 
+                      className="w-6 h-6 rounded flex items-center justify-center text-white font-bold text-xs"
+                      style={{ backgroundColor: storeSettings.primaryColor }}
+                    >
+                      {getCompanyInitials(storeSettings.storeName)}
+                    </div>
+                  )}
+                  
+                  <div>
+                    <h1 className="text-sm font-bold text-gray-900 dark:text-white">
+                      {isLoading ? 'Loading...' : storeSettings.storeName}
+                    </h1>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      Admin Panel
+                    </p>
+                  </div>
+                </div>
                 <ThemeToggle size="sm" />
               </div>
               
@@ -179,18 +299,6 @@ export default function AdminNavigation() {
                     )
                   })}
                 </nav>
-              </div>
-              
-              {/* Mobile logout */}
-              <div className="flex flex-shrink-0 border-t border-gray-200 dark:border-gray-700 p-4">
-                <Button
-                  onClick={handleLogout}
-                  variant="ghost"
-                  className="w-full justify-start text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-800"
-                >
-                  <LogOut className="mr-3 h-5 w-5" />
-                  Sign out
-                </Button>
               </div>
             </div>
           </div>

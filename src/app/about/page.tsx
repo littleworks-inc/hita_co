@@ -1,3 +1,4 @@
+// src/app/about/page.tsx
 import Link from 'next/link'
 import { db } from '@/lib/db'
 import {
@@ -13,7 +14,10 @@ import {
   Search,
   Menu,
   User,
-  Package
+  Package,
+  Target,
+  Shield,
+  Zap
 } from 'lucide-react'
 
 // Get store settings for dynamic content
@@ -31,15 +35,15 @@ async function getStoreSettings() {
 // Generate dynamic metadata
 export async function generateMetadata() {
   const storeSettings = await getStoreSettings()
-  const storeName = storeSettings?.storeName || 'Hita&Co'
-  const tagline = storeSettings?.tagline || 'Authentic Indian Ethnic Wear & Lifestyle'
+  const storeName = storeSettings?.storeName || 'LittleWorks Inc'
+  const tagline = storeSettings?.tagline || 'Building Digital Solutions'
   
   return {
     title: `About Us - ${storeName}`,
-    description: `Learn about ${storeName} - ${tagline}. Discover our story, mission, and commitment to bringing you authentic handcrafted Indian products.`,
+    description: `Learn about ${storeName} - ${tagline}. Discover our story, mission, and commitment to delivering exceptional digital solutions.`,
     openGraph: {
       title: `About ${storeName}`,
-      description: `Learn about our story, mission, and commitment to authentic Indian craftsmanship.`,
+      description: `Learn about our story, mission, and commitment to excellence.`,
       type: 'website'
     }
   }
@@ -47,9 +51,9 @@ export async function generateMetadata() {
 
 // Dynamic Navigation Component
 function DynamicNavigation({ storeSettings }: { storeSettings: any }) {
-  const storeName = storeSettings?.storeName || 'Hita&Co'
-  const tagline = storeSettings?.tagline || 'Authentic Indian Ethnic Wear'
-  const primaryColor = storeSettings?.primaryColor || '#7c3aed'
+  const storeName = storeSettings?.storeName || 'LittleWorks Inc'
+  const tagline = storeSettings?.tagline || 'Building Digital Solutions'
+  const primaryColor = storeSettings?.primaryColor || '#1f2937'
   const accentColor = storeSettings?.accentColor || '#f59e0b'
   const logo = storeSettings?.logo
 
@@ -63,7 +67,7 @@ function DynamicNavigation({ storeSettings }: { storeSettings: any }) {
         }}
       >
         <p className="text-sm font-medium">
-          ✨ Free shipping on orders over $100 | Authentic handcrafted products
+          ✨ Professional services and solutions | Contact us for consultation
         </p>
       </div>
 
@@ -73,63 +77,41 @@ function DynamicNavigation({ storeSettings }: { storeSettings: any }) {
             <div className="flex items-center">
               <Link href="/" className="flex items-center space-x-3">
                 {logo ? (
-                  <img 
-                    src={logo} 
-                    alt={storeName} 
-                    className="w-10 h-10 object-contain rounded-full"
+                  <img
+                    src={logo}
+                    alt={storeName}
+                    className="h-8 w-auto"
                   />
                 ) : (
                   <div 
-                    className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-lg"
+                    className="w-8 h-8 rounded flex items-center justify-center text-white font-bold text-sm"
                     style={{ backgroundColor: primaryColor }}
                   >
-                    {storeName.charAt(0)}
+                    {storeName.split(' ').map(word => word.charAt(0)).join('').substring(0, 2)}
                   </div>
                 )}
                 <div>
                   <h1 className="text-xl font-bold text-gray-900">{storeName}</h1>
-                  <p className="text-xs text-gray-500">{tagline}</p>
+                  <p className="text-xs text-gray-600">{tagline}</p>
                 </div>
               </Link>
             </div>
 
-            <div className="hidden md:flex items-center space-x-8">
-              <Link href="/" className="text-sm font-medium text-gray-700 hover:text-purple-600">
-                Home
-              </Link>
-              <Link href="/products" className="text-sm font-medium text-gray-700 hover:text-purple-600">
-                Products
-              </Link>
-              <Link href="/categories" className="text-sm font-medium text-gray-700 hover:text-purple-600">
-                Categories
-              </Link>
-              <Link 
-                href="/about" 
-                className="text-sm font-medium border-b-2"
-                style={{ 
-                  color: primaryColor, 
-                  borderColor: primaryColor 
-                }}
-              >
-                About
-              </Link>
-              <Link href="/contact" className="text-sm font-medium text-gray-700 hover:text-purple-600">
-                Contact
-              </Link>
+            {/* Navigation Links */}
+            <div className="hidden md:flex space-x-8">
+              <Link href="/" className="text-gray-700 hover:text-purple-600">Home</Link>
+              <Link href="/products" className="text-gray-700 hover:text-purple-600">Products</Link>
+              <Link href="/about" className="text-purple-600 font-medium">About</Link>
+              <Link href="/contact" className="text-gray-700 hover:text-purple-600">Contact</Link>
             </div>
 
+            {/* Action buttons */}
             <div className="flex items-center space-x-4">
-              <Search className="h-6 w-6 text-gray-700 hover:text-purple-600 cursor-pointer" />
+              <Search className="h-5 w-5 text-gray-600 hover:text-purple-600 cursor-pointer" />
               <div className="relative">
-                <Heart className="h-6 w-6 text-gray-700 hover:text-red-500 cursor-pointer" />
-                <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                  0
-                </span>
-              </div>
-              <div className="relative">
-                <Package className="h-6 w-6 text-gray-700 hover:text-purple-600 cursor-pointer" />
+                <ShoppingBag className="h-6 w-6 text-gray-700 hover:text-purple-600 cursor-pointer" />
                 <span 
-                  className="absolute -top-2 -right-2 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center"
+                  className="absolute -top-2 -right-2 h-4 w-4 rounded-full text-xs font-bold text-white flex items-center justify-center"
                   style={{ backgroundColor: primaryColor }}
                 >
                   0
@@ -144,18 +126,18 @@ function DynamicNavigation({ storeSettings }: { storeSettings: any }) {
   )
 }
 
-// Dynamic Hero Section
+// About Hero Section
 function AboutHero({ storeSettings }: { storeSettings: any }) {
-  const storeName = storeSettings?.storeName || 'Hita&Co'
-  const tagline = storeSettings?.tagline || 'Authentic Indian Ethnic Wear & Lifestyle'
-  const primaryColor = storeSettings?.primaryColor || '#7c3aed'
+  const storeName = storeSettings?.storeName || 'LittleWorks Inc'
+  const tagline = storeSettings?.tagline || 'Building Digital Solutions'
+  const primaryColor = storeSettings?.primaryColor || '#1f2937'
   const accentColor = storeSettings?.accentColor || '#f59e0b'
 
   return (
-    <section className="relative bg-gradient-to-br from-purple-50 to-pink-50 py-20">
-      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center">
-          <h1 className="text-4xl md:text-6xl font-bold text-gray-900 mb-6">
+    <section className="bg-gradient-to-br from-gray-50 to-blue-50 py-16">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="text-center mb-12">
+          <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-6">
             About{' '}
             <span 
               className="bg-clip-text text-transparent"
@@ -168,16 +150,16 @@ function AboutHero({ storeSettings }: { storeSettings: any }) {
               {storeName}
             </span>
           </h1>
-          <p className="text-xl md:text-2xl text-gray-600 mb-8 max-w-3xl mx-auto">
-            {tagline}
+          <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
+            {tagline} - We are passionate about bringing you exceptional products and creating amazing shopping experiences.
           </p>
           <div 
             className="flex items-center justify-center gap-2"
             style={{ color: primaryColor }}
           >
-            <Sparkles className="h-5 w-5" />
-            <span className="text-sm font-medium">Celebrating Indian Heritage Since 2020</span>
-            <Sparkles className="h-5 w-5" />
+            <Star className="h-5 w-5" />
+            <span className="text-sm font-medium">Excellence in every project</span>
+            <Star className="h-5 w-5" />
           </div>
         </div>
       </div>
@@ -185,46 +167,11 @@ function AboutHero({ storeSettings }: { storeSettings: any }) {
   )
 }
 
-// Dynamic Call to Action Section
-function CallToActionSection({ storeSettings }: { storeSettings: any }) {
-  const primaryColor = storeSettings?.primaryColor || '#7c3aed'
-  const accentColor = storeSettings?.accentColor || '#f59e0b'
+// Our Story Section
+function OurStorySection({ storeSettings }: { storeSettings: any }) {
+  const storeName = storeSettings?.storeName || 'LittleWorks Inc'
+  const primaryColor = storeSettings?.primaryColor || '#1f2937'
 
-  return (
-    <section className="py-16 bg-gray-900 text-white">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-        <h2 className="text-3xl md:text-4xl font-bold mb-4">
-          Ready to Explore Authentic Indian Craftsmanship?
-        </h2>
-        <p className="text-xl text-gray-300 mb-8 max-w-2xl mx-auto">
-          Join thousands of customers worldwide who trust us for authentic, handcrafted Indian products.
-        </p>
-        <div className="flex flex-col sm:flex-row gap-4 justify-center">
-          <Link
-            href="/products"
-            className="inline-flex items-center gap-2 text-white px-8 py-3 rounded-full font-semibold transition-colors"
-            style={{ 
-              background: `linear-gradient(to right, ${primaryColor}, ${accentColor})` 
-            }}
-          >
-            <ShoppingBag className="h-5 w-5" />
-            Shop Now
-          </Link>
-          <Link
-            href="/contact"
-            className="inline-flex items-center gap-2 border border-white text-white px-8 py-3 rounded-full font-semibold hover:bg-white hover:text-gray-900 transition-colors"
-          >
-            <Heart className="h-5 w-5" />
-            Get in Touch
-          </Link>
-        </div>
-      </div>
-    </section>
-  )
-}
-
-// Static sections (can be made dynamic later)
-function OurStorySection() {
   return (
     <section className="py-16 bg-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -235,29 +182,29 @@ function OurStorySection() {
             </h2>
             <div className="space-y-4 text-gray-600 leading-relaxed">
               <p>
-                Founded with a deep passion for Indian heritage and craftsmanship, our journey began as a 
-                vision to bridge the gap between traditional artisans and modern consumers who appreciate 
-                authentic, handcrafted products.
+                {storeName} was founded with a passion for bringing exceptional products directly to our customers. 
+                We believe that everyone deserves access to high-quality, authentic products that enhance their 
+                lifestyle and bring joy to their everyday experiences.
               </p>
               <p>
-                Our story started when our founder discovered the incredible talent of local artisans 
-                across India – from the skilled weavers of Rajasthan to the jewelry makers of Gujarat. 
-                These craftspeople carry forward centuries-old traditions, creating pieces that tell 
-                stories of culture, heritage, and timeless beauty.
+                What started as a small vision has grown into a trusted online destination where quality meets 
+                convenience. We carefully curate our product selection, working directly with trusted suppliers 
+                and artisans to ensure that every item in our store meets our high standards.
               </p>
               <p>
-                Today, we proudly serve customers worldwide, bringing them not just products, but pieces 
-                of India's rich cultural tapestry. Every item in our collection is carefully curated to 
-                ensure authenticity, quality, and the preservation of traditional craftsmanship.
+                Our commitment goes beyond just selling products – we're dedicated to creating an exceptional 
+                shopping experience, providing outstanding customer service, and building lasting relationships 
+                with our customers around the world.
               </p>
             </div>
           </div>
           <div className="relative">
-            <div className="bg-gradient-to-br from-orange-100 to-red-100 flex items-center justify-center h-96 rounded-2xl shadow-xl">
-              <div className="text-center">
-                <Heart className="h-16 w-16 text-red-500 mx-auto mb-4" />
-                <p className="text-gray-600 font-medium">Crafted with Love</p>
-                <p className="text-sm text-gray-500">Traditional Heritage</p>
+            <div className="aspect-w-4 aspect-h-3 rounded-lg overflow-hidden bg-gray-100">
+              <div 
+                className="w-full h-full flex items-center justify-center text-white text-6xl font-bold"
+                style={{ backgroundColor: primaryColor }}
+              >
+                {storeName.split(' ').map(word => word.charAt(0)).join('')}
               </div>
             </div>
           </div>
@@ -267,29 +214,30 @@ function OurStorySection() {
   )
 }
 
+// Mission & Values Section
 function MissionValuesSection({ storeSettings }: { storeSettings: any }) {
-  const primaryColor = storeSettings?.primaryColor || '#7c3aed'
+  const primaryColor = storeSettings?.primaryColor || '#1f2937'
 
   const values = [
     {
-      icon: Star,
-      title: 'Authentic Craftsmanship',
-      description: 'We partner directly with skilled artisans to bring you genuine, handcrafted products that preserve traditional techniques.'
+      icon: Target,
+      title: 'Quality First',
+      description: 'We carefully select each product to ensure it meets our high standards for quality, authenticity, and value.'
     },
     {
-      icon: Globe,
-      title: 'Global Accessibility',
-      description: 'Making authentic Indian products accessible to customers worldwide with seamless shopping and international shipping.'
+      icon: Users,
+      title: 'Customer Focus',
+      description: 'Our customers are at the heart of everything we do. We listen, we care, and we deliver exceptional service.'
     },
     {
-      icon: Heart,
-      title: 'Cultural Preservation',
-      description: 'Supporting traditional craftspeople and helping preserve centuries-old techniques for future generations.'
+      icon: Shield,
+      title: 'Trust & Security',
+      description: 'Shop with confidence knowing your personal information and payments are protected with industry-leading security.'
     },
     {
-      icon: Award,
-      title: 'Quality Excellence',
-      description: 'Every product is carefully inspected and curated to meet our high standards of quality and authenticity.'
+      icon: Zap,
+      title: 'Fast & Reliable',
+      description: 'Quick processing, fast shipping, and reliable delivery ensure you get your products when you need them.'
     }
   ]
 
@@ -301,8 +249,7 @@ function MissionValuesSection({ storeSettings }: { storeSettings: any }) {
             Our Mission & Values
           </h2>
           <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-            We're committed to celebrating Indian heritage while supporting artisan communities 
-            and bringing authentic products to customers around the world.
+            We're committed to providing an exceptional online shopping experience built on trust, quality, and customer satisfaction.
           </p>
         </div>
 
@@ -310,17 +257,17 @@ function MissionValuesSection({ storeSettings }: { storeSettings: any }) {
           {values.map((value, index) => {
             const Icon = value.icon
             return (
-              <div key={index} className="bg-white rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow">
+              <div key={index} className="text-center">
                 <div 
-                  className="flex items-center justify-center w-12 h-12 rounded-lg mb-4"
-                  style={{ backgroundColor: `${primaryColor}20` }}
+                  className="inline-flex items-center justify-center w-16 h-16 rounded-full text-white mb-4"
+                  style={{ backgroundColor: primaryColor }}
                 >
-                  <Icon className="h-6 w-6" style={{ color: primaryColor }} />
+                  <Icon className="h-8 w-8" />
                 </div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">
                   {value.title}
                 </h3>
-                <p className="text-gray-600 text-sm leading-relaxed">
+                <p className="text-gray-600 text-sm">
                   {value.description}
                 </p>
               </div>
@@ -332,16 +279,31 @@ function MissionValuesSection({ storeSettings }: { storeSettings: any }) {
   )
 }
 
-function CategoriesShowcase({ storeSettings }: { storeSettings: any }) {
-  const primaryColor = storeSettings?.primaryColor || '#7c3aed'
+// Services Overview Section
+function ServicesOverview({ storeSettings }: { storeSettings: any }) {
+  const primaryColor = storeSettings?.primaryColor || '#1f2937'
 
-  const categories = [
-    { name: 'Ethnic Clothing', description: 'Traditional sarees, lehengas, and kurtis', icon: '👗' },
-    { name: 'Handcrafted Jewelry', description: 'Authentic silver and traditional designs', icon: '💎' },
-    { name: 'Natural Cosmetics', description: 'Ayurvedic and herbal beauty products', icon: '🌿' },
-    { name: 'Artisan Soaps', description: 'Handmade natural and organic soaps', icon: '🧼' },
-    { name: 'Home Decor', description: 'Traditional decorative items and crafts', icon: '🏺' },
-    { name: 'Accessories', description: 'Bags, scarves, and ethnic accessories', icon: '👜' }
+  const features = [
+    {
+      icon: Globe,
+      title: 'Worldwide Shipping',
+      description: 'We deliver to customers around the world with reliable shipping partners and tracking.'
+    },
+    {
+      icon: Package,
+      title: 'Curated Selection',
+      description: 'Every product is hand-picked and carefully vetted to ensure quality and authenticity.'
+    },
+    {
+      icon: Sparkles,
+      title: 'Exclusive Products',
+      description: 'Discover unique items and limited editions that you won\'t find in traditional stores.'
+    },
+    {
+      icon: Award,
+      title: 'Customer Support',
+      description: 'Our dedicated support team is here to help with questions, orders, and returns.'
+    }
   ]
 
   return (
@@ -349,85 +311,79 @@ function CategoriesShowcase({ storeSettings }: { storeSettings: any }) {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-12">
           <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
-            What We Offer
+            Why Shop With Us
           </h2>
           <p className="text-xl text-gray-600">
-            Discover our curated collection of authentic Indian products
+            We're committed to making your shopping experience exceptional from browsing to delivery.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {categories.map((category, index) => (
-            <div key={index} className="group bg-gray-50 rounded-xl p-6 hover:bg-purple-50 transition-colors">
-              <div className="text-4xl mb-4">{category.icon}</div>
-              <h3 
-                className="text-lg font-semibold text-gray-900 mb-2 group-hover:transition-colors"
-                style={{ color: 'inherit' }}
-                onMouseEnter={(e) => e.currentTarget.style.color = primaryColor}
-                onMouseLeave={(e) => e.currentTarget.style.color = 'inherit'}
-              >
-                {category.name}
-              </h3>
-              <p className="text-gray-600 text-sm">
-                {category.description}
-              </p>
-            </div>
-          ))}
-        </div>
-
-        <div className="text-center mt-12">
-          <Link
-            href="/products"
-            className="inline-flex items-center gap-2 text-white px-8 py-3 rounded-full font-semibold transition-colors"
-            style={{ 
-              background: `linear-gradient(to right, ${primaryColor}, ${storeSettings?.accentColor || '#f59e0b'})` 
-            }}
-          >
-            <ShoppingBag className="h-5 w-5" />
-            Explore Our Products
-            <ArrowRight className="h-4 w-4" />
-          </Link>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          {features.map((feature, index) => {
+            const Icon = feature.icon
+            return (
+              <div key={index} className="p-6 bg-gray-50 rounded-xl hover:shadow-lg transition-shadow">
+                <div className="flex items-start space-x-4">
+                  <div 
+                    className="flex-shrink-0 w-12 h-12 rounded-lg flex items-center justify-center text-white"
+                    style={{ backgroundColor: primaryColor }}
+                  >
+                    <Icon className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                      {feature.title}
+                    </h3>
+                    <p className="text-gray-600">
+                      {feature.description}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )
+          })}
         </div>
       </div>
     </section>
   )
 }
 
+// Why Choose Us Section
 function WhyChooseUsSection({ storeSettings }: { storeSettings: any }) {
-  const primaryColor = storeSettings?.primaryColor || '#7c3aed'
+  const primaryColor = storeSettings?.primaryColor || '#1f2937'
 
   const reasons = [
     {
       icon: CheckCircle,
-      title: 'Authentic Products',
-      description: 'Every item is sourced directly from skilled artisans and verified for authenticity.'
-    },
-    {
-      icon: Globe,
-      title: 'Worldwide Shipping',
-      description: 'We ship internationally with secure packaging and tracking for all orders.'
+      title: 'Trusted by Thousands',
+      description: 'Join thousands of satisfied customers who trust us for quality products and excellent service.'
     },
     {
       icon: Users,
-      title: 'Supporting Artisans',
-      description: 'Your purchase directly supports traditional craftspeople and their communities.'
+      title: 'Expert Curation',
+      description: 'Our team carefully selects each product to ensure it meets our standards for quality and value.'
+    },
+    {
+      icon: Heart,
+      title: 'Customer First',
+      description: 'Your satisfaction is our priority. We go above and beyond to ensure you love your purchase.'
     },
     {
       icon: Star,
-      title: 'Customer Satisfaction',
-      description: 'Thousands of happy customers worldwide trust us for quality and service.'
+      title: 'Quality Guarantee',
+      description: 'Shop with confidence knowing that every product comes with our quality guarantee and easy returns.'
     }
   ]
 
   return (
-    <section className="py-16 bg-gradient-to-br from-purple-50 to-pink-50">
+    <section className="py-16 bg-gradient-to-br from-gray-50 to-blue-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-12">
           <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
             Why Choose Us?
           </h2>
           <p className="text-xl text-gray-600">
-            Experience the difference of authentic craftsmanship and exceptional service
+            Experience the difference of shopping with a store that truly cares about your satisfaction.
           </p>
         </div>
 
@@ -454,26 +410,68 @@ function WhyChooseUsSection({ storeSettings }: { storeSettings: any }) {
   )
 }
 
+// Call to Action Section
+function CallToActionSection({ storeSettings }: { storeSettings: any }) {
+  const storeName = storeSettings?.storeName || 'LittleWorks Inc'
+  const primaryColor = storeSettings?.primaryColor || '#1f2937'
+  const accentColor = storeSettings?.accentColor || '#f59e0b'
+
+  return (
+    <section className="py-16 bg-gray-900 text-white">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+        <h2 className="text-3xl md:text-4xl font-bold mb-4">
+          Ready to Start Shopping?
+        </h2>
+        <p className="text-xl text-gray-300 mb-8 max-w-2xl mx-auto">
+          Discover our curated collection of quality products and experience the {storeName} difference today.
+        </p>
+        <div className="flex flex-col sm:flex-row gap-4 justify-center">
+          <Link
+            href="/products"
+            className="inline-flex items-center gap-2 text-white px-8 py-3 rounded-full font-semibold transition-colors"
+            style={{ 
+              background: `linear-gradient(to right, ${primaryColor}, ${accentColor})` 
+            }}
+          >
+            <Heart className="h-5 w-5" />
+            Browse Products
+            <ArrowRight className="h-4 w-4" />
+          </Link>
+          <Link
+            href="/contact"
+            className="inline-flex items-center gap-2 border border-white text-white px-8 py-3 rounded-full font-semibold hover:bg-white hover:text-gray-900 transition-colors"
+          >
+            <Package className="h-5 w-5" />
+            Contact Us
+          </Link>
+        </div>
+      </div>
+    </section>
+  )
+}
+
 // Main About Page Component
 export default async function AboutPage() {
   const storeSettings = await getStoreSettings()
+  const storeName = storeSettings?.storeName || 'LittleWorks Inc'
+  const tagline = storeSettings?.tagline || 'Building Digital Solutions'
 
   // Structured data for SEO
   const structuredData = {
     '@context': 'https://schema.org',
     '@type': 'AboutPage',
-    name: `About ${storeSettings?.storeName || 'Hita&Co'}`,
-    description: `Learn about ${storeSettings?.storeName || 'Hita&Co'} - ${storeSettings?.tagline || 'Authentic Indian Ethnic Wear & Lifestyle'}`,
+    name: `About ${storeName}`,
+    description: `Learn about ${storeName} - ${tagline}`,
     url: `${process.env.NEXT_PUBLIC_APP_URL}/about`,
     mainEntity: {
       '@type': 'Organization',
-      name: storeSettings?.storeName || 'Hita&Co',
-      description: storeSettings?.tagline || 'Authentic Indian Ethnic Wear & Lifestyle',
+      name: storeName,
+      description: tagline,
       url: process.env.NEXT_PUBLIC_APP_URL,
       logo: storeSettings?.logo,
       contactPoint: {
         '@type': 'ContactPoint',
-        email: storeSettings?.email,
+        email: storeSettings?.email || 'contact@littleworks.inc',
         telephone: storeSettings?.phone,
         contactType: 'customer service'
       }
@@ -496,9 +494,9 @@ export default async function AboutPage() {
       {/* Page Content */}
       <main>
         <AboutHero storeSettings={storeSettings} />
-        <OurStorySection />
+        <OurStorySection storeSettings={storeSettings} />
         <MissionValuesSection storeSettings={storeSettings} />
-        <CategoriesShowcase storeSettings={storeSettings} />
+        <ServicesOverview storeSettings={storeSettings} />
         <WhyChooseUsSection storeSettings={storeSettings} />
         <CallToActionSection storeSettings={storeSettings} />
       </main>
