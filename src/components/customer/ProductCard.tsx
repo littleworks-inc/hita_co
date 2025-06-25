@@ -7,6 +7,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { useCurrency } from '@/contexts/CurrencyContext'
 import { formatPrice } from '@/lib/utils'
+import AddToCartButton from '@/components/cart/AddToCartButton'
 import {
   Heart,
   Package,
@@ -203,23 +204,22 @@ export default function ProductCard({ product, className = '' }: ProductCardProp
           )}
         </div>
 
-        {/* Add to Cart Button */}
-        <button
-          onClick={(e) => {
-            e.preventDefault()
-            // TODO: Add to cart functionality
-            console.log('Add to cart:', product.id)
+        {/* ✅ FIXED: Functional Add to Cart Button */}
+        <AddToCartButton 
+          product={{
+            id: product.id,
+            sku: product.id, // Using ID as SKU fallback
+            name: product.name,
+            sellingPriceUSD: discountedPrice, // Use the actual price customer pays
+            stockQuantity: product.stockQuantity,
+            images: product.images,
+            category: product.category,
+            country: product.country
           }}
+          variant="default"
+          className="w-full"
           disabled={isOutOfStock}
-          className={`w-full py-2 px-4 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 ${
-            isOutOfStock
-              ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-              : 'bg-purple-600 text-white hover:bg-purple-700'
-          }`}
-        >
-          <ShoppingCart className="h-4 w-4" />
-          {isOutOfStock ? 'Out of Stock' : 'Add to Cart'}
-        </button>
+        />
       </div>
     </div>
   )
