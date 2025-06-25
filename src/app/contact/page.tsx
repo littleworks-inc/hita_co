@@ -1,3 +1,4 @@
+// src/app/contact/page.tsx
 import Link from 'next/link'
 import { db } from '@/lib/db'
 import {
@@ -19,7 +20,8 @@ import {
   Package,
   CreditCard,
   Search,
-  User
+  User,
+  ShoppingBag
 } from 'lucide-react'
 
 // Get store settings for dynamic content
@@ -37,11 +39,11 @@ async function getStoreSettings() {
 // Generate dynamic metadata
 export async function generateMetadata() {
   const storeSettings = await getStoreSettings()
-  const storeName = storeSettings?.storeName || 'Hita&Co'
+  const storeName = storeSettings?.storeName || 'LittleWorks Inc' // Updated default
   
   return {
     title: `Contact Us - ${storeName}`,
-    description: `Get in touch with ${storeName}. We're here to help with your questions about our authentic Indian products, orders, and customer service.`,
+    description: `Get in touch with ${storeName}. We're here to help with your questions and provide excellent customer service.`,
     openGraph: {
       title: `Contact ${storeName}`,
       description: `Get in touch with us. We're here to help with your questions and provide excellent customer service.`,
@@ -52,9 +54,9 @@ export async function generateMetadata() {
 
 // Dynamic Navigation Component
 function DynamicNavigation({ storeSettings }: { storeSettings: any }) {
-  const storeName = storeSettings?.storeName || 'Hita&Co'
-  const tagline = storeSettings?.tagline || 'Authentic Indian Ethnic Wear'
-  const primaryColor = storeSettings?.primaryColor || '#7c3aed'
+  const storeName = storeSettings?.storeName || 'LittleWorks Inc' // Updated default
+  const tagline = storeSettings?.tagline || 'Building Digital Solutions' // Updated default
+  const primaryColor = storeSettings?.primaryColor || '#1f2937' // Updated default
   const logo = storeSettings?.logo
 
   return (
@@ -67,7 +69,7 @@ function DynamicNavigation({ storeSettings }: { storeSettings: any }) {
         }}
       >
         <p className="text-sm font-medium">
-          ✨ Free shipping on orders over $100 | Authentic handcrafted products
+          ✨ Free shipping on orders over $100 | Quality products delivered worldwide
         </p>
       </div>
 
@@ -77,63 +79,41 @@ function DynamicNavigation({ storeSettings }: { storeSettings: any }) {
             <div className="flex items-center">
               <Link href="/" className="flex items-center space-x-3">
                 {logo ? (
-                  <img 
-                    src={logo} 
-                    alt={storeName} 
-                    className="w-10 h-10 object-contain rounded-full"
+                  <img
+                    src={logo}
+                    alt={storeName}
+                    className="h-8 w-auto"
                   />
                 ) : (
                   <div 
-                    className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-lg"
+                    className="w-8 h-8 rounded flex items-center justify-center text-white font-bold text-sm"
                     style={{ backgroundColor: primaryColor }}
                   >
-                    {storeName.charAt(0)}
+                    {storeName.split(' ').map(word => word.charAt(0)).join('').substring(0, 2)}
                   </div>
                 )}
                 <div>
                   <h1 className="text-xl font-bold text-gray-900">{storeName}</h1>
-                  <p className="text-xs text-gray-500">{tagline}</p>
+                  <p className="text-xs text-gray-600">{tagline}</p>
                 </div>
               </Link>
             </div>
 
-            <div className="hidden md:flex items-center space-x-8">
-              <Link href="/" className="text-sm font-medium text-gray-700 hover:text-purple-600">
-                Home
-              </Link>
-              <Link href="/products" className="text-sm font-medium text-gray-700 hover:text-purple-600">
-                Products
-              </Link>
-              <Link href="/categories" className="text-sm font-medium text-gray-700 hover:text-purple-600">
-                Categories
-              </Link>
-              <Link href="/about" className="text-sm font-medium text-gray-700 hover:text-purple-600">
-                About
-              </Link>
-              <Link 
-                href="/contact" 
-                className="text-sm font-medium border-b-2"
-                style={{ 
-                  color: primaryColor, 
-                  borderColor: primaryColor 
-                }}
-              >
-                Contact
-              </Link>
+            {/* Navigation Links */}
+            <div className="hidden md:flex space-x-8">
+              <Link href="/" className="text-gray-700 hover:text-purple-600">Home</Link>
+              <Link href="/products" className="text-gray-700 hover:text-purple-600">Products</Link>
+              <Link href="/about" className="text-gray-700 hover:text-purple-600">About</Link>
+              <Link href="/contact" className="text-purple-600 font-medium">Contact</Link>
             </div>
 
+            {/* Action buttons */}
             <div className="flex items-center space-x-4">
-              <Search className="h-6 w-6 text-gray-700 hover:text-purple-600 cursor-pointer" />
+              <Search className="h-5 w-5 text-gray-600 hover:text-purple-600 cursor-pointer" />
               <div className="relative">
-                <Heart className="h-6 w-6 text-gray-700 hover:text-red-500 cursor-pointer" />
-                <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                  0
-                </span>
-              </div>
-              <div className="relative">
-                <Package className="h-6 w-6 text-gray-700 hover:text-purple-600 cursor-pointer" />
+                <ShoppingBag className="h-6 w-6 text-gray-700 hover:text-purple-600 cursor-pointer" />
                 <span 
-                  className="absolute -top-2 -right-2 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center"
+                  className="absolute -top-2 -right-2 h-4 w-4 rounded-full text-xs font-bold text-white flex items-center justify-center"
                   style={{ backgroundColor: primaryColor }}
                 >
                   0
@@ -150,12 +130,12 @@ function DynamicNavigation({ storeSettings }: { storeSettings: any }) {
 
 // Dynamic Hero Section
 function ContactHero({ storeSettings }: { storeSettings: any }) {
-  const storeName = storeSettings?.storeName || 'Hita&Co'
-  const primaryColor = storeSettings?.primaryColor || '#7c3aed'
+  const storeName = storeSettings?.storeName || 'LittleWorks Inc'
+  const primaryColor = storeSettings?.primaryColor || '#1f2937'
   const accentColor = storeSettings?.accentColor || '#f59e0b'
 
   return (
-    <section className="bg-gradient-to-br from-purple-50 to-pink-50 py-16">
+    <section className="bg-gradient-to-br from-gray-50 to-blue-50 py-16">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
         <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-6">
           Contact{' '}
@@ -172,7 +152,7 @@ function ContactHero({ storeSettings }: { storeSettings: any }) {
         </h1>
         <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
           We'd love to hear from you! Reach out with any questions about our products, 
-          orders, or just to say hello.
+          orders, shipping, or just to say hello.
         </p>
         <div 
           className="flex items-center justify-center gap-2"
@@ -189,23 +169,25 @@ function ContactHero({ storeSettings }: { storeSettings: any }) {
 
 // Dynamic Contact Information Component
 function ContactInformation({ storeSettings }: { storeSettings: any }) {
-  const primaryColor = storeSettings?.primaryColor || '#7c3aed'
+  const primaryColor = storeSettings?.primaryColor || '#1f2937'
+  const storeName = storeSettings?.storeName || 'LittleWorks Inc'
 
+  // Dynamic contact information with proper fallbacks
   const contactMethods = [
     {
       icon: Mail,
       title: 'Email Us',
       description: 'Send us an email and we\'ll respond within 24 hours',
-      value: storeSettings?.email || 'contact@hitaandco.com',
-      action: `mailto:${storeSettings?.email || 'contact@hitaandco.com'}`,
+      value: storeSettings?.email || 'contact@littleworks.inc', // Updated fallback
+      action: `mailto:${storeSettings?.email || 'contact@littleworks.inc'}`,
       color: 'blue'
     },
     {
       icon: Phone,
       title: 'Call Us',
       description: 'Speak directly with our customer service team',
-      value: storeSettings?.phone || '+1 (555) 123-4567',
-      action: `tel:${storeSettings?.phone || '+15551234567'}`,
+      value: storeSettings?.phone || '+1 (555) 123-4567', // Keep generic fallback
+      action: `tel:${storeSettings?.phone?.replace(/\s/g, '') || '+15551234567'}`,
       color: 'green'
     },
     {
@@ -218,10 +200,10 @@ function ContactInformation({ storeSettings }: { storeSettings: any }) {
     },
     {
       icon: MapPin,
-      title: 'Visit Us',
-      description: 'Our business address for correspondence',
-      value: storeSettings?.address || 'New York, NY, USA',
-      action: '#',
+      title: 'Our Location',
+      description: 'Business address and office location',
+      value: storeSettings?.address || 'Shipping Worldwide - Online Store', // Updated fallback
+      action: storeSettings?.address ? `https://maps.google.com/?q=${encodeURIComponent(storeSettings.address)}` : '#',
       color: 'red'
     }
   ]
@@ -249,27 +231,39 @@ function ContactInformation({ storeSettings }: { storeSettings: any }) {
           {contactMethods.map((method, index) => {
             const Icon = method.icon
             return (
-              <div key={index} className="group">
-                <a
-                  href={method.action}
-                  className={`block p-6 rounded-xl border-2 transition-all duration-300 ${colorClasses[method.color as keyof typeof colorClasses]}`}
+              <div
+                key={index}
+                className={`p-6 bg-white border-2 rounded-xl transition-all duration-300 hover:shadow-lg ${colorClasses[method.color as keyof typeof colorClasses]}`}
+              >
+                <div 
+                  className="w-12 h-12 rounded-full flex items-center justify-center mb-4"
+                  style={{ backgroundColor: `${primaryColor}20` }}
                 >
-                  <div 
-                    className="flex items-center justify-center w-12 h-12 rounded-lg mb-4 mx-auto"
-                    style={{ backgroundColor: `${primaryColor}20` }}
-                  >
-                    <Icon className="h-6 w-6" style={{ color: primaryColor }} />
-                  </div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2 text-center">
-                    {method.title}
-                  </h3>
-                  <p className="text-sm text-gray-600 mb-3 text-center">
-                    {method.description}
-                  </p>
-                  <p className="text-sm font-medium text-center group-hover:underline">
+                  <Icon className="h-6 w-6" style={{ color: primaryColor }} />
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                  {method.title}
+                </h3>
+                <p className="text-sm text-gray-600 mb-4">
+                  {method.description}
+                </p>
+                <div className="space-y-2">
+                  <p className="font-medium text-gray-900">
                     {method.value}
                   </p>
-                </a>
+                  {method.action !== '#' && (
+                    <a
+                      href={method.action}
+                      className="inline-flex items-center gap-1 text-sm font-medium transition-colors"
+                      style={{ color: primaryColor }}
+                    >
+                      {method.icon === Mail && 'Send Email'}
+                      {method.icon === Phone && 'Call Now'}
+                      {method.icon === MapPin && storeSettings?.address && 'View on Map'}
+                      <ArrowRight className="h-3 w-3" />
+                    </a>
+                  )}
+                </div>
               </div>
             )
           })}
@@ -279,112 +273,106 @@ function ContactInformation({ storeSettings }: { storeSettings: any }) {
   )
 }
 
-// Simple Contact Form Component
-function ContactFormSection({ storeSettings }: { storeSettings: any }) {
-  const primaryColor = storeSettings?.primaryColor || '#7c3aed'
+// Contact Form Section
+function ContactForm({ storeSettings }: { storeSettings: any }) {
+  const primaryColor = storeSettings?.primaryColor || '#1f2937'
+  const storeName = storeSettings?.storeName || 'LittleWorks Inc'
 
   return (
     <section className="py-16 bg-gray-50">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-12">
           <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
-            Send Us a Message
+            Send us a Message
           </h2>
           <p className="text-xl text-gray-600">
-            Have a question? We'd love to hear from you. Send us a message and we'll respond as soon as possible.
+            Have a question about our products, need help with an order, or want to know more about shipping? Let us know!
           </p>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-lg p-8">
+        <div className="bg-white rounded-2xl shadow-xl p-8">
           <form className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <label className="block text-sm font-medium text-gray-700">
-                  Full Name *
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  First Name *
                 </label>
                 <input
                   type="text"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent outline-none transition-colors"
-                  style={{ 
-                    '--tw-ring-color': primaryColor,
-                    '--tw-ring-opacity': '0.5'
-                  } as React.CSSProperties}
-                  placeholder="Enter your full name"
+                  required
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent focus:outline-none"
+                  style={{ focusRingColor: primaryColor }}
+                  placeholder="Enter your first name"
                 />
               </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Last Name *
+                </label>
+                <input
+                  type="text"
+                  required
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent focus:outline-none"
+                  placeholder="Enter your last name"
+                />
+              </div>
+            </div>
 
-              <div className="space-y-2">
-                <label className="block text-sm font-medium text-gray-700">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
                   Email Address *
                 </label>
                 <input
                   type="email"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent outline-none transition-colors"
-                  style={{ 
-                    '--tw-ring-color': primaryColor,
-                    '--tw-ring-opacity': '0.5'
-                  } as React.CSSProperties}
-                  placeholder="Enter your email address"
+                  required
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent focus:outline-none"
+                  placeholder="your.email@example.com"
                 />
               </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <label className="block text-sm font-medium text-gray-700">
-                  Phone Number (Optional)
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Phone Number
                 </label>
                 <input
                   type="tel"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent outline-none transition-colors"
-                  placeholder="Enter your phone number"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent focus:outline-none"
+                  placeholder="+1 (555) 123-4567"
                 />
-              </div>
-
-              <div className="space-y-2">
-                <label className="block text-sm font-medium text-gray-700">
-                  Inquiry Type
-                </label>
-                <select className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent outline-none">
-                  <option>General Inquiry</option>
-                  <option>Product Question</option>
-                  <option>Order Support</option>
-                  <option>Shipping Question</option>
-                  <option>Return/Exchange</option>
-                  <option>Wholesale Inquiry</option>
-                </select>
               </div>
             </div>
 
-            <div className="space-y-2">
-              <label className="block text-sm font-medium text-gray-700">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
                 Subject *
               </label>
               <input
                 type="text"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent outline-none transition-colors"
-                placeholder="What is your message about?"
+                required
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent focus:outline-none"
+                                  placeholder="What can we help you with? (e.g., Product inquiry, Order status, Shipping question)"
               />
             </div>
 
-            <div className="space-y-2">
-              <label className="block text-sm font-medium text-gray-700">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
                 Message *
               </label>
               <textarea
+                required
                 rows={6}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent outline-none transition-colors resize-none"
-                placeholder="Tell us more about your inquiry..."
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent focus:outline-none resize-none"
+                placeholder="Tell us more about your inquiry... (e.g., product details you're looking for, order number, delivery address, etc.)"
               />
             </div>
 
-            <div className="pt-4">
+            <div>
               <button
                 type="submit"
-                className="w-full md:w-auto px-8 py-3 text-white font-semibold rounded-lg transition-colors flex items-center justify-center gap-2"
+                className="w-full text-white px-8 py-4 rounded-lg font-semibold text-lg transition-all duration-300 hover:transform hover:scale-105 shadow-lg"
                 style={{ backgroundColor: primaryColor }}
               >
-                <Send className="h-4 w-4" />
+                <Send className="inline h-5 w-5 mr-2" />
                 Send Message
               </button>
             </div>
@@ -395,102 +383,10 @@ function ContactFormSection({ storeSettings }: { storeSettings: any }) {
   )
 }
 
-// FAQ Section
-function FAQSection({ storeSettings }: { storeSettings: any }) {
-  const primaryColor = storeSettings?.primaryColor || '#7c3aed'
-
-  const faqs = [
-    {
-      icon: Package,
-      question: 'What is your shipping policy?',
-      answer: 'We offer free shipping on orders over $100. Standard shipping takes 5-7 business days, and we ship internationally to most countries.'
-    },
-    {
-      icon: CreditCard,
-      question: 'What payment methods do you accept?',
-      answer: 'We accept all major credit cards, PayPal, and other secure payment methods. All transactions are encrypted and secure.'
-    },
-    {
-      icon: Star,
-      question: 'Are your products authentic?',
-      answer: 'Yes! All our products are sourced directly from skilled artisans and verified for authenticity. We work closely with craftspeople across India.'
-    },
-    {
-      icon: Headphones,
-      question: 'How can I track my order?',
-      answer: 'Once your order ships, you\'ll receive a tracking number via email. You can use this to track your package until it arrives.'
-    }
-  ]
-
-  return (
-    <section className="py-16 bg-white">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-12">
-          <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
-            Frequently Asked Questions
-          </h2>
-          <p className="text-xl text-gray-600">
-            Quick answers to common questions
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          {faqs.map((faq, index) => {
-            const Icon = faq.icon
-            return (
-              <div key={index} className="bg-gray-50 rounded-xl p-6">
-                <div className="flex items-start gap-4">
-                  <div className="flex-shrink-0">
-                    <div 
-                      className="flex items-center justify-center w-10 h-10 rounded-lg"
-                      style={{ backgroundColor: `${primaryColor}20` }}
-                    >
-                      <Icon className="h-5 w-5" style={{ color: primaryColor }} />
-                    </div>
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                      {faq.question}
-                    </h3>
-                    <p className="text-gray-600 leading-relaxed">
-                      {faq.answer}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      </div>
-    </section>
-  )
-}
-
-// Dynamic Social Media & Hours Section
-function SocialMediaSection({ storeSettings }: { storeSettings: any }) {
-  const primaryColor = storeSettings?.primaryColor || '#7c3aed'
-  const accentColor = storeSettings?.accentColor || '#f59e0b'
-
-  const socialLinks = [
-    {
-      name: 'Instagram',
-      icon: Instagram,
-      url: storeSettings?.instagram,
-      color: 'from-purple-400 to-pink-400'
-    },
-    {
-      name: 'Facebook',
-      icon: Facebook,
-      url: storeSettings?.facebook,
-      color: 'from-blue-500 to-blue-600'
-    },
-    {
-      name: 'Twitter',
-      icon: Twitter,
-      url: storeSettings?.twitter,
-      color: 'from-blue-400 to-blue-500'
-    }
-  ].filter(link => link.url) // Only show social links that exist
+// Business Hours and Additional Info
+function BusinessInfo({ storeSettings }: { storeSettings: any }) {
+  const primaryColor = storeSettings?.primaryColor || '#1f2937'
+  const storeName = storeSettings?.storeName || 'LittleWorks Inc'
 
   const businessHours = [
     { day: 'Monday - Friday', hours: '9:00 AM - 6:00 PM EST' },
@@ -498,41 +394,18 @@ function SocialMediaSection({ storeSettings }: { storeSettings: any }) {
     { day: 'Sunday', hours: 'Closed' }
   ]
 
-  return (
-    <section className="py-16 bg-gradient-to-br from-purple-50 to-pink-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-          {/* Social Media */}
-          {socialLinks.length > 0 && (
-            <div className="text-center lg:text-left">
-              <h3 className="text-2xl font-bold text-gray-900 mb-6">
-                Follow Us
-              </h3>
-              <p className="text-gray-600 mb-8">
-                Stay updated with our latest products and behind-the-scenes content
-              </p>
-              <div className="flex flex-wrap gap-4 justify-center lg:justify-start">
-                {socialLinks.map((social) => {
-                  const Icon = social.icon
-                  return (
-                    <a
-                      key={social.name}
-                      href={social.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className={`flex items-center gap-3 px-6 py-3 rounded-full text-white font-medium transition-transform hover:scale-105 bg-gradient-to-r ${social.color}`}
-                    >
-                      <Icon className="h-5 w-5" />
-                      {social.name}
-                    </a>
-                  )
-                })}
-              </div>
-            </div>
-          )}
+  const socialMedia = [
+    { name: 'Instagram', url: storeSettings?.instagram, icon: Instagram },
+    { name: 'Facebook', url: storeSettings?.facebook, icon: Facebook },
+    { name: 'Twitter', url: storeSettings?.twitter, icon: Twitter }
+  ].filter(social => social.url) // Only show configured social media
 
+  return (
+    <section className="py-16 bg-white">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-start">
           {/* Business Hours */}
-          <div className="text-center lg:text-left">
+          <div>
             <h3 className="text-2xl font-bold text-gray-900 mb-6">
               <Clock className="inline h-6 w-6 mr-2" />
               Business Hours
@@ -542,16 +415,59 @@ function SocialMediaSection({ storeSettings }: { storeSettings: any }) {
             </p>
             <div className="space-y-3">
               {businessHours.map((schedule, index) => (
-                <div key={index} className="flex justify-between items-center py-2 border-b border-gray-200 last:border-b-0">
+                <div key={index} className="flex justify-between items-center py-3 border-b border-gray-200 last:border-b-0">
                   <span className="font-medium text-gray-900">{schedule.day}</span>
                   <span className="text-gray-600">{schedule.hours}</span>
                 </div>
               ))}
             </div>
-            <div className="mt-6 p-4 bg-white rounded-lg">
+            <div className="mt-6 p-4 bg-gray-50 rounded-lg">
               <p className="text-sm text-gray-600">
                 <CheckCircle className="inline h-4 w-4 text-green-500 mr-2" />
                 Email support available 24/7 - we respond within 24 hours
+              </p>
+            </div>
+          </div>
+
+          {/* Social Media & Additional Info */}
+          <div>
+            <h3 className="text-2xl font-bold text-gray-900 mb-6">
+              <Globe className="inline h-6 w-6 mr-2" />
+              Connect With Us
+            </h3>
+            <p className="text-gray-600 mb-8">
+              Follow us for product updates, special offers, and customer stories
+            </p>
+
+            {socialMedia.length > 0 && (
+              <div className="mb-8">
+                <h4 className="font-semibold text-gray-900 mb-4">Social Media</h4>
+                <div className="flex space-x-4">
+                  {socialMedia.map((social, index) => {
+                    const Icon = social.icon
+                    return (
+                      <a
+                        key={index}
+                        href={social.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="w-12 h-12 rounded-full flex items-center justify-center text-white transition-transform hover:scale-110"
+                        style={{ backgroundColor: primaryColor }}
+                      >
+                        <Icon className="h-5 w-5" />
+                      </a>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Customer Service Notice */}
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
+              <h4 className="font-semibold text-blue-900 mb-2">Customer Support</h4>
+              <p className="text-sm text-blue-700">
+                {storeName} is committed to providing exceptional customer service. 
+                Whether you need help with product selection, order tracking, or returns, we're here to help!
               </p>
             </div>
           </div>
@@ -561,65 +477,27 @@ function SocialMediaSection({ storeSettings }: { storeSettings: any }) {
   )
 }
 
-// Dynamic Call to Action Section
-function CallToActionSection({ storeSettings }: { storeSettings: any }) {
-  const primaryColor = storeSettings?.primaryColor || '#7c3aed'
-  const accentColor = storeSettings?.accentColor || '#f59e0b'
-
-  return (
-    <section className="py-16 bg-gray-900 text-white">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-        <h2 className="text-3xl md:text-4xl font-bold mb-4">
-          Ready to Shop Authentic Indian Products?
-        </h2>
-        <p className="text-xl text-gray-300 mb-8 max-w-2xl mx-auto">
-          Explore our curated collection of handcrafted items while we're here to help with any questions.
-        </p>
-        <div className="flex flex-col sm:flex-row gap-4 justify-center">
-          <Link
-            href="/products"
-            className="inline-flex items-center gap-2 text-white px-8 py-3 rounded-full font-semibold transition-colors"
-            style={{ 
-              background: `linear-gradient(to right, ${primaryColor}, ${accentColor})` 
-            }}
-          >
-            <Heart className="h-5 w-5" />
-            Browse Products
-            <ArrowRight className="h-4 w-4" />
-          </Link>
-          <Link
-            href="/about"
-            className="inline-flex items-center gap-2 border border-white text-white px-8 py-3 rounded-full font-semibold hover:bg-white hover:text-gray-900 transition-colors"
-          >
-            <Star className="h-5 w-5" />
-            Learn About Us
-          </Link>
-        </div>
-      </div>
-    </section>
-  )
-}
-
 // Main Contact Page Component
 export default async function ContactPage() {
   const storeSettings = await getStoreSettings()
+  const storeName = storeSettings?.storeName || 'LittleWorks Inc'
 
   // Structured data for SEO
   const structuredData = {
     '@context': 'https://schema.org',
     '@type': 'ContactPage',
-    name: `Contact ${storeSettings?.storeName || 'Hita&Co'}`,
-    description: `Get in touch with ${storeSettings?.storeName || 'Hita&Co'} for questions about our authentic Indian products and customer service.`,
+    name: `Contact ${storeName}`,
+    description: `Get in touch with ${storeName} for questions about products, orders, and customer support.`,
     url: `${process.env.NEXT_PUBLIC_APP_URL}/contact`,
     mainEntity: {
       '@type': 'Organization',
-      name: storeSettings?.storeName || 'Hita&Co',
-      email: storeSettings?.email,
+      name: storeName,
+      email: storeSettings?.email || 'contact@littleworks.inc',
       telephone: storeSettings?.phone,
       address: storeSettings?.address,
       contactPoint: {
         '@type': 'ContactPoint',
-        email: storeSettings?.email,
+        email: storeSettings?.email || 'contact@littleworks.inc',
         telephone: storeSettings?.phone,
         contactType: 'customer service',
         availableLanguage: ['English'],
@@ -629,20 +507,9 @@ export default async function ContactPage() {
             dayOfWeek: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
             opens: '09:00',
             closes: '18:00'
-          },
-          {
-            '@type': 'OpeningHoursSpecification',
-            dayOfWeek: 'Saturday',
-            opens: '10:00',
-            closes: '16:00'
           }
         ]
-      },
-      sameAs: [
-        storeSettings?.instagram,
-        storeSettings?.facebook,
-        storeSettings?.twitter
-      ].filter(Boolean)
+      }
     }
   }
 
@@ -663,10 +530,8 @@ export default async function ContactPage() {
       <main>
         <ContactHero storeSettings={storeSettings} />
         <ContactInformation storeSettings={storeSettings} />
-        <ContactFormSection storeSettings={storeSettings} />
-        <FAQSection storeSettings={storeSettings} />
-        <SocialMediaSection storeSettings={storeSettings} />
-        <CallToActionSection storeSettings={storeSettings} />
+        <ContactForm storeSettings={storeSettings} />
+        <BusinessInfo storeSettings={storeSettings} />
       </main>
     </>
   )

@@ -1,8 +1,60 @@
-// /src/app/api/admin/settings/route.ts
+// src/app/api/admin/settings/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth'
 import { db } from '@/lib/db'
 
+// GET: Fetch store settings (NEW METHOD)
+export async function GET(request: NextRequest) {
+  try {
+    const session = await getSession()
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Get store settings (create default if doesn't exist)
+    let storeSettings = await db.storeSetting.findFirst({
+      where: { id: 'default' }
+    })
+
+    if (!storeSettings) {
+      // Create default settings with LittleWorks Inc as default
+      storeSettings = await db.storeSetting.create({
+        data: {
+          id: 'default',
+          storeName: 'LittleWorks Inc', // Default company name as requested
+          tagline: 'Building Digital Solutions',
+          primaryColor: '#1f2937',
+          secondaryColor: '#ffffff',
+          accentColor: '#f59e0b',
+          email: 'admin@littleworks.inc',
+          currency: 'USD',
+          timezone: 'America/New_York',
+        }
+      })
+    }
+
+    return NextResponse.json({
+      success: true,
+      storeSettings
+    })
+
+  } catch (error) {
+    console.error('Store settings fetch error:', error)
+    return NextResponse.json(
+      { 
+        success: false,
+        error: 'Failed to fetch store settings',
+        storeSettings: {
+          storeName: 'LittleWorks Inc', // Fallback default
+          primaryColor: '#1f2937'
+        }
+      },
+      { status: 500 }
+    )
+  }
+}
+
+// PUT: Update store settings (EXISTING METHOD)
 export async function PUT(request: NextRequest) {
   try {
     const session = await getSession()
@@ -76,7 +128,7 @@ export async function PUT(request: NextRequest) {
       twitter: data.twitter?.trim() || null,
       aiProvider: data.aiProvider?.trim() || null,
       aiApiKey: data.aiApiKey?.trim() || null,
-      aiModel: data.aiModel?.trim() || null,  // 👈 ADD THIS LINE
+      aiModel: data.aiModel?.trim() || null,
       currency: data.currency || 'USD',
       timezone: data.timezone || 'America/New_York'
     }
@@ -89,16 +141,21 @@ export async function PUT(request: NextRequest) {
         data: updateData
       })
     } else {
-      // Create new settings
+      // Create new settings with LittleWorks Inc default
       storeSettings = await db.storeSetting.create({
         data: {
           id: 'default',
+          storeName: 'LittleWorks Inc', // Ensure default even on create
           ...updateData
         }
       })
     }
 
-    return NextResponse.json(storeSettings)
+    return NextResponse.json({
+      success: true,
+      storeSettings
+    })
+
   } catch (error) {
     console.error('Store settings UPDATE error:', error)
     return NextResponse.json(
