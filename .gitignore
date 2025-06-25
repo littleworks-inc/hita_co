@@ -276,3 +276,5 @@ test-*.js
 debug-*.js
 *.backup
 .backup-*/
+
+CLAUDE.md
