@@ -221,43 +221,41 @@ export async function POST(request: NextRequest) {
 
     // Prepare product data (INCLUDING DISCOUNT FIELDS)
     const productData = {
-      sku,
-      name,
-      description: description || '',
-      shortDescription: shortDescription || '',
-      categoryId,
-      countryId,
-      supplierId,
-      barcode: barcode || '',
-      barcodeType: barcodeType || 'CODE128',
-      originalPrice: parseFloat(originalPrice) || 0,
-      originalCurrency: originalCurrency || 'INR',
-      quantity: parseInt(quantity) || 1,
-      gstPercentage: parseFloat(gstPercentage) || 0,
-      shippingCost: parseFloat(shippingCost) || 0,
-      conversionCharges: parseFloat(conversionCharges) || 0,
-      additionalExpenses: parseFloat(additionalExpenses) || 0,
-      costPriceUSD: parseFloat(costPriceUSD) || 0,
-      piecePriceUSD: parseFloat(piecePriceUSD) || 0,
-      profitMargin: parseFloat(profitMargin) || 0,
-      discountPercentage: parseFloat(discountPercentage) || 0,
-      showDiscountToCustomers: Boolean(showDiscountToCustomers), // 🎯 NEW FIELD
-      sellingPriceUSD: parseFloat(sellingPriceUSD) || 0,
-      stockQuantity: parseInt(stockQuantity) || 0,
-      lowStockAlert: parseInt(lowStockAlert) || 5,
-      tags: tags || [],
-      images: images || [],
-      seoTitle: seoTitle || '',
-      seoDescription: seoDescription || '',
-      purchaseDate: purchaseDate ? new Date(purchaseDate) : null,
-      invoiceNumber: invoiceNumber || '',
-      isActive: isActive ?? true,
-      isFeatured: isFeatured ?? false,
-      status,
-      publishedAt: status === 'PUBLISHED' && !publishedAt ? new Date() : (publishedAt ? new Date(publishedAt) : null),
-      publishedBy: status === 'PUBLISHED' ? session.userId : null, // 🔧 FIXED: session.userId
-      lastEditedAt: new Date()
-    }
+  sku,
+  name,
+  description: description || '',
+  shortDescription: shortDescription || '',
+  categoryId,
+  countryId,
+  supplierId,
+  barcode: barcode || '',
+  barcodeType: barcodeType || 'CODE128',
+  originalPrice: parseFloat(originalPrice) || 0,
+  originalCurrency: originalCurrency || 'INR',
+  quantity: parseInt(quantity) || 1,
+  gstPercentage: parseFloat(gstPercentage) || 0,
+  shippingCost: parseFloat(shippingCost) || 0,
+  conversionCharges: parseFloat(conversionCharges) || 0,
+  additionalExpenses: parseFloat(additionalExpenses) || 0,
+  costPriceUSD: parseFloat(costPriceUSD) || 0,
+  piecePriceUSD: parseFloat(piecePriceUSD) || 0,
+  profitMargin: parseFloat(profitMargin) || 0,
+  discountPercentage: parseFloat(discountPercentage) || 0,
+  showDiscountToCustomers: Boolean(showDiscountToCustomers),
+  sellingPriceUSD: parseFloat(sellingPriceUSD) || 0,
+  stockQuantity: parseInt(stockQuantity) || 0,
+  lowStockAlert: parseInt(lowStockAlert) || 5,
+  tags: tags || [],
+  images: images || [],
+  seoTitle: seoTitle || '',
+  seoDescription: seoDescription || '',
+  purchaseDate: purchaseDate ? new Date(purchaseDate) : null,
+  invoiceNumber: invoiceNumber || '',
+  isActive: isActive ?? true,
+  isFeatured: isFeatured ?? false,
+  status,
+  publishedAt: status === 'PUBLISHED' && !publishedAt ? new Date() : (publishedAt ? new Date(publishedAt) : null),
+}
 
     // Create product
     const product = await db.product.create({
@@ -269,7 +267,8 @@ export async function POST(request: NextRequest) {
       }
     })
 
-    console.log(`Product ${product.name} created with status ${status} by user ${session.userId}`) // 🔧 FIXED: session.userId
+    console.log(`Product ${product.name} created with status ${status} by user ${session?.userId || session?.id || 'unknown'}`)
+    console.log('🔍 Session debug:', session)
 
     return NextResponse.json({
       success: true,
