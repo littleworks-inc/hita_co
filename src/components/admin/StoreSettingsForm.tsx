@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, Button, Input, Label } from '
 import ColorPicker from '@/components/admin/ColorPicker'
 import ImageUpload from '@/components/admin/ImageUpload'
 import {
+  RotateCcw,
   Store,
   Palette,
   Contact,
@@ -86,6 +87,7 @@ const TABS = [
   { id: 'contact', name: 'Contact Info', icon: Contact },
   { id: 'social', name: 'Social Media', icon: Share2 },
   { id: 'ai', name: 'AI Settings', icon: Brain },
+  { name: 'Policies', id: 'policies', icon: Shield },
   { id: 'general', name: 'General', icon: Globe }
 ]
 
@@ -162,7 +164,7 @@ function BrandingPreview({
   accentColor
 }: BrandingPreviewProps) {
   const [previewMode, setPreviewMode] = useState<'desktop' | 'mobile'>('desktop')
-  
+
   const displayStoreName = storeName || 'Your Store'
   const displayTagline = tagline || 'Welcome to our store!'
 
@@ -175,39 +177,37 @@ function BrandingPreview({
             <Eye className="h-4 w-4 text-gray-500" />
             <span className="text-sm font-medium text-gray-700">Live Preview</span>
           </div>
-          
+
           <div className="flex items-center gap-2">
             {/* Preview Mode Toggle */}
             <div className="flex bg-white rounded-md border border-gray-200 p-1">
               <button
                 type="button"
                 onClick={() => setPreviewMode('desktop')}
-                className={`p-1.5 rounded text-xs transition-colors ${
-                  previewMode === 'desktop'
-                    ? 'bg-blue-100 text-blue-600'
-                    : 'text-gray-500 hover:text-gray-700'
-                }`}
+                className={`p-1.5 rounded text-xs transition-colors ${previewMode === 'desktop'
+                  ? 'bg-blue-100 text-blue-600'
+                  : 'text-gray-500 hover:text-gray-700'
+                  }`}
               >
                 <Monitor className="h-4 w-4" />
               </button>
               <button
                 type="button"
                 onClick={() => setPreviewMode('mobile')}
-                className={`p-1.5 rounded text-xs transition-colors ${
-                  previewMode === 'mobile'
-                    ? 'bg-blue-100 text-blue-600'
-                    : 'text-gray-500 hover:text-gray-700'
-                }`}
+                className={`p-1.5 rounded text-xs transition-colors ${previewMode === 'mobile'
+                  ? 'bg-blue-100 text-blue-600'
+                  : 'text-gray-500 hover:text-gray-700'
+                  }`}
               >
                 <Smartphone className="h-4 w-4" />
               </button>
             </div>
 
             {/* Open in New Tab */}
-            <Button 
+            <Button
               type="button"
-              variant="outline" 
-              size="sm" 
+              variant="outline"
+              size="sm"
               className="text-xs"
               onClick={() => window.open('/', '_blank')}
             >
@@ -220,22 +220,21 @@ function BrandingPreview({
 
       {/* Preview Content */}
       <div className={`bg-gray-100 p-4 ${previewMode === 'mobile' ? 'flex justify-center' : ''}`}>
-        <div className={`bg-white shadow-lg ${
-          previewMode === 'mobile' 
-            ? 'w-80 h-96 rounded-lg overflow-hidden' 
-            : 'w-full h-80 rounded-lg overflow-hidden'
-        }`}>
-          
+        <div className={`bg-white shadow-lg ${previewMode === 'mobile'
+          ? 'w-80 h-96 rounded-lg overflow-hidden'
+          : 'w-full h-80 rounded-lg overflow-hidden'
+          }`}>
+
           {/* Mock Store Header */}
-          <div 
+          <div
             className="px-4 py-3 text-white"
             style={{ backgroundColor: primaryColor }}
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 {logo ? (
-                  <img 
-                    src={logo} 
+                  <img
+                    src={logo}
                     alt={displayStoreName}
                     className="w-8 h-8 object-contain bg-white rounded p-1"
                   />
@@ -246,7 +245,7 @@ function BrandingPreview({
                     </span>
                   </div>
                 )}
-                
+
                 <div>
                   <h1 className={`font-bold ${previewMode === 'mobile' ? 'text-sm' : 'text-lg'}`}>
                     {displayStoreName}
@@ -270,7 +269,7 @@ function BrandingPreview({
           {/* Mock Content */}
           <div className="p-4 space-y-4">
             {/* Hero Section */}
-            <div 
+            <div
               className="rounded-lg p-4 text-white text-center"
               style={{ backgroundColor: accentColor }}
             >
@@ -300,14 +299,14 @@ function BrandingPreview({
           <span className="text-gray-600">Colors being used:</span>
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-1">
-              <div 
+              <div
                 className="w-3 h-3 rounded border"
                 style={{ backgroundColor: primaryColor }}
               />
               <span className="text-gray-500">Primary</span>
             </div>
             <div className="flex items-center gap-1">
-              <div 
+              <div
                 className="w-3 h-3 rounded border"
                 style={{ backgroundColor: accentColor }}
               />
@@ -331,8 +330,8 @@ export default function StoreSettingsForm({ storeSettings }: StoreSettingsFormPr
   // Enhanced AI state variables
   const [showApiKey, setShowApiKey] = useState(false)
   const [testingConnection, setTestingConnection] = useState(false)
-  const [connectionStatus, setConnectionStatus] = useState<{success: boolean; message: string} | null>(null)
-  const [availableModels, setAvailableModels] = useState<Array<{value: string, label: string, recommended?: boolean}>>([])
+  const [connectionStatus, setConnectionStatus] = useState<{ success: boolean; message: string } | null>(null)
+  const [availableModels, setAvailableModels] = useState<Array<{ value: string, label: string, recommended?: boolean }>>([])
   const [loadingModels, setLoadingModels] = useState(false)
 
   // Form state
@@ -355,7 +354,14 @@ export default function StoreSettingsForm({ storeSettings }: StoreSettingsFormPr
     aiApiKey: storeSettings.aiApiKey || '',
     aiModel: storeSettings.aiModel || '',
     currency: storeSettings.currency || DEFAULT_VALUES.CURRENCY,
-    timezone: storeSettings.timezone || DEFAULT_VALUES.TIMEZONE
+    timezone: storeSettings.timezone || DEFAULT_VALUES.TIMEZONE,
+    returnsEnabled: storeSettings.returnsEnabled ?? true,
+    returnPeriodDays: storeSettings.returnPeriodDays || 30,
+    returnPolicyUrl: storeSettings.returnPolicyUrl || '',
+    hasRestockingFee: storeSettings.hasRestockingFee || false,
+    restockingFeePercentage: storeSettings.restockingFeePercentage || 0,
+    returnPolicyDescription: storeSettings.returnPolicyDescription || '',
+    noReturnsReason: storeSettings.noReturnsReason || '',
   })
 
   // Dynamic model fetching
@@ -378,7 +384,7 @@ export default function StoreSettingsForm({ storeSettings }: StoreSettingsFormPr
       if (response.ok) {
         const data = await response.json()
         setAvailableModels(data.models || [])
-        
+
         // Auto-select recommended model if no model is currently selected
         if (!formData.aiModel && data.models.length > 0) {
           const recommendedModel = data.models.find((m: any) => m.recommended)
@@ -401,7 +407,7 @@ export default function StoreSettingsForm({ storeSettings }: StoreSettingsFormPr
 
   // Static fallback models (in case API fails)
   const getStaticModels = (provider: string) => {
-    const staticModels: Record<string, Array<{value: string, label: string, recommended?: boolean}>> = {
+    const staticModels: Record<string, Array<{ value: string, label: string, recommended?: boolean }>> = {
       openai: [
         { value: 'gpt-4o-mini', label: 'GPT-4o Mini', recommended: true },
         { value: 'gpt-4o', label: 'GPT-4o' },
@@ -542,7 +548,7 @@ export default function StoreSettingsForm({ storeSettings }: StoreSettingsFormPr
 
       setConnectionStatus({
         success: data.success,
-        message: data.success 
+        message: data.success
           ? `✅ Connection successful! AI is ready to generate content.`
           : `❌ Connection failed: ${data.error}`
       })
@@ -651,11 +657,10 @@ export default function StoreSettingsForm({ storeSettings }: StoreSettingsFormPr
                 key={tab.id}
                 type="button"
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-2 py-2 px-1 border-b-2 font-medium text-sm whitespace-nowrap transition-colors ${
-                  activeTab === tab.id
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
+                className={`flex items-center gap-2 py-2 px-1 border-b-2 font-medium text-sm whitespace-nowrap transition-colors ${activeTab === tab.id
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  }`}
               >
                 <Icon className="h-4 w-4" />
                 {tab.name}
@@ -1090,9 +1095,8 @@ export default function StoreSettingsForm({ storeSettings }: StoreSettingsFormPr
                     value={formData.aiProvider || ''}
                     onChange={(e) => handleInputChange('aiProvider', e.target.value)}
                     disabled={loading}
-                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed ${
-                      errors.aiProvider ? 'border-red-500' : 'border-gray-300'
-                    }`}
+                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed ${errors.aiProvider ? 'border-red-500' : 'border-gray-300'
+                      }`}
                   >
                     <option value="">Select AI Provider</option>
                     <option value="openai">OpenAI (ChatGPT) - Recommended</option>
@@ -1263,11 +1267,10 @@ export default function StoreSettingsForm({ storeSettings }: StoreSettingsFormPr
                       )}
                     </Button>
                     {connectionStatus && (
-                      <div className={`mt-2 p-2 rounded text-sm ${
-                        connectionStatus.success 
-                          ? 'bg-green-50 text-green-700 border border-green-200' 
-                          : 'bg-red-50 text-red-700 border border-red-200'
-                      }`}>
+                      <div className={`mt-2 p-2 rounded text-sm ${connectionStatus.success
+                        ? 'bg-green-50 text-green-700 border border-green-200'
+                        : 'bg-red-50 text-red-700 border border-red-200'
+                        }`}>
                         {connectionStatus.message}
                       </div>
                     )}
@@ -1359,6 +1362,217 @@ export default function StoreSettingsForm({ storeSettings }: StoreSettingsFormPr
           </Card>
         )}
       </div>
+      {/* ✅ ENHANCED: Policies Tab with No Returns Option */}
+      {activeTab === 'policies' && (
+        <div className="space-y-6">
+          {/* Return Policy Settings */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <RotateCcw className="h-5 w-5" />
+                Return Policy Configuration
+              </CardTitle>
+              <p className="text-sm text-gray-600">
+                Configure your store's return policy settings. These will be displayed throughout your site.
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Returns Enabled Toggle */}
+              <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                <div className="flex items-center space-x-3 mb-4">
+                  <input
+                    type="checkbox"
+                    id="returnsEnabled"
+                    checked={formData.returnsEnabled}
+                    onChange={(e) => handleInputChange('returnsEnabled', e.target.checked)}
+                    className="rounded border-gray-300"
+                  />
+                  <Label htmlFor="returnsEnabled" className="flex items-center gap-2 font-medium">
+                    <RotateCcw className="h-4 w-4 text-blue-500" />
+                    Enable Returns & Exchanges
+                  </Label>
+                </div>
+                <p className="text-sm text-gray-600">
+                  {formData.returnsEnabled
+                    ? "Customers can return items according to your policy below"
+                    : "No returns or exchanges will be accepted (all sales final)"
+                  }
+                </p>
+              </div>
+
+              {/* No Returns Reason (when returns disabled) */}
+              {!formData.returnsEnabled && (
+                <div className="border border-orange-200 rounded-lg p-4 bg-orange-50">
+                  <Label htmlFor="noReturnsReason" className="flex items-center gap-2 text-orange-800 font-medium mb-2">
+                    <AlertCircle className="h-4 w-4" />
+                    Reason for No Returns (Optional)
+                  </Label>
+                  <textarea
+                    id="noReturnsReason"
+                    rows={3}
+                    value={formData.noReturnsReason}
+                    onChange={(e) => handleInputChange('noReturnsReason', e.target.value)}
+                    placeholder="e.g., Due to hygiene reasons, custom-made items, or perishable goods"
+                    className="w-full px-3 py-2 border border-orange-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 bg-white"
+                  />
+                  <p className="text-xs text-orange-700 mt-2">
+                    Brief explanation for why returns aren't accepted (shown to customers)
+                  </p>
+                </div>
+              )}
+
+              {/* Return Policy Details (when returns enabled) */}
+              {formData.returnsEnabled && (
+                <>
+                  {/* Return Period */}
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="returnPeriodDays" className="flex items-center gap-2">
+                        <RotateCcw className="h-4 w-4" />
+                        Return Period (Days) *
+                      </Label>
+                      <select
+                        id="returnPeriodDays"
+                        value={formData.returnPeriodDays}
+                        onChange={(e) => handleInputChange('returnPeriodDays', parseInt(e.target.value))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value={7}>7 days</option>
+                        <option value={14}>14 days</option>
+                        <option value={30}>30 days</option>
+                        <option value={60}>60 days</option>
+                        <option value={90}>90 days</option>
+                      </select>
+                      <p className="text-xs text-gray-500">
+                        Number of days customers have to return items
+                      </p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="returnPolicyUrl">Return Policy URL (Optional)</Label>
+                      <Input
+                        id="returnPolicyUrl"
+                        type="url"
+                        value={formData.returnPolicyUrl}
+                        onChange={(e) => handleInputChange('returnPolicyUrl', e.target.value)}
+                        placeholder="https://yourstore.com/return-policy"
+                      />
+                      <p className="text-xs text-gray-500">
+                        Link to your detailed return policy page
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Restocking Fee Settings */}
+                  <div className="border border-gray-200 rounded-lg p-4">
+                    <div className="flex items-center space-x-3 mb-4">
+                      <input
+                        type="checkbox"
+                        id="hasRestockingFee"
+                        checked={formData.hasRestockingFee}
+                        onChange={(e) => handleInputChange('hasRestockingFee', e.target.checked)}
+                        className="rounded border-gray-300"
+                      />
+                      <Label htmlFor="hasRestockingFee" className="flex items-center gap-2">
+                        <AlertCircle className="h-4 w-4 text-orange-500" />
+                        Apply Restocking Fee
+                      </Label>
+                    </div>
+
+                    {formData.hasRestockingFee && (
+                      <div className="space-y-2">
+                        <Label htmlFor="restockingFeePercentage">Restocking Fee Percentage</Label>
+                        <div className="flex items-center gap-2">
+                          <Input
+                            id="restockingFeePercentage"
+                            type="number"
+                            min="0"
+                            max="50"
+                            step="0.1"
+                            value={formData.restockingFeePercentage}
+                            onChange={(e) => handleInputChange('restockingFeePercentage', parseFloat(e.target.value) || 0)}
+                            placeholder="15"
+                            className="w-32"
+                          />
+                          <span className="text-gray-500">%</span>
+                        </div>
+                        <p className="text-xs text-gray-500">
+                          Percentage of item price charged as restocking fee (0-50%)
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Return Policy Description */}
+                  <div className="space-y-2">
+                    <Label htmlFor="returnPolicyDescription">Return Policy Description</Label>
+                    <textarea
+                      id="returnPolicyDescription"
+                      rows={4}
+                      value={formData.returnPolicyDescription}
+                      onChange={(e) => handleInputChange('returnPolicyDescription', e.target.value)}
+                      placeholder="We offer hassle-free returns within 30 days of purchase. Items must be in original condition with tags attached."
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <p className="text-xs text-gray-500">
+                      Brief description of your return policy (displayed in trust indicators)
+                    </p>
+                  </div>
+                </>
+              )}
+
+              {/* Enhanced Preview */}
+              <div className="bg-gray-50 rounded-lg p-4">
+                <h4 className="font-medium text-gray-900 mb-3 flex items-center gap-2">
+                  <Info className="h-4 w-4" />
+                  Customer Preview
+                </h4>
+                <div className="text-center bg-white p-4 rounded border">
+                  <div className={`inline-flex items-center justify-center w-12 h-12 rounded-lg mb-4 ${formData.returnsEnabled ? 'bg-purple-100' : 'bg-red-100'
+                    }`}>
+                    {formData.returnsEnabled ? (
+                      <RotateCcw className="h-6 w-6 text-purple-600" />
+                    ) : (
+                      <AlertCircle className="h-6 w-6 text-red-600" />
+                    )}
+                  </div>
+
+                  {formData.returnsEnabled ? (
+                    <>
+                      <h3 className="text-lg font-semibold text-gray-900 mb-2">Easy Returns</h3>
+                      <p className="text-gray-600">
+                        {formData.returnPeriodDays}-day return policy
+                        {formData.hasRestockingFee && formData.restockingFeePercentage > 0 && (
+                          <span className="block text-sm mt-1">
+                            {formData.restockingFeePercentage}% restocking fee applies
+                          </span>
+                        )}
+                        {!formData.hasRestockingFee && (
+                          <span className="block text-sm mt-1">
+                            No restocking fees
+                          </span>
+                        )}
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <h3 className="text-lg font-semibold text-gray-900 mb-2">No Returns</h3>
+                      <p className="text-gray-600">
+                        All sales are final
+                        {formData.noReturnsReason && (
+                          <span className="block text-sm mt-1">
+                            {formData.noReturnsReason}
+                          </span>
+                        )}
+                      </p>
+                    </>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* Success Message */}
       {saveSuccess && (
