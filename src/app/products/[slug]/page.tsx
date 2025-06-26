@@ -49,74 +49,211 @@ async function getStoreSettings() {
 
 // Enhanced product fetching with Draft System Protection
 async function getProduct(slug: string) {
+  console.log(`🔍 Getting product from slug: ${slug}`)
+  
+  // FIXED: Extract SKU correctly from slug
+  // URL format: "product-name-SKU" where SKU can contain hyphens
+  // Example: "saree-HC-SARE-452468" should extract "HC-SARE-452468"
+  
+  let sku: string
+  
+  // Method 1: Look for HC- pattern (your SKUs start with HC-)
+  const hcMatch = slug.match(/HC-[A-Z0-9-]+$/i)
+  if (hcMatch) {
+    sku = hcMatch[0]
+  } else {
+    // Fallback: Take everything after the last occurrence of the product name
+    const parts = slug.split('-')
+    sku = parts[parts.length - 1]
+  }
+
+  console.log(`🔍 Extracted SKU: ${sku} from slug: ${slug}`)
+
+  // Use ONLY the isActive query for now (avoid status field entirely)
+  try {
+    const product = await db.product.findFirst({
+      where: {
+        sku: sku,
+        isActive: true
+      },
+      include: {
+        category: {
+          include: {
+            parent: true
+          }
+        },
+        country: true,
+        supplier: {
+          select: {
+            id: true,
+            name: true,
+            country: true
+          }
+        }
+      }
+    })
+
+    if (product) {
+      console.log(`✅ Found product: ${product.name} with SKU: ${product.sku}`)
+    } else {
+      console.log(`❌ No active product found with SKU: ${sku}`)
+      
+      // Debug: Let's see what SKUs are actually available
+      const allActiveProducts = await db.product.findMany({
+        where: { isActive: true },
+        select: { sku: true, name: true }
+      })
+      console.log('📦 Available SKUs:', allActiveProducts.map(p => p.sku))
+    }
+
+    return product
+  } catch (error) {
+    console.error(`❌ Error fetching product with SKU ${sku}:`, error)
+    return null
+  }
+}
+
+// ALSO ADD this function to help generate correct URLs:
+export async function generateCorrectProductURLs() {
+  try {
+    const products = await db.product.findMany({
+      where: { isActive: true },
+      select: { sku: true, name: true }
+    })
+    
+    console.log('🔗 Correct Product URLs:')
+    products.forEach((product, index) => {
+      const slug = `${product.name.toLowerCase().replace(/\s+/g, '-')}-${product.sku}`
+      console.log(`${index + 1}. ${product.name}`)
+      console.log(`   URL: http://localhost:3001/products/${slug}`)
+      console.log(`   SKU: ${product.sku}`)
+      console.log('')
+    })
+    
+    return products
+  } catch (error) {
+    console.error('Error generating URLs:', error)
+    return []
+  }
+}
+
+async function debugGetProduct(slug: string) {
+  console.log(`🔍 Debug: Fetching product for slug: ${slug}`)
+  
   // Extract SKU from slug (format: product-name-SKU)
   const parts = slug.split('-')
   const sku = parts[parts.length - 1]
-
-  const product = await db.product.findFirst({
-    where: {
-      sku: sku,
-      // CRITICAL: Only show published products to customers
-      OR: [
-        { status: 'PUBLISHED' },
-        { 
-          AND: [
-            { status: null }, // Legacy products without status
-            { isActive: true } // But must be active
-          ]
-        }
-      ]
-      // NOTE: We don't check stockQuantity here as customers should see 
-      // out-of-stock products (just not be able to buy them)
-    },
-    include: {
-      category: {
-        include: {
-          parent: true
-        }
+  
+  console.log(`🔍 Debug: Extracted SKU: ${sku}`)
+  
+  // First, let's see if this SKU exists at all
+  try {
+    const allProducts = await db.product.findMany({
+      select: { sku: true, name: true, isActive: true }
+    })
+    
+    console.log('📦 Debug: All products in database:')
+    allProducts.forEach(p => {
+      console.log(`  - ${p.name} (SKU: ${p.sku}, Active: ${p.isActive})`)
+    })
+    
+    const matchingProduct = allProducts.find(p => p.sku === sku)
+    if (!matchingProduct) {
+      console.log(`❌ Debug: No product found with SKU: ${sku}`)
+      return null
+    }
+    
+    console.log(`✅ Debug: Found matching product: ${matchingProduct.name}`)
+    
+    // Now try to fetch the full product (using only isActive)
+    const product = await db.product.findFirst({
+      where: {
+        sku: sku,
+        isActive: true
       },
-      country: true,
-      supplier: {
-        select: {
-          id: true,
-          name: true,
-          country: true
+      include: {
+        category: {
+          include: {
+            parent: true
+          }
+        },
+        country: true,
+        supplier: {
+          select: {
+            id: true,
+            name: true,
+            country: true
+          }
         }
       }
+    })
+    
+    if (product) {
+      console.log(`✅ Debug: Successfully fetched full product: ${product.name}`)
+    } else {
+      console.log(`❌ Debug: Product exists but failed to fetch full details`)
     }
-  })
-
-  return product
+    
+    return product
+    
+  } catch (error) {
+    console.error('❌ Debug: Error fetching product:', error)
+    return null
+  }
 }
 
 // Get related published products only
 async function getRelatedProducts(productId: string, categoryId: string) {
-  return await db.product.findMany({
-    where: {
-      // Only published products for related products
-      OR: [
-        { status: 'PUBLISHED' },
-        { 
-          AND: [
-            { status: null },
-            { isActive: true }
-          ]
-        }
-      ],
-      stockQuantity: { gt: 0 }, // Related products should have stock
-      categoryId: categoryId,
-      id: { not: productId }
-    },
-    include: {
-      category: true,
-      country: true
-    },
-    take: 4,
-    orderBy: [
-      { isFeatured: 'desc' },
-      { createdAt: 'desc' }
-    ]
-  })
+  try {
+    // Try the new status-based query first
+    return await db.product.findMany({
+      where: {
+        OR: [
+          { status: 'PUBLISHED' },
+          { 
+            AND: [
+              { status: null },
+              { isActive: true }
+            ]
+          }
+        ],
+        stockQuantity: { gt: 0 },
+        categoryId: categoryId,
+        id: { not: productId }
+      },
+      include: {
+        category: true,
+        country: true
+      },
+      take: 4,
+      orderBy: [
+        { isFeatured: 'desc' },
+        { createdAt: 'desc' }
+      ]
+    })
+    
+  } catch (error) {
+    console.warn('⚠️ Status field query failed for related products, using fallback...', error.message)
+    
+    // Fallback: Use old isActive-based query
+    return await db.product.findMany({
+      where: {
+        isActive: true,
+        stockQuantity: { gt: 0 },
+        categoryId: categoryId,
+        id: { not: productId }
+      },
+      include: {
+        category: true,
+        country: true
+      },
+      take: 4,
+      orderBy: [
+        { isFeatured: 'desc' },
+        { createdAt: 'desc' }
+      ]
+    })
+  }
 }
 
 // Main Product Detail Component
@@ -302,28 +439,64 @@ async function RelatedProducts({ productId, categoryId }: { productId: string, c
 
 // Generate static paths for published products only (for static generation)
 export async function generateStaticParams() {
-  // Only generate paths for published products
-  const products = await db.product.findMany({
-    where: {
-      OR: [
-        { status: 'PUBLISHED' },
-        { 
-          AND: [
-            { status: null },
-            { isActive: true }
-          ]
-        }
-      ]
-    },
-    select: {
-      sku: true,
-      name: true
-    }
-  })
+  try {
+    console.log('🔍 Attempting to generate static params with status field...')
+    
+    // Try the new status-based query first
+    const products = await db.product.findMany({
+      where: {
+        OR: [
+          { status: 'PUBLISHED' },
+          { 
+            AND: [
+              { status: null },
+              { isActive: true }
+            ]
+          }
+        ]
+      },
+      select: {
+        sku: true,
+        name: true
+      }
+    })
 
-  return products.map((product) => ({
-    slug: `${product.name.toLowerCase().replace(/\s+/g, '-')}-${product.sku}`
-  }))
+    console.log(`✅ Generated static params for ${products.length} products with status field`)
+    
+    return products.map((product) => ({
+      slug: `${product.name.toLowerCase().replace(/\s+/g, '-')}-${product.sku}`
+    }))
+    
+  } catch (error) {
+    console.warn('⚠️ Status field not available, using fallback query...', error.message)
+    
+    // Fallback: Use the old isActive-based query
+    try {
+      const products = await db.product.findMany({
+        where: {
+          isActive: true
+        },
+        select: {
+          sku: true,
+          name: true
+        }
+      })
+
+      console.log(`✅ Fallback: Generated static params for ${products.length} products`)
+      
+      const generatedSlugs = products.map((product) => {
+        const slug = `${product.name.toLowerCase().replace(/\s+/g, '-')}-${product.sku}`
+        console.log(`📎 Generated slug: ${slug} for SKU: ${product.sku}`)
+        return { slug }
+      })
+      
+      return generatedSlugs
+      
+    } catch (fallbackError) {
+      console.error('❌ Both queries failed:', fallbackError)
+      return []
+    }
+  }
 }
 
 // Enhanced metadata generation with draft system considerations

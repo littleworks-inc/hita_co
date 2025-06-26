@@ -20,6 +20,7 @@ import {
 
 interface Product {
   id: string
+  sku: string  // ADD this line if missing
   name: string
   shortDescription?: string
   images: string[]
@@ -57,7 +58,7 @@ export default function ProductCard({ product, className = '' }: ProductCardProp
   const secondaryImage = product.images && product.images.length > 1 ? product.images[1] : null
 
   // Generate product slug for URL
-  const productSlug = `${product.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${product.id.slice(-8)}`
+  const productSlug = `${product.name.toLowerCase().replace(/\s+/g, '-')}-${product.sku}`
 
   // ✅ FIXED: Calculate discount information - MATCHING ADMIN PREVIEW LOGIC
   const hasDiscount = product.discountPercentage > 0
