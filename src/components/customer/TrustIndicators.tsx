@@ -1,11 +1,16 @@
-// ✅ NEW: src/components/customer/TrustIndicators.tsx - Dynamic shipping settings
+// ✅ ENHANCED: src/components/customer/TrustIndicators.tsx - Dynamic shipping + return policy
 
 import { db } from '@/lib/db'
-import { Shield, Truck, RotateCcw } from 'lucide-react'
+import { Shield, Truck, RotateCcw, AlertCircle } from 'lucide-react'
 
-// Get shipping settings from database
-async function getShippingSettings() {
+// Get shipping and store settings from database
+async function getStoreAndShippingSettings() {
   try {
+    // Get store settings for return policy
+    const storeSettings = await db.storeSetting.findFirst({
+      where: { id: 'default' }
+    })
+
     // Get default shipping zone with rates
     const defaultZone = await db.shippingZone.findFirst({
       where: { 
@@ -20,9 +25,16 @@ async function getShippingSettings() {
       }
     })
 
+    let shippingSettings = {
+      freeShippingThreshold: 100,
+      flatRate: 7,
+      estimatedDays: '5-7 business days',
+      zoneName: 'Default'
+    }
+
     if (defaultZone && defaultZone.shippingRates.length > 0) {
       const rate = defaultZone.shippingRates[0]
-      return {
+      shippingSettings = {
         freeShippingThreshold: rate.freeShippingThreshold,
         flatRate: rate.flatRate,
         estimatedDays: rate.estimatedDays,
@@ -30,27 +42,42 @@ async function getShippingSettings() {
       }
     }
 
-    // Fallback values if no shipping configured
+    // Return policy settings (with fallbacks)
+    const returnPolicy = {
+      returnsEnabled: storeSettings?.returnsEnabled ?? true,
+      returnPeriodDays: storeSettings?.returnPeriodDays || 30,
+      returnPolicyUrl: storeSettings?.returnPolicyUrl || null,
+      hasRestockingFee: storeSettings?.hasRestockingFee || false,
+      restockingFeePercentage: storeSettings?.restockingFeePercentage || 0,
+      noReturnsReason: storeSettings?.noReturnsReason || null
+    }
+
     return {
-      freeShippingThreshold: 100,
-      flatRate: 7,
-      estimatedDays: '5-7 business days',
-      zoneName: 'Default'
+      shipping: shippingSettings,
+      returns: returnPolicy
     }
   } catch (error) {
-    console.error('Error fetching shipping settings:', error)
+    console.error('Error fetching store and shipping settings:', error)
     // Fallback values
     return {
-      freeShippingThreshold: 100,
-      flatRate: 7,
-      estimatedDays: '5-7 business days',
-      zoneName: 'Default'
+      shipping: {
+        freeShippingThreshold: 100,
+        flatRate: 7,
+        estimatedDays: '5-7 business days',
+        zoneName: 'Default'
+      },
+      returns: {
+        returnPeriodDays: 30,
+        returnPolicyUrl: null,
+        hasRestockingFee: false,
+        restockingFeePercentage: 0
+      }
     }
   }
 }
 
 export default async function TrustIndicators() {
-  const shippingSettings = await getShippingSettings()
+  const settings = await getStoreAndShippingSettings()
 
   return (
     <section className="py-12 bg-white border-t border-b border-gray-200">
@@ -72,25 +99,60 @@ export default async function TrustIndicators() {
             </div>
             <h3 className="text-lg font-semibold text-gray-900 mb-2">Free Shipping</h3>
             <p className="text-gray-600">
-              {shippingSettings.freeShippingThreshold 
-                ? `Orders over $${shippingSettings.freeShippingThreshold.toFixed(0)}`
-                : `Starting at $${shippingSettings.flatRate.toFixed(0)}`
+              {settings.shipping.freeShippingThreshold 
+                ? `Orders over $${settings.shipping.freeShippingThreshold.toFixed(0)}`
+                : `Starting at $${settings.shipping.flatRate.toFixed(0)}`
               }
-              {shippingSettings.estimatedDays && (
+              {settings.shipping.estimatedDays && (
                 <span className="block text-sm mt-1">
-                  {shippingSettings.estimatedDays}
+                  {settings.shipping.estimatedDays}
                 </span>
               )}
             </p>
           </div>
 
-          {/* Easy Returns */}
+          {/* Dynamic Returns Policy */}
           <div className="text-center">
-            <div className="inline-flex items-center justify-center w-12 h-12 bg-purple-100 rounded-lg mb-4">
-              <RotateCcw className="h-6 w-6 text-purple-600" />
+            <div className={`inline-flex items-center justify-center w-12 h-12 rounded-lg mb-4 ${
+              settings.returns.returnsEnabled ? 'bg-purple-100' : 'bg-red-100'
+            }`}>
+              {settings.returns.returnsEnabled ? (
+                <RotateCcw className="h-6 w-6 text-purple-600" />
+              ) : (
+                <AlertCircle className="h-6 w-6 text-red-600" />
+              )}
             </div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">Easy Returns</h3>
-            <p className="text-gray-600">30-day return policy for your peace of mind.</p>
+            
+            {settings.returns.returnsEnabled ? (
+              <>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Easy Returns</h3>
+                <p className="text-gray-600">
+                  {settings.returns.returnPeriodDays}-day return policy
+                  {settings.returns.hasRestockingFee && settings.returns.restockingFeePercentage > 0 && (
+                    <span className="block text-sm mt-1">
+                      {settings.returns.restockingFeePercentage}% restocking fee applies
+                    </span>
+                  )}
+                  {!settings.returns.hasRestockingFee && (
+                    <span className="block text-sm mt-1">
+                      No restocking fees
+                    </span>
+                  )}
+                </p>
+              </>
+            ) : (
+              <>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">No Returns</h3>
+                <p className="text-gray-600">
+                  All sales are final
+                  {settings.returns.noReturnsReason && (
+                    <span className="block text-sm mt-1">
+                      {settings.returns.noReturnsReason}
+                    </span>
+                  )}
+                </p>
+              </>
+            )}
           </div>
         </div>
       </div>
