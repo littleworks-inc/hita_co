@@ -15,6 +15,7 @@ import CustomerNavigation from '@/components/customer/CustomerNavigation'
 import ProductCard from '@/components/customer/ProductCard'
 import ProductGallery from '@/components/customer/ProductGallery'
 import LoadingSpinner from '@/components/customer/LoadingSpinner'
+import AddToCartButton from '@/components/cart/AddToCartButton'
 import {
   Star,
   Heart,
@@ -412,41 +413,48 @@ async function ProductDetail({ slug }: { slug: string }) {
 
         {/* Add to Cart Section */}
         <div className="space-y-4 pt-6 border-t border-gray-200">
-          <div className="flex items-center gap-4">
-            <label htmlFor="quantity" className="text-sm font-medium text-gray-700">
-              Quantity:
-            </label>
-            <select
-              id="quantity"
-              className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
-              defaultValue={1}
-            >
-              {Array.from({ length: Math.min(10, product.stockQuantity) }, (_, i) => (
-                <option key={i + 1} value={i + 1}>
-                  {i + 1}
-                </option>
-              ))}
-            </select>
-          </div>
+          {/* ✅ FIXED: Use proper AddToCartButton component */}
+          {(() => {
+            const hasDiscount = product.discountPercentage > 0
+            const shouldShowDiscount = hasDiscount && product.showDiscountToCustomers
+            const finalPrice = shouldShowDiscount 
+              ? product.sellingPriceUSD * (1 - product.discountPercentage / 100)
+              : product.sellingPriceUSD
 
+            return (
+              <AddToCartButton 
+                product={{
+                  id: product.id,
+                  sku: product.sku,
+                  name: product.name,
+                  sellingPriceUSD: finalPrice,
+                  stockQuantity: product.stockQuantity,
+                  images: product.images,
+                  category: product.category,
+                  country: product.country
+                }}
+                variant="large"
+                showQuantitySelector={true}
+                className="w-full"
+                disabled={isOutOfStock}
+              />
+            )
+          })()}
+
+          {/* Additional action buttons */}
           <div className="flex gap-3">
-            <button
-              disabled={isOutOfStock}
-              className="flex-1 bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors font-medium"
-            >
-              <ShoppingCart className="h-5 w-5 inline mr-2" />
-              {isOutOfStock ? 'Out of Stock' : 'Add to Cart'}
+            <button className="flex-1 border border-gray-300 text-gray-700 px-6 py-3 rounded-lg hover:bg-gray-50 transition-colors font-medium flex items-center justify-center gap-2">
+              <Heart className="h-5 w-5" />
+              Add to Wishlist
             </button>
-            <button className="p-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
-              <Heart className="h-5 w-5 text-gray-600" />
-            </button>
-            <button className="p-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
-              <Share2 className="h-5 w-5 text-gray-600" />
+            <button className="flex-1 border border-gray-300 text-gray-700 px-6 py-3 rounded-lg hover:bg-gray-50 transition-colors font-medium flex items-center justify-center gap-2">
+              <Share2 className="h-5 w-5" />
+              Share
             </button>
           </div>
         </div>
 
-        {/* Trust Indicators */}
+        {/* Trust Indicators with Dynamic Shipping Info */}
         <div className="grid grid-cols-3 gap-4 pt-6 border-t border-gray-200">
           <div className="text-center">
             <Shield className="h-8 w-8 text-green-500 mx-auto mb-2" />
@@ -456,7 +464,7 @@ async function ProductDetail({ slug }: { slug: string }) {
           <div className="text-center">
             <Truck className="h-8 w-8 text-blue-500 mx-auto mb-2" />
             <div className="text-xs font-medium text-gray-900">Free Shipping</div>
-            <div className="text-xs text-gray-500">Orders over $50</div>
+            <div className="text-xs text-gray-500">Orders over $100</div>
           </div>
           <div className="text-center">
             <RotateCcw className="h-8 w-8 text-purple-500 mx-auto mb-2" />
