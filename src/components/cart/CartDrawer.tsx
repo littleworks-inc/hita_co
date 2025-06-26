@@ -1,7 +1,11 @@
+// ✅ Complete CartDrawer.tsx with Product List Synchronization
+// src/components/cart/CartDrawer.tsx
+
 'use client'
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { useCart } from '@/contexts/CartContext'
 import { useCartWithCurrency } from '@/contexts/CartContext'
 import CartItem from '@/components/cart/CartItem'
@@ -16,8 +20,17 @@ import {
 } from 'lucide-react'
 
 export default function CartDrawer() {
-  const { isOpen, closeCart, items, totalItems, clearCart, isClient } = useCart()
+  const { 
+    isOpen, 
+    closeCart, 
+    items, 
+    totalItems, 
+    clearCart, 
+    isClient,
+    removeItem 
+  } = useCart()
   const { totalPriceFormatted } = useCartWithCurrency()
+  const router = useRouter()
   const [isAnimating, setIsAnimating] = useState(false)
 
   // Handle drawer animations
@@ -31,6 +44,36 @@ export default function CartDrawer() {
       return () => clearTimeout(timer)
     }
   }, [isOpen])
+
+  // ✅ Enhanced remove item function that triggers product list refresh
+  const handleRemoveItem = (productId: string, productName: string) => {
+    console.log(`🗑️ Removing "${productName}" from cart...`)
+    
+    // Remove the item from cart
+    removeItem(productId)
+    
+    // Trigger a soft refresh to update product listings after a brief delay
+    setTimeout(() => {
+      console.log('🔄 Refreshing product listings after cart removal...')
+      router.refresh()
+    }, 500) // Small delay to ensure cart state updates first
+  }
+
+  // ✅ Enhanced clear cart function with product list refresh
+  const handleClearCart = () => {
+    if (window.confirm('Are you sure you want to clear your cart?')) {
+      console.log('🗑️ Clearing entire cart...')
+      const removedItemCount = items.length
+      
+      clearCart()
+      
+      // Trigger refresh after clearing cart
+      setTimeout(() => {
+        console.log(`🔄 Refreshing product listings after clearing ${removedItemCount} items...`)
+        router.refresh()
+      }, 500)
+    }
+  }
 
   // Don't render on server side to prevent hydration issues
   if (!isClient) return null
@@ -71,6 +114,7 @@ export default function CartDrawer() {
               <button
                 onClick={closeCart}
                 className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                aria-label="Close cart"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -98,13 +142,37 @@ export default function CartDrawer() {
                     Start Shopping
                     <ArrowRight className="h-4 w-4" />
                   </Link>
+
+                  {/* Quick Categories */}
+                  <div className="mt-8 grid grid-cols-2 gap-3 w-full max-w-sm">
+                    <Link
+                      href="/products?featured=true"
+                      onClick={closeCart}
+                      className="p-3 bg-purple-50 rounded-lg hover:bg-purple-100 transition-colors text-center"
+                    >
+                      <Heart className="h-5 w-5 text-purple-600 mx-auto mb-1" />
+                      <span className="text-xs text-purple-700 font-medium">Featured</span>
+                    </Link>
+                    <Link
+                      href="/products?sort=newest"
+                      onClick={closeCart}
+                      className="p-3 bg-green-50 rounded-lg hover:bg-green-100 transition-colors text-center"
+                    >
+                      <Package className="h-5 w-5 text-green-600 mx-auto mb-1" />
+                      <span className="text-xs text-green-700 font-medium">New Arrivals</span>
+                    </Link>
+                  </div>
                 </div>
               ) : (
                 /* Cart Items */
                 <div className="flex-1 overflow-y-auto">
                   <div className="p-4 space-y-4">
                     {items.map((item) => (
-                      <CartItem key={item.id} item={item} />
+                      <EnhancedCartItem 
+                        key={item.id} 
+                        item={item} 
+                        onRemove={handleRemoveItem}
+                      />
                     ))}
                   </div>
                 </div>
@@ -117,11 +185,7 @@ export default function CartDrawer() {
                 {/* Clear Cart Button */}
                 <div className="px-4 py-3 border-b border-gray-100">
                   <button
-                    onClick={() => {
-                      if (window.confirm('Are you sure you want to clear your cart?')) {
-                        clearCart()
-                      }
-                    }}
+                    onClick={handleClearCart}
                     className="flex items-center gap-2 text-sm text-gray-600 hover:text-red-600 transition-colors"
                   >
                     <Trash2 className="h-4 w-4" />
@@ -174,5 +238,65 @@ export default function CartDrawer() {
         </div>
       )}
     </>
+  )
+}
+
+// ✅ Enhanced CartItem wrapper component for the drawer
+interface EnhancedCartItemProps {
+  item: {
+    id: string
+    sku: string
+    name: string
+    priceUSD: number
+    quantity: number
+    maxQuantity: number
+    image?: string
+    category?: {
+      id: string
+      name: string
+      slug: string
+    }
+    country?: {
+      id: string
+      name: string
+      currency: string
+      currencySymbol: string
+    }
+  }
+  onRemove: (productId: string, productName: string) => void
+}
+
+function EnhancedCartItem({ item, onRemove }: EnhancedCartItemProps) {
+  const { updateQuantity } = useCart()
+  const [isUpdating, setIsUpdating] = useState(false)
+  const [isRemoving, setIsRemoving] = useState(false)
+
+  const handleUpdateQuantity = async (newQuantity: number) => {
+    if (newQuantity < 1 || newQuantity > item.maxQuantity) return
+    
+    setIsUpdating(true)
+    await updateQuantity(item.id, newQuantity)
+    
+    // Small delay for user feedback
+    setTimeout(() => setIsUpdating(false), 500)
+  }
+
+  const handleRemoveItem = () => {
+    setIsRemoving(true)
+    // Small delay for animation
+    setTimeout(() => {
+      onRemove(item.id, item.name)
+    }, 200)
+  }
+
+  return (
+    <div className={`transition-all duration-200 ${isRemoving ? 'opacity-0 scale-95' : 'opacity-100 scale-100'}`}>
+      <CartItem 
+        item={item}
+        onUpdateQuantity={handleUpdateQuantity}
+        onRemove={handleRemoveItem}
+        isUpdating={isUpdating}
+      />
+    </div>
   )
 }
