@@ -110,6 +110,41 @@ async function getProduct(slug: string) {
               country: true
             }
           }
+        },
+        // ✅ Ensure we select all fields including discount fields
+        select: {
+          id: true,
+          name: true,
+          sku: true,
+          description: true,
+          shortDescription: true,
+          sellingPriceUSD: true,
+          discountPercentage: true,
+          showDiscountToCustomers: true,
+          images: true,
+          stockQuantity: true,
+          isFeatured: true,
+          tags: true,
+          seoTitle: true,
+          seoDescription: true,
+          isActive: true,
+          status: true,
+          categoryId: true,
+          category: {
+            include: {
+              parent: true
+            }
+          },
+          country: true,
+          supplier: {
+            select: {
+              id: true,
+              name: true,
+              country: true
+            }
+          },
+          createdAt: true,
+          updatedAt: true
         }
       })
       
@@ -127,7 +162,25 @@ async function getProduct(slug: string) {
         sku: sku,
         isActive: true
       },
-      include: {
+      // ✅ Ensure we select all fields including discount fields
+      select: {
+        id: true,
+        name: true,
+        sku: true,
+        description: true,
+        shortDescription: true,
+        sellingPriceUSD: true,
+        discountPercentage: true,
+        showDiscountToCustomers: true,
+        images: true,
+        stockQuantity: true,
+        isFeatured: true,
+        tags: true,
+        seoTitle: true,
+        seoDescription: true,
+        isActive: true,
+        status: true,
+        categoryId: true,
         category: {
           include: {
             parent: true
@@ -140,7 +193,9 @@ async function getProduct(slug: string) {
             name: true,
             country: true
           }
-        }
+        },
+        createdAt: true,
+        updatedAt: true
       }
     })
 
@@ -269,9 +324,51 @@ async function ProductDetail({ slug }: { slug: string }) {
           </div>
         </div>
 
-        {/* Price */}
-        <div className="text-3xl font-bold text-purple-600">
-          {formatPrice(product.sellingPriceUSD)}
+        {/* Price with Discount Logic */}
+        <div className="space-y-2">
+          {/* Calculate discount information */}
+          {(() => {
+            const hasDiscount = product.discountPercentage > 0
+            const shouldShowDiscount = hasDiscount && product.showDiscountToCustomers
+            
+            if (shouldShowDiscount) {
+              // ✅ CRITICAL FIX: Use the SAME logic as admin system
+              // sellingPriceUSD is the ORIGINAL price (before discount)
+              const originalPrice = product.sellingPriceUSD  // $104.04 (original price)
+              
+              // Calculate the final discounted price (what customer actually pays)
+              const finalPrice = originalPrice * (1 - product.discountPercentage / 100)  // $93.64
+              const savings = originalPrice - finalPrice  // $10.40
+
+              return (
+                <>
+                  {/* Discount pricing display */}
+                  <div className="flex items-center gap-4 flex-wrap">
+                    <span className="text-2xl line-through text-gray-400">
+                      {formatPrice(originalPrice)}
+                    </span>
+                    <span className="text-3xl font-bold text-red-600">
+                      {formatPrice(finalPrice)}
+                    </span>
+                    <span className="bg-red-100 text-red-600 px-3 py-1.5 rounded-full text-sm font-bold">
+                      {product.discountPercentage}% OFF
+                    </span>
+                  </div>
+                  {/* Savings information */}
+                  <div className="text-lg text-green-600 font-medium">
+                    You save {formatPrice(savings)}
+                  </div>
+                </>
+              )
+            } else {
+              /* Regular price when no discount */
+              return (
+                <div className="text-3xl font-bold text-purple-600">
+                  {formatPrice(product.sellingPriceUSD)}
+                </div>
+              )
+            }
+          })()}
         </div>
 
         {/* Stock Status */}
