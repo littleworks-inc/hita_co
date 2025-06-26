@@ -1,6 +1,6 @@
-// ✅ UPDATED: prisma/schema.prisma - Added Return Policy Fields to StoreSetting
+// ✅ Complete prisma/schema.prisma with Exhibition POS System
+// Enhanced schema with Shipping System + Return Policy + Exhibition POS
 
-// Enhanced prisma/schema.prisma with Shipping System + Return Policy
 generator client {
   provider = "prisma-client-js"
 }
@@ -119,6 +119,16 @@ enum OrderStatus {
   REFUNDED
 }
 
+// ✅ NEW: Exhibition Payment Methods
+enum ExhibitionPaymentMethod {
+  CASH
+  ZELLE
+  CARD
+  VENMO
+  PAYPAL
+  SPLIT_PAYMENT
+}
+
 model Product {
   id                      String              @id @default(cuid())
   sku                     String              @unique
@@ -158,8 +168,11 @@ model Product {
   status                  ProductStatus       @default(DRAFT)
   archivedAt              DateTime?
   showDiscountToCustomers Boolean             @default(false)
+  
+  // Relations
   exhibitionItems         ExhibitionProduct[]
   orderItems              OrderItem[]
+  exhibitionSaleItems     ExhibitionSaleItem[]  // ✅ NEW: For exhibition POS
   category                Category            @relation(fields: [categoryId], references: [id])
   country                 Country             @relation(fields: [countryId], references: [id])
   supplier                Supplier            @relation(fields: [supplierId], references: [id])
@@ -220,8 +233,11 @@ model Exhibition {
   isActive         Boolean             @default(true)
   createdAt        DateTime            @default(now())
   updatedAt        DateTime            @updatedAt
+  
+  // Relations
   products         ExhibitionProduct[]
   orders           Order[]
+  sales            ExhibitionSale[]    // ✅ NEW: For exhibition POS
 
   @@map("exhibitions")
 }
@@ -232,11 +248,101 @@ model ExhibitionProduct {
   productId     String
   quantityTaken Int
   quantitySold  Int        @default(0)
+  
+  // ✅ NEW: Exhibition-specific pricing fields
+  exhibitionPrice     Float?    // Override price for this exhibition
+  originalPrice       Float?    // Store the original price for reference
+  discountPercentage  Float?    @default(0) // Clearance discount
+  isClearance         Boolean   @default(false) // Mark as clearance item
+  priceHistory        Json?     // Track price changes during exhibition
+  
+  // ✅ NEW: Sales tracking fields
+  salesNotes          String?   // Notes about sales performance
+  lastSaleDate        DateTime? // When was last item sold
+  priceChangedAt      DateTime? // When price was last updated
+  
+  // Relations
   exhibition    Exhibition @relation(fields: [exhibitionId], references: [id], onDelete: Cascade)
   product       Product    @relation(fields: [productId], references: [id])
+  saleItems     ExhibitionSaleItem[]  // ✅ NEW: For exhibition POS
 
   @@unique([exhibitionId, productId])
   @@map("exhibition_products")
+}
+
+// ✅ NEW: Exhibition Sales (POS System)
+model ExhibitionSale {
+  id                    String                    @id @default(cuid())
+  exhibitionId          String
+  saleNumber            String                    @unique // EXH001, EXH002, etc.
+  
+  // Customer Info
+  customerName          String?
+  customerPhone         String?
+  customerEmail         String?
+  
+  // Sale Details
+  subtotal              Float                     // Original prices total
+  customDiscount        Float      @default(0)   // Custom discount amount
+  bundleDiscount        Float      @default(0)   // Bundle/negotiation discount
+  finalTotal            Float                     // What customer actually paid
+  
+  // Payment Information
+  paymentMethod         ExhibitionPaymentMethod
+  cashAmount            Float?                    // For cash payments
+  zelleAmount           Float?                    // For Zelle payments
+  cardAmount            Float?                    // For card payments
+  paymentNotes          String?                   // Payment details/confirmation
+  
+  // Sale Metadata
+  bargainApplied        Boolean    @default(false) // Was price negotiated?
+  bargainReason         String?                   // Why discount was given
+  salesPersonNotes      String?                   // Internal notes
+  
+  createdAt             DateTime   @default(now())
+  updatedAt             DateTime   @updatedAt
+  
+  // Relations
+  exhibition            Exhibition @relation(fields: [exhibitionId], references: [id])
+  items                 ExhibitionSaleItem[]
+  
+  @@map("exhibition_sales")
+}
+
+// ✅ NEW: Exhibition Sale Items
+model ExhibitionSaleItem {
+  id                    String          @id @default(cuid())
+  saleId                String
+  exhibitionProductId   String
+  productId             String
+  
+  // Item Details
+  productName           String          // Store name at time of sale
+  productSku            String          // Store SKU at time of sale
+  categoryName          String          // Store category at time of sale
+  
+  // Pricing
+  originalPrice         Float           // Original store price
+  exhibitionPrice       Float           // Exhibition price (if different)
+  customPrice           Float?          // Custom bargained price for this item
+  finalPrice            Float           // What was actually charged
+  
+  quantity              Int             @default(1)
+  lineTotal             Float           // finalPrice * quantity
+  
+  // Metadata
+  wasScanned            Boolean         @default(false) // Was barcode scanned?
+  scanMethod            String?         // "BARCODE" or "SKU" or "MANUAL"
+  appliedDiscount       Float           @default(0)     // Individual item discount
+  
+  createdAt             DateTime        @default(now())
+  
+  // Relations
+  sale                  ExhibitionSale  @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  exhibitionProduct     ExhibitionProduct @relation(fields: [exhibitionProductId], references: [id])
+  product               Product         @relation(fields: [productId], references: [id])
+  
+  @@map("exhibition_sale_items")
 }
 
 model StoreSetting {
@@ -261,7 +367,8 @@ model StoreSetting {
   currency                  String        @default("USD")
   timezone                  String        @default("America/New_York")
   defaultShippingZoneId     String?
-  // ✅ ENHANCED: Return Policy Fields with No Returns Option
+  
+  // ✅ Return Policy Fields with No Returns Option
   returnsEnabled            Boolean?      @default(true)
   returnPeriodDays          Int?          @default(30)
   returnPolicyUrl           String?
@@ -269,7 +376,7 @@ model StoreSetting {
   restockingFeePercentage   Float?        @default(0)
   returnPolicyDescription   String?
   noReturnsReason           String?
-  // ✅ END: Enhanced Return Policy Fields
+  
   createdAt                 DateTime      @default(now())
   updatedAt                 DateTime      @updatedAt
   defaultShippingZone       ShippingZone? @relation(fields: [defaultShippingZoneId], references: [id])
