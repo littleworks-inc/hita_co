@@ -251,7 +251,7 @@ export default async function ExhibitionDashboard() {
       </div>
 
       {/* Quick Actions Grid */}
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {/* POS System */}
         <Card className="hover:shadow-md transition-shadow cursor-pointer">
           <Link href={`/exhibition/${exhibition.id}/pos`}>
@@ -316,6 +316,29 @@ export default async function ExhibitionDashboard() {
                   View Sales
                 </span>
                 <ArrowRight className="w-4 h-4 text-purple-600" />
+              </div>
+            </CardContent>
+          </Link>
+        </Card>
+
+        {/* Analytics Dashboard */}
+        <Card className="hover:shadow-md transition-shadow cursor-pointer">
+          <Link href={`/exhibition/${exhibition.id}/analytics`}>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <TrendingUp className="w-5 h-5 text-orange-600" />
+                Analytics
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-gray-600 mb-4">
+                Real-time insights, charts, and business intelligence
+              </p>
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-orange-600">
+                  View Analytics
+                </span>
+                <ArrowRight className="w-4 h-4 text-orange-600" />
               </div>
             </CardContent>
           </Link>
