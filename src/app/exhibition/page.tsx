@@ -30,11 +30,14 @@ import {
 
 // Get current exhibition with stats
 async function getCurrentExhibitionWithStats() {
-  const exhibition = await db.exhibition.findFirst({
+  const now = new Date()
+  
+  // First, try to find a currently running exhibition
+  let exhibition = await db.exhibition.findFirst({
     where: {
       isActive: true,
-      startDate: { lte: new Date() },
-      endDate: { gte: new Date() }
+      startDate: { lte: now },
+      endDate: { gte: now }
     },
     include: {
       products: {
@@ -58,9 +61,73 @@ async function getCurrentExhibitionWithStats() {
     }
   })
 
+  // If no currently running exhibition, find the next upcoming exhibition
+  if (!exhibition) {
+    exhibition = await db.exhibition.findFirst({
+      where: {
+        isActive: true,
+        startDate: { gt: now }
+      },
+      include: {
+        products: {
+          include: {
+            product: {
+              include: {
+                category: true,
+                country: true
+              }
+            }
+          }
+        },
+        sales: {
+          include: {
+            items: true
+          }
+        }
+      },
+      orderBy: {
+        startDate: 'asc' // Get the soonest upcoming
+      }
+    })
+  }
+
+  // If still no exhibition, get the most recent one (including past)
+  if (!exhibition) {
+    exhibition = await db.exhibition.findFirst({
+      where: {
+        isActive: true
+      },
+      include: {
+        products: {
+          include: {
+            product: {
+              include: {
+                category: true,
+                country: true
+              }
+            }
+          }
+        },
+        sales: {
+          include: {
+            items: true
+          }
+        }
+      },
+      orderBy: {
+        startDate: 'desc'
+      }
+    })
+  }
+
   if (!exhibition) return null
 
-  // Calculate stats
+  // Use a stable date that doesn't change between server and client
+  const serverTime = new Date()
+  const todayStart = new Date(serverTime.getFullYear(), serverTime.getMonth(), serverTime.getDate())
+  const todayEnd = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000)
+
+  // Calculate stats with stable date comparison
   const totalProducts = exhibition.products.length
   const totalQuantityTaken = exhibition.products.reduce((sum, p) => sum + p.quantityTaken, 0)
   const totalQuantitySold = exhibition.products.reduce((sum, p) => sum + p.quantitySold, 0)
@@ -70,18 +137,18 @@ async function getCurrentExhibitionWithStats() {
   }, 0)
   
   const totalSales = exhibition.sales.length
+  
+  // Use stable date filtering
   const todaySales = exhibition.sales.filter(sale => {
-    const today = new Date()
     const saleDate = new Date(sale.createdAt)
-    return saleDate.toDateString() === today.toDateString()
+    return saleDate >= todayStart && saleDate < todayEnd
   }).length
 
   const totalRevenue = exhibition.sales.reduce((sum, sale) => sum + sale.finalTotal, 0)
   const todayRevenue = exhibition.sales
     .filter(sale => {
-      const today = new Date()
       const saleDate = new Date(sale.createdAt)
-      return saleDate.toDateString() === today.toDateString()
+      return saleDate >= todayStart && saleDate < todayEnd
     })
     .reduce((sum, sale) => sum + sale.finalTotal, 0)
 
@@ -119,12 +186,24 @@ export default async function ExhibitionDashboard() {
 
   const { exhibition, stats } = data
 
-  // Calculate exhibition progress
+  // Calculate exhibition status and progress with stable dates
   const now = new Date()
   const start = new Date(exhibition.startDate)
   const end = new Date(exhibition.endDate)
+  
+  let exhibitionStatus: 'upcoming' | 'active' | 'completed' = 'completed'
+  let badgeColor = 'bg-gray-100 text-gray-800'
+  
+  if (start > now) {
+    exhibitionStatus = 'upcoming'
+    badgeColor = 'bg-blue-100 text-blue-800'
+  } else if (end >= now) {
+    exhibitionStatus = 'active'
+    badgeColor = 'bg-green-100 text-green-800'
+  }
+
   const totalDuration = end.getTime() - start.getTime()
-  const elapsed = now.getTime() - start.getTime()
+  const elapsed = Math.max(0, now.getTime() - start.getTime())
   const progress = Math.min(100, Math.max(0, (elapsed / totalDuration) * 100))
 
   return (
@@ -137,8 +216,8 @@ export default async function ExhibitionDashboard() {
               <h1 className="text-2xl font-bold text-gray-900">
                 {exhibition.title}
               </h1>
-              <Badge variant="default" className="bg-green-100 text-green-800">
-                Active
+              <Badge variant="success" className={badgeColor}>
+                {exhibitionStatus.charAt(0).toUpperCase() + exhibitionStatus.slice(1)}
               </Badge>
             </div>
             
@@ -157,46 +236,38 @@ export default async function ExhibitionDashboard() {
                 <p className="text-gray-700 mt-2">{exhibition.description}</p>
               )}
             </div>
-
-            {/* Exhibition Progress */}
-            <div className="mt-4">
-              <div className="flex justify-between text-sm text-gray-600 mb-1">
-                <span>Exhibition Progress</span>
-                <span>{Math.round(progress)}%</span>
-              </div>
-              <div className="w-full bg-gray-200 rounded-full h-2">
-                <div 
-                  className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                  style={{ width: `${progress}%` }}
-                />
-              </div>
-            </div>
           </div>
 
-          {/* Quick Action Button */}
-          <div className="flex flex-col gap-2 sm:flex-row">
-            <Link href={`/exhibition/${exhibition.id}/pos`}>
-              <Button size="lg" className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700">
-                <ShoppingCart className="w-5 h-5 mr-2" />
-                Start Sale
-              </Button>
-            </Link>
+          {/* Progress Indicator */}
+          <div className="w-full sm:w-32">
+            <div className="text-sm text-gray-600 mb-1">Progress</div>
+            <div className="w-full bg-gray-200 rounded-full h-2">
+              <div 
+                className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+            <div className="text-xs text-gray-500 mt-1">
+              {progress.toFixed(0)}% complete
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Key Stats Grid */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {/* Today's Sales */}
+      {/* Quick Stats */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Today's Revenue */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Today's Sales</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Today's Revenue</CardTitle>
+            <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.todaySales}</div>
+            <div className="text-2xl font-bold">
+              {formatPrice(stats.todayRevenue)}
+            </div>
             <p className="text-xs text-muted-foreground">
-              {formatPrice(stats.todayRevenue, 'USD')} revenue
+              {stats.todaySales} transactions
             </p>
           </CardContent>
         </Card>
@@ -205,11 +276,11 @@ export default async function ExhibitionDashboard() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
+            <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {formatPrice(stats.totalRevenue, 'USD')}
+              {formatPrice(stats.totalRevenue)}
             </div>
             <p className="text-xs text-muted-foreground">
               {stats.totalSales} transactions
@@ -356,7 +427,7 @@ export default async function ExhibitionDashboard() {
         <CardContent>
           {stats.totalSales > 0 ? (
             <div className="space-y-3">
-              {exhibition.sales.slice(0, 5).map((sale) => (
+              {exhibition.sales.slice(0, 5).map((sale: any) => (
                 <div key={sale.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
@@ -373,7 +444,7 @@ export default async function ExhibitionDashboard() {
                   </div>
                   <div className="text-right">
                     <p className="text-sm font-medium">
-                      {formatPrice(sale.finalTotal, 'USD')}
+                      {formatPrice(sale.finalTotal)}
                     </p>
                     <p className="text-xs text-gray-500 capitalize">
                       {sale.paymentMethod.toLowerCase().replace('_', ' ')}
