@@ -30,6 +30,7 @@ interface Product {
   name: string
   sku: string
   sellingPriceUSD: number
+  discountPercentage: number // ✅ ADD: Existing store discount
   stockQuantity: number
   images: string[]
   category: { name: string }
@@ -41,7 +42,7 @@ interface ExhibitionProduct {
   productId: string
   quantityTaken: number
   quantitySold: number
-  // ✅ ADD: Exhibition pricing fields (these exist in your schema)
+  // ✅ Exhibition pricing fields
   exhibitionPrice?: number
   originalPrice?: number
   discountPercentage?: number
@@ -117,16 +118,45 @@ export default function ExhibitionProductsManager({
     return !isAlreadyAdded && matchesSearch && matchesCategory
   })
 
-  // ✅ NEW: Pricing calculation helper
-  const calculateFinalPrice = (exhibitionProduct: ExhibitionProduct) => {
-    const originalPrice = exhibitionProduct.product.sellingPriceUSD
-    const exhibitionPrice = exhibitionProduct.exhibitionPrice || originalPrice
+  // ✅ ENHANCED: Pricing calculation helper that respects existing discounts
+  const calculatePricingHierarchy = (exhibitionProduct: ExhibitionProduct) => {
+    const product = exhibitionProduct.product
     
-    if (exhibitionProduct.isClearance && exhibitionProduct.discountPercentage) {
-      return exhibitionPrice * (1 - exhibitionProduct.discountPercentage / 100)
+    // Calculate the original price (before store discount)
+    const originalStorePrice = product.discountPercentage > 0 
+      ? product.sellingPriceUSD / (1 - product.discountPercentage / 100)
+      : product.sellingPriceUSD
+      
+    // Current store price (with existing discount applied)
+    const currentStorePrice = product.sellingPriceUSD
+    
+    // Exhibition price (custom price for exhibition or defaults to store price)
+    const exhibitionPrice = exhibitionProduct.exhibitionPrice || currentStorePrice
+    
+    // Final price after exhibition-specific clearance discount
+    const finalPrice = exhibitionProduct.isClearance && exhibitionProduct.discountPercentage
+      ? exhibitionPrice * (1 - exhibitionProduct.discountPercentage / 100)
+      : exhibitionPrice
+    
+    // Calculate total savings
+    const totalSavings = originalStorePrice - finalPrice
+    const totalDiscountPercent = originalStorePrice > 0 
+      ? ((originalStorePrice - finalPrice) / originalStorePrice) * 100 
+      : 0
+    
+    return {
+      originalStorePrice,
+      currentStorePrice,
+      exhibitionPrice,
+      finalPrice,
+      storeDiscount: product.discountPercentage || 0,
+      exhibitionDiscount: exhibitionProduct.discountPercentage || 0,
+      totalSavings,
+      totalDiscountPercent,
+      hasStoreDiscount: (product.discountPercentage || 0) > 0,
+      hasExhibitionDiscount: (exhibitionProduct.discountPercentage || 0) > 0,
+      hasCustomExhibitionPrice: exhibitionProduct.exhibitionPrice && exhibitionProduct.exhibitionPrice !== currentStorePrice
     }
-    
-    return exhibitionPrice
   }
 
   // ✅ PRESERVE: All existing handlers
@@ -321,7 +351,7 @@ export default function ExhibitionProductsManager({
 
   return (
     <div className="space-y-6">
-      {/* ✅ NEW: Enhanced Header with Tabs */}
+      {/* ✅ ENHANCED: Header with Tabs */}
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
@@ -430,16 +460,16 @@ export default function ExhibitionProductsManager({
                     ) : (
                       <>
                         <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Original Price
+                          Store Price (Original)
                         </th>
                         <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Exhibition Price
                         </th>
                         <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Final Price
+                          Final Customer Price
                         </th>
                         <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Status
+                          Pricing Status
                         </th>
                       </>
                     )}
@@ -450,12 +480,12 @@ export default function ExhibitionProductsManager({
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {exhibitionProducts.map((exhibitionProduct) => {
+                    const pricing = calculatePricingHierarchy(exhibitionProduct)
+                    const PerformanceIcon = getPerformanceIcon(exhibitionProduct.quantityTaken, exhibitionProduct.quantitySold)
                     const isEditing = editingId === exhibitionProduct.id
                     const sellRate = exhibitionProduct.quantityTaken > 0 
                       ? (exhibitionProduct.quantitySold / exhibitionProduct.quantityTaken) * 100 
                       : 0
-                    const PerformanceIcon = getPerformanceIcon(exhibitionProduct.quantityTaken, exhibitionProduct.quantitySold)
-                    const finalPrice = calculateFinalPrice(exhibitionProduct)
 
                     return (
                       <tr key={exhibitionProduct.id} className="hover:bg-gray-50">
@@ -476,7 +506,7 @@ export default function ExhibitionProductsManager({
                           </td>
                         )}
                         
-                        {/* Product Info */}
+                        {/* ✅ ENHANCED: Product Info with discount indicators */}
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-3">
                             <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center overflow-hidden">
@@ -493,14 +523,26 @@ export default function ExhibitionProductsManager({
                               <div className="text-sm text-gray-500">
                                 SKU: {exhibitionProduct.product.sku} • {exhibitionProduct.product.category.name}
                               </div>
-                              {exhibitionProduct.isClearance && (
-                                <div className="inline-flex items-center gap-1 mt-1">
-                                  <Tag className="h-3 w-3 text-red-600" />
-                                  <span className="text-xs font-medium text-red-600 bg-red-100 px-2 py-0.5 rounded">
-                                    CLEARANCE
+                              {/* ✅ ENHANCED: Show existing store discount */}
+                              <div className="flex items-center gap-2 mt-1">
+                                {pricing.hasStoreDiscount && (
+                                  <span className="inline-flex items-center gap-1">
+                                    <Percent className="h-3 w-3 text-blue-600" />
+                                    <span className="text-xs font-medium text-blue-600 bg-blue-100 px-2 py-0.5 rounded">
+                                      Store: {pricing.storeDiscount}% OFF
+                                    </span>
                                   </span>
-                                </div>
-                              )}
+                                )}
+                                {/* ✅ ENHANCED: Show clearance badge */}
+                                {exhibitionProduct.isClearance && (
+                                  <span className="inline-flex items-center gap-1">
+                                    <Tag className="h-3 w-3 text-red-600" />
+                                    <span className="text-xs font-medium text-red-600 bg-red-100 px-2 py-0.5 rounded">
+                                      CLEARANCE: {pricing.exhibitionDiscount}% OFF
+                                    </span>
+                                  </span>
+                                )}
+                              </div>
                             </div>
                           </div>
                         </td>
@@ -552,61 +594,86 @@ export default function ExhibitionProductsManager({
                             {/* Revenue */}
                             <td className="px-6 py-4 text-center">
                               <div className="font-medium">
-                                {formatPrice(exhibitionProduct.quantitySold * finalPrice)}
+                                {formatPrice(exhibitionProduct.quantitySold * pricing.finalPrice)}
                               </div>
                               <div className="text-xs text-gray-500">
-                                {formatPrice(finalPrice)} each
+                                {formatPrice(pricing.finalPrice)} each
                               </div>
                             </td>
                           </>
                         ) : (
                           <>
-                            {/* Original Price */}
+                            {/* ✅ ENHANCED: Original Store Price */}
                             <td className="px-6 py-4 text-center">
-                              <div className="font-medium text-gray-600">
-                                {formatPrice(exhibitionProduct.product.sellingPriceUSD)}
-                              </div>
-                            </td>
-
-                            {/* Exhibition Price */}
-                            <td className="px-6 py-4 text-center">
-                              <div className="font-medium">
-                                {formatPrice(exhibitionProduct.exhibitionPrice || exhibitionProduct.product.sellingPriceUSD)}
-                              </div>
-                              {exhibitionProduct.exhibitionPrice !== exhibitionProduct.product.sellingPriceUSD && (
-                                <div className="text-xs text-blue-600">Custom Price</div>
-                              )}
-                            </td>
-
-                            {/* Final Price */}
-                            <td className="px-6 py-4 text-center">
-                              <div className="font-bold text-lg">
-                                {formatPrice(finalPrice)}
-                              </div>
-                              {exhibitionProduct.isClearance && exhibitionProduct.discountPercentage && (
-                                <div className="text-xs text-red-600">
-                                  -{exhibitionProduct.discountPercentage}% off
+                              <div className="space-y-1">
+                                <div className="font-medium text-gray-600">
+                                  {formatPrice(pricing.originalStorePrice)}
                                 </div>
-                              )}
+                                {pricing.hasStoreDiscount && (
+                                  <div className="text-xs text-gray-500">Before store discount</div>
+                                )}
+                              </div>
                             </td>
 
-                            {/* Status */}
+                            {/* ✅ ENHANCED: Exhibition Price */}
                             <td className="px-6 py-4 text-center">
-                              {exhibitionProduct.isClearance ? (
-                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                                  <Tag className="h-3 w-3 mr-1" />
-                                  Clearance
-                                </span>
-                              ) : exhibitionProduct.exhibitionPrice ? (
-                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                                  <DollarSign className="h-3 w-3 mr-1" />
-                                  Custom Price
-                                </span>
-                              ) : (
-                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                                  Regular Price
-                                </span>
-                              )}
+                              <div className="space-y-1">
+                                <div className="font-medium">
+                                  {formatPrice(pricing.exhibitionPrice)}
+                                </div>
+                                {pricing.hasCustomExhibitionPrice ? (
+                                  <div className="text-xs text-blue-600">Custom Exhibition Price</div>
+                                ) : pricing.hasStoreDiscount ? (
+                                  <div className="text-xs text-gray-500">Store price (after {pricing.storeDiscount}% off)</div>
+                                ) : (
+                                  <div className="text-xs text-gray-500">Regular store price</div>
+                                )}
+                              </div>
+                            </td>
+
+                            {/* ✅ ENHANCED: Final Price with full breakdown */}
+                            <td className="px-6 py-4 text-center">
+                              <div className="space-y-1">
+                                <div className="font-bold text-lg">
+                                  {formatPrice(pricing.finalPrice)}
+                                </div>
+                                {pricing.totalSavings > 0 && (
+                                  <div className="text-xs text-green-600">
+                                    Save {formatPrice(pricing.totalSavings)} ({pricing.totalDiscountPercent.toFixed(1)}% off)
+                                  </div>
+                                )}
+                                {pricing.hasExhibitionDiscount && (
+                                  <div className="text-xs text-red-600">
+                                    Exhibition: -{pricing.exhibitionDiscount}% off
+                                  </div>
+                                )}
+                              </div>
+                            </td>
+
+                            {/* ✅ ENHANCED: Status with more detail */}
+                            <td className="px-6 py-4 text-center">
+                              <div className="space-y-1">
+                                {exhibitionProduct.isClearance ? (
+                                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                    <Tag className="h-3 w-3 mr-1" />
+                                    Clearance
+                                  </span>
+                                ) : pricing.hasCustomExhibitionPrice ? (
+                                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                    <DollarSign className="h-3 w-3 mr-1" />
+                                    Custom Price
+                                  </span>
+                                ) : pricing.hasStoreDiscount ? (
+                                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                    <Percent className="h-3 w-3 mr-1" />
+                                    Store Discount
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                                    Regular Price
+                                  </span>
+                                )}
+                              </div>
                             </td>
                           </>
                         )}
@@ -672,7 +739,7 @@ export default function ExhibitionProductsManager({
         </CardContent>
       </Card>
 
-      {/* ✅ PRESERVE: Add Product Modal (unchanged) */}
+      {/* ✅ PRESERVE: Add Product Modal */}
       {showAddModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
@@ -738,8 +805,19 @@ export default function ExhibitionProductsManager({
                             <div className="text-sm text-gray-500">
                               SKU: {product.sku} • {product.category.name}
                             </div>
-                            <div className="text-sm font-medium text-green-600">
-                              {formatPrice(product.sellingPriceUSD)}
+                            {/* ✅ ENHANCED: Show existing store discount */}
+                            <div className="flex items-center gap-2 mt-1">
+                              <div className="text-sm font-medium text-green-600">
+                                Current: {formatPrice(product.sellingPriceUSD)}
+                              </div>
+                              {product.discountPercentage > 0 && (
+                                <span className="inline-flex items-center gap-1">
+                                  <Percent className="h-3 w-3 text-blue-600" />
+                                  <span className="text-xs font-medium text-blue-600 bg-blue-100 px-2 py-0.5 rounded">
+                                    {product.discountPercentage}% OFF
+                                  </span>
+                                </span>
+                              )}
                             </div>
                           </div>
                           <div className="text-right">
@@ -782,7 +860,7 @@ export default function ExhibitionProductsManager({
         </div>
       )}
 
-      {/* ✅ NEW: Pricing Modal */}
+      {/* ✅ ENHANCED: Pricing Modal with discount hierarchy */}
       {showPricingModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg w-full max-w-lg mx-4">
@@ -810,7 +888,7 @@ export default function ExhibitionProductsManager({
                     placeholder="Custom price for this exhibition"
                   />
                   <p className="text-xs text-gray-500 mt-1">
-                    Leave empty to use regular store price
+                    Leave empty to use current store price (after any store discounts)
                   </p>
                 </div>
 
@@ -831,7 +909,7 @@ export default function ExhibitionProductsManager({
                       Mark as Clearance Item
                     </Label>
                     <p className="text-xs text-gray-500">
-                      Apply additional discount and clearance badge
+                      Apply additional exhibition discount on top of any existing store discount
                     </p>
                   </div>
                   <Tag className="h-5 w-5 text-red-600" />
@@ -840,7 +918,7 @@ export default function ExhibitionProductsManager({
                 {/* Clearance Discount */}
                 {pricingData.isClearance && (
                   <div>
-                    <Label htmlFor="discountPercentage">Clearance Discount (%)</Label>
+                    <Label htmlFor="discountPercentage">Exhibition Clearance Discount (%)</Label>
                     <Input
                       id="discountPercentage"
                       type="number"
@@ -851,33 +929,67 @@ export default function ExhibitionProductsManager({
                         ...pricingData,
                         discountPercentage: parseFloat(e.target.value) || 0
                       })}
-                      placeholder="Additional discount percentage"
+                      placeholder="Additional discount percentage for exhibition"
                     />
+                    <p className="text-xs text-gray-500 mt-1">
+                      This discount will be applied on top of the exhibition price
+                    </p>
                   </div>
                 )}
 
-                {/* Price Preview */}
+                {/* ✅ ENHANCED: Price Preview with full discount hierarchy */}
                 <div className="bg-gray-50 p-3 rounded-lg">
-                  <h4 className="font-medium text-gray-900 mb-2">Price Preview</h4>
-                  <div className="space-y-1 text-sm">
-                    <div className="flex justify-between">
-                      <span>Exhibition Price:</span>
-                      <span className="font-medium">{formatPrice(pricingData.exhibitionPrice)}</span>
-                    </div>
-                    {pricingData.isClearance && pricingData.discountPercentage > 0 && (
-                      <>
-                        <div className="flex justify-between text-red-600">
-                          <span>Clearance Discount:</span>
-                          <span>-{pricingData.discountPercentage}%</span>
-                        </div>
-                        <div className="flex justify-between font-bold text-lg border-t pt-1">
-                          <span>Final Price:</span>
-                          <span className="text-green-600">
-                            {formatPrice(pricingData.exhibitionPrice * (1 - pricingData.discountPercentage / 100))}
-                          </span>
-                        </div>
-                      </>
-                    )}
+                  <h4 className="font-medium text-gray-900 mb-2">Pricing Breakdown</h4>
+                  <div className="space-y-2 text-sm">
+                    {/* Find the product to show its current store discount */}
+                    {(() => {
+                      const product = availableProducts.find(p => p.id === selectedProductId)
+                      if (!product) return null
+                      
+                      const originalStorePrice = product.discountPercentage > 0 
+                        ? product.sellingPriceUSD / (1 - product.discountPercentage / 100)
+                        : product.sellingPriceUSD
+                      
+                      const exhibitionPrice = pricingData.exhibitionPrice || product.sellingPriceUSD
+                      const finalPrice = pricingData.isClearance && pricingData.discountPercentage > 0
+                        ? exhibitionPrice * (1 - pricingData.discountPercentage / 100)
+                        : exhibitionPrice
+                      
+                      return (
+                        <>
+                          <div className="flex justify-between">
+                            <span>Store Original Price:</span>
+                            <span className="font-medium">{formatPrice(originalStorePrice)}</span>
+                          </div>
+                          {product.discountPercentage > 0 && (
+                            <div className="flex justify-between text-blue-600">
+                              <span>Store Discount ({product.discountPercentage}%):</span>
+                              <span>-{formatPrice(originalStorePrice - product.sellingPriceUSD)}</span>
+                            </div>
+                          )}
+                          <div className="flex justify-between">
+                            <span>Exhibition Price:</span>
+                            <span className="font-medium">{formatPrice(exhibitionPrice)}</span>
+                          </div>
+                          {pricingData.isClearance && pricingData.discountPercentage > 0 && (
+                            <div className="flex justify-between text-red-600">
+                              <span>Exhibition Clearance ({pricingData.discountPercentage}%):</span>
+                              <span>-{formatPrice(exhibitionPrice - finalPrice)}</span>
+                            </div>
+                          )}
+                          <div className="flex justify-between font-bold text-lg border-t pt-2">
+                            <span>Final Customer Price:</span>
+                            <span className="text-green-600">{formatPrice(finalPrice)}</span>
+                          </div>
+                          {(product.discountPercentage > 0 || (pricingData.isClearance && pricingData.discountPercentage > 0)) && (
+                            <div className="text-center text-sm text-green-600 font-medium">
+                              Total Savings: {formatPrice(originalStorePrice - finalPrice)} 
+                              ({(((originalStorePrice - finalPrice) / originalStorePrice) * 100).toFixed(1)}% off)
+                            </div>
+                          )}
+                        </>
+                      )
+                    })()}
                   </div>
                 </div>
 
@@ -931,7 +1043,7 @@ export default function ExhibitionProductsManager({
                 </div>
 
                 <div>
-                  <Label htmlFor="bulkDiscount">Clearance Discount (%)</Label>
+                  <Label htmlFor="bulkDiscount">Exhibition Clearance Discount (%)</Label>
                   <Input
                     id="bulkDiscount"
                     type="number"
@@ -941,6 +1053,9 @@ export default function ExhibitionProductsManager({
                     onChange={(e) => setBulkDiscount(parseFloat(e.target.value) || 0)}
                     placeholder="Discount percentage for all selected items"
                   />
+                  <p className="text-xs text-gray-500 mt-1">
+                    This will be applied as an additional clearance discount
+                  </p>
                 </div>
 
                 <div className="bg-orange-50 p-3 rounded-lg">
@@ -951,7 +1066,7 @@ export default function ExhibitionProductsManager({
                         Bulk Clearance Action
                       </p>
                       <p className="text-xs text-orange-700">
-                        This will mark all selected products as clearance and apply the discount.
+                        This will mark all selected products as clearance and apply the discount on top of any existing pricing.
                       </p>
                     </div>
                   </div>
@@ -976,7 +1091,7 @@ export default function ExhibitionProductsManager({
         </div>
       )}
 
-      {/* ✅ NEW: Summary Cards */}
+      {/* ✅ ENHANCED: Summary Cards with better calculations */}
       {exhibitionProducts.length > 0 && (
         <div className="grid gap-4 md:grid-cols-4">
           <Card>
@@ -1026,10 +1141,12 @@ export default function ExhibitionProductsManager({
                 <div>
                   <div className="text-sm text-gray-600">Avg. Final Price</div>
                   <div className="text-xl font-bold">
-                    {formatPrice(
-                      exhibitionProducts.reduce((sum, ep) => sum + calculateFinalPrice(ep), 0) / 
-                      exhibitionProducts.length
-                    )}
+                    {exhibitionProducts.length > 0 ? formatPrice(
+                      exhibitionProducts.reduce((sum, ep) => {
+                        const pricing = calculatePricingHierarchy(ep)
+                        return sum + pricing.finalPrice
+                      }, 0) / exhibitionProducts.length
+                    ) : '$0'}
                   </div>
                 </div>
               </div>
