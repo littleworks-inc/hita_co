@@ -125,7 +125,7 @@ export default function ExhibitionPOS({ params }: POSProps) {
   useEffect(() => {
     async function loadData() {
       try {
-        const response = await fetch(`/api/exhibition/${params.id}/products`)
+        const response = await fetch(`/api/exhibition/${params.id}/inventory`)
         if (!response.ok) throw new Error('Failed to load exhibition data')
         
         const data = await response.json()
