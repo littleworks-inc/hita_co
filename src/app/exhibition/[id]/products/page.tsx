@@ -148,7 +148,7 @@ export default function ExhibitionProductsInventory({ params }: ProductsInventor
       if (categoryFilter) queryParams.set('category', categoryFilter)
       if (searchQuery) queryParams.set('search', searchQuery)
 
-      const response = await fetch(`/api/exhibition/${params.id}/products?${queryParams}`)
+      const response = await fetch(`/api/exhibition/${params.id}/inventory?${queryParams}`)
       if (!response.ok) throw new Error('Failed to load products data')
       
       const data = await response.json()
