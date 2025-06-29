@@ -6,7 +6,6 @@ import { formatPrice, formatDate } from '@/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle, Button } from '@/components/ui'
 import AdminNavigation from '@/components/admin/AdminNavigation'
 import ExhibitionProductsManager from '@/components/admin/ExhibitionProductsManager'
-import QuickSalesUpdate from '@/components/admin/QuickSalesUpdate'
 import {
   ArrowLeft,
   Package,
@@ -71,7 +70,8 @@ export default async function ExhibitionProductsPage({ params }: ExhibitionProdu
   const totalProductsSold = exhibition.products.reduce((sum, p) => sum + p.quantitySold, 0)
   const totalValue = exhibition.products.reduce((sum, p) => sum + (p.quantityTaken * p.product.sellingPriceUSD), 0)
   const soldValue = exhibition.products.reduce((sum, p) => sum + (p.quantitySold * p.product.sellingPriceUSD), 0)
-  const sellThroughRate = totalProductsTaken > 0 ? (totalProductsSold / totalProductsTaken) * 100 : 0
+  const sellThroughRate = totalProductsTaken > 0 ? 
+    (totalProductsSold / totalProductsTaken) * 100 : 0
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -117,27 +117,27 @@ export default async function ExhibitionProductsPage({ params }: ExhibitionProdu
                 <CardContent>
                   <div className="text-2xl font-bold">{totalProductsTaken}</div>
                   <p className="text-xs text-muted-foreground">
-                    {exhibition.products.length} product types
+                    Total items at exhibition
                   </p>
                 </CardContent>
               </Card>
 
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Products Sold</CardTitle>
+                  <CardTitle className="text-sm font-medium">Sell-Through Rate</CardTitle>
                   <TrendingUp className="h-4 w-4 text-green-600" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">{totalProductsSold}</div>
+                  <div className="text-2xl font-bold">{sellThroughRate.toFixed(1)}%</div>
                   <p className="text-xs text-muted-foreground">
-                    {sellThroughRate.toFixed(1)}% sell-through rate
+                    Products sold vs taken
                   </p>
                 </CardContent>
               </Card>
 
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Inventory Value</CardTitle>
+                  <CardTitle className="text-sm font-medium">Total Investment</CardTitle>
                   <DollarSign className="h-4 w-4 text-purple-600" />
                 </CardHeader>
                 <CardContent>
@@ -162,23 +162,13 @@ export default async function ExhibitionProductsPage({ params }: ExhibitionProdu
               </Card>
             </div>
 
-            {/* Exhibition Products Manager */}
-            <div className="grid gap-6 lg:grid-cols-3">
-              <div className="lg:col-span-2">
-                <ExhibitionProductsManager 
-                  exhibition={exhibition}
-                  exhibitionProducts={exhibition.products}
-                  availableProducts={availableProducts}
-                />
-              </div>
-              
-              {/* Quick Sales Update Sidebar */}
-              <div>
-                <QuickSalesUpdate 
-                  exhibitionId={exhibition.id}
-                  exhibitionProducts={exhibition.products}
-                />
-              </div>
+            {/* Exhibition Products Manager - Full Width */}
+            <div className="w-full">
+              <ExhibitionProductsManager 
+                exhibition={exhibition}
+                exhibitionProducts={exhibition.products}
+                availableProducts={availableProducts}
+              />
             </div>
           </div>
         </div>

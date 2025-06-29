@@ -30,7 +30,7 @@ interface Product {
   name: string
   sku: string
   sellingPriceUSD: number
-  discountPercentage: number // ✅ ADD: Existing store discount
+  discountPercentage: number
   stockQuantity: number
   images: string[]
   category: { name: string }
@@ -42,7 +42,6 @@ interface ExhibitionProduct {
   productId: string
   quantityTaken: number
   quantitySold: number
-  // ✅ Exhibition pricing fields
   exhibitionPrice?: number
   originalPrice?: number
   discountPercentage?: number
@@ -75,21 +74,21 @@ export default function ExhibitionProductsManager({
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   
-  // ✅ PRESERVE: All existing states
+  // State management
   const [editingId, setEditingId] = useState<string | null>(null)
   const [showAddModal, setShowAddModal] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('')
 
-  // ✅ PRESERVE: Existing edit states for quantities
+  // Edit states for quantities
   const [editQuantityTaken, setEditQuantityTaken] = useState(0)
   const [editQuantitySold, setEditQuantitySold] = useState(0)
 
-  // ✅ PRESERVE: Existing add product states
+  // Add product states
   const [selectedProductId, setSelectedProductId] = useState('')
   const [addQuantityTaken, setAddQuantityTaken] = useState(1)
 
-  // ✅ NEW: Pricing management states
+  // Pricing management states
   const [activeTab, setActiveTab] = useState<'quantities' | 'pricing'>('quantities')
   const [showPricingModal, setShowPricingModal] = useState(false)
   const [pricingProductId, setPricingProductId] = useState<string | null>(null)
@@ -100,15 +99,15 @@ export default function ExhibitionProductsManager({
     salesNotes: ''
   })
 
-  // ✅ NEW: Bulk operations states
+  // Bulk operations states
   const [selectedProducts, setSelectedProducts] = useState<string[]>([])
   const [showBulkPricingModal, setShowBulkPricingModal] = useState(false)
   const [bulkDiscount, setBulkDiscount] = useState(0)
 
-  // ✅ PRESERVE: Get unique categories for filter
+  // Get unique categories for filter
   const categories = [...new Set(availableProducts.map(p => p.category.name))].sort()
 
-  // ✅ PRESERVE: Filter available products (exclude already added ones)
+  // Filter available products (exclude already added ones)
   const filteredAvailableProducts = availableProducts.filter(product => {
     const isAlreadyAdded = exhibitionProducts.some(ep => ep.productId === product.id)
     const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -118,48 +117,75 @@ export default function ExhibitionProductsManager({
     return !isAlreadyAdded && matchesSearch && matchesCategory
   })
 
-  // ✅ ENHANCED: Pricing calculation helper that respects existing discounts
+  // ✅ CORRECTED: Fixed pricing calculation to match customer-facing logic
   const calculatePricingHierarchy = (exhibitionProduct: ExhibitionProduct) => {
     const product = exhibitionProduct.product
     
-    // Calculate the original price (before store discount)
-    const originalStorePrice = product.discountPercentage > 0 
-      ? product.sellingPriceUSD / (1 - product.discountPercentage / 100)
-      : product.sellingPriceUSD
-      
-    // Current store price (with existing discount applied)
-    const currentStorePrice = product.sellingPriceUSD
+    // ✅ CRITICAL CORRECTION: 
+    // - sellingPriceUSD = ORIGINAL price (before discount) - matches customer logic
+    // - discountPercentage = Store discount to be applied
     
-    // Exhibition price (custom price for exhibition or defaults to store price)
-    const exhibitionPrice = exhibitionProduct.exhibitionPrice || currentStorePrice
+    const storeOriginalPrice = product.sellingPriceUSD  // $104.04 (original price)
     
-    // Final price after exhibition-specific clearance discount
-    const finalPrice = exhibitionProduct.isClearance && exhibitionProduct.discountPercentage
+    // Calculate what customer actually pays (with store discount applied)
+    const customerFinalPrice = product.discountPercentage > 0 
+      ? storeOriginalPrice * (1 - product.discountPercentage / 100)  // $93.64
+      : storeOriginalPrice
+    
+    // Exhibition price (custom price for exhibition or defaults to customer final price)
+    const exhibitionPrice = exhibitionProduct.exhibitionPrice || customerFinalPrice
+    
+    // Final exhibition price after exhibition-specific clearance discount
+    const finalExhibitionPrice = exhibitionProduct.isClearance && exhibitionProduct.discountPercentage
       ? exhibitionPrice * (1 - exhibitionProduct.discountPercentage / 100)
       : exhibitionPrice
     
-    // Calculate total savings
-    const totalSavings = originalStorePrice - finalPrice
-    const totalDiscountPercent = originalStorePrice > 0 
-      ? ((originalStorePrice - finalPrice) / originalStorePrice) * 100 
+    // Calculate savings information
+    const storeDiscount = product.discountPercentage || 0
+    const storeSavings = storeOriginalPrice - customerFinalPrice
+    const exhibitionSavings = exhibitionPrice - finalExhibitionPrice
+    const totalSavings = storeOriginalPrice - finalExhibitionPrice
+    const totalDiscountPercent = storeOriginalPrice > 0 
+      ? ((totalSavings) / storeOriginalPrice) * 100 
       : 0
     
     return {
-      originalStorePrice,
-      currentStorePrice,
-      exhibitionPrice,
-      finalPrice,
-      storeDiscount: product.discountPercentage || 0,
-      exhibitionDiscount: exhibitionProduct.discountPercentage || 0,
-      totalSavings,
-      totalDiscountPercent,
-      hasStoreDiscount: (product.discountPercentage || 0) > 0,
+      // ✅ CORRECTED PRICING HIERARCHY:
+      storeOriginalPrice,        // $104.04 - sellingPriceUSD (original price)
+      customerFinalPrice,        // $93.64 - What customer pays (after 10% discount)
+      exhibitionPrice,           // $93.64 - Price for this exhibition (default = customerFinalPrice)
+      finalExhibitionPrice,      // $93.64 - Final exhibition price after any clearance
+      
+      // Discount information
+      storeDiscount,             // 10% - Store discount percentage
+      exhibitionDiscount: exhibitionProduct.discountPercentage || 0, // Additional exhibition discount
+      
+      // Savings calculations
+      storeSavings,              // $10.40 - How much store discount saves
+      exhibitionSavings,         // $0 - How much exhibition clearance saves
+      totalSavings,              // $10.40 - Total savings from original
+      totalDiscountPercent,      // 10% - Total discount percentage
+      
+      // Status flags
+      hasStoreDiscount: storeDiscount > 0,
       hasExhibitionDiscount: (exhibitionProduct.discountPercentage || 0) > 0,
-      hasCustomExhibitionPrice: exhibitionProduct.exhibitionPrice && exhibitionProduct.exhibitionPrice !== currentStorePrice
+      hasCustomExhibitionPrice: exhibitionProduct.exhibitionPrice && 
+                               exhibitionProduct.exhibitionPrice !== customerFinalPrice,
+      isOnClearance: exhibitionProduct.isClearance || false
     }
   }
 
-  // ✅ PRESERVE: All existing handlers
+  // Performance icon helper
+  const getPerformanceIcon = (taken: number, sold: number) => {
+    if (taken === 0) return CheckCircle
+    const rate = (sold / taken) * 100
+    if (rate >= 80) return TrendingUp
+    if (rate >= 50) return CheckCircle
+    if (rate >= 20) return AlertTriangle
+    return TrendingUp
+  }
+
+  // Event handlers
   const handleEdit = (exhibitionProduct: ExhibitionProduct) => {
     setEditingId(exhibitionProduct.id)
     setEditQuantityTaken(exhibitionProduct.quantityTaken)
@@ -255,7 +281,7 @@ export default function ExhibitionProductsManager({
     }
   }
 
-  // ✅ NEW: Pricing handlers
+  // Pricing handlers
   const handleOpenPricingModal = (exhibitionProduct: ExhibitionProduct) => {
     setPricingProductId(exhibitionProduct.id)
     setPricingData({
@@ -297,88 +323,49 @@ export default function ExhibitionProductsManager({
     }
   }
 
-  const handleBulkClearance = async () => {
-    if (selectedProducts.length === 0) {
-      alert('Please select products first')
-      return
-    }
-
-    setLoading(true)
-
-    try {
-      const response = await fetch(`/api/admin/exhibitions/${exhibition.id}/products/bulk-clearance`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          productIds: selectedProducts,
-          discountPercentage: bulkDiscount,
-          isClearance: true
-        })
-      })
-
-      if (response.ok) {
-        setShowBulkPricingModal(false)
-        setSelectedProducts([])
-        setBulkDiscount(0)
-        router.refresh()
-      } else {
-        const errorData = await response.json()
-        alert(errorData.error || 'Failed to apply bulk clearance')
-      }
-    } catch (error) {
-      alert('Failed to apply bulk clearance. Please try again.')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  // ✅ PRESERVE: Existing performance helpers
-  const getPerformanceColor = (taken: number, sold: number) => {
-    if (taken === 0) return 'text-gray-500'
-    const rate = (sold / taken) * 100
-    if (rate >= 80) return 'text-green-600'
-    if (rate >= 50) return 'text-yellow-600'
-    return 'text-red-600'
-  }
-
-  const getPerformanceIcon = (taken: number, sold: number) => {
-    if (taken === 0) return AlertTriangle
-    const rate = (sold / taken) * 100
-    if (rate >= 80) return CheckCircle
-    if (rate >= 50) return TrendingUp
-    return AlertTriangle
-  }
+  // Calculate summary statistics for pricing overview
+  const pricingSummary = exhibitionProducts.length > 0 ? {
+    averageStoreDiscount: exhibitionProducts.reduce((sum, ep) => sum + (ep.product.discountPercentage || 0), 0) / exhibitionProducts.length,
+    totalOriginalValue: exhibitionProducts.reduce((sum, ep) => {
+      const pricing = calculatePricingHierarchy(ep)
+      return sum + (pricing.storeOriginalPrice * ep.quantityTaken)
+    }, 0),
+    totalCustomerValue: exhibitionProducts.reduce((sum, ep) => {
+      const pricing = calculatePricingHierarchy(ep)
+      return sum + (pricing.customerFinalPrice * ep.quantityTaken)
+    }, 0),
+    totalSavings: exhibitionProducts.reduce((sum, ep) => {
+      const pricing = calculatePricingHierarchy(ep)
+      return sum + (pricing.totalSavings * ep.quantityTaken)
+    }, 0),
+    clearanceProducts: exhibitionProducts.filter(ep => ep.isClearance).length,
+    customPricedProducts: exhibitionProducts.filter(ep => ep.exhibitionPrice && ep.exhibitionPrice !== ep.product.sellingPriceUSD).length
+  } : null
 
   return (
     <div className="space-y-6">
-      {/* ✅ ENHANCED: Header with Tabs */}
+      {/* Main Products Management Card */}
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-2">
-              <Package className="h-5 w-5" />
-              Exhibition Products Management ({exhibitionProducts.length})
-            </CardTitle>
-            <div className="flex items-center gap-2">
-              <Button onClick={() => setShowAddModal(true)} disabled={loading}>
-                <Plus className="h-4 w-4 mr-2" />
-                Add Products
-              </Button>
-              {exhibitionProducts.length > 0 && (
-                <Button 
-                  variant="outline" 
-                  onClick={() => setShowBulkPricingModal(true)}
-                  disabled={loading}
-                >
-                  <Tag className="h-4 w-4 mr-2" />
-                  Bulk Pricing
-                </Button>
-              )}
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Package className="h-5 w-5" />
+                Exhibition Products ({exhibitionProducts.length})
+              </CardTitle>
+              <p className="text-sm text-gray-500 mt-1">
+                Manage products taken to this exhibition, quantities, and pricing
+              </p>
             </div>
+            
+            <Button onClick={() => setShowAddModal(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Add Products
+            </Button>
           </div>
-          
-          {/* ✅ NEW: Tab Navigation */}
-          <div className="flex border-b border-gray-200">
+
+          {/* Tab Navigation */}
+          <div className="flex border-b border-gray-200 mt-4">
             <button
               onClick={() => setActiveTab('quantities')}
               className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
@@ -399,7 +386,7 @@ export default function ExhibitionProductsManager({
               }`}
             >
               <DollarSign className="h-4 w-4 inline mr-2" />
-              Pricing & Clearance
+              Pricing & Discounts
             </button>
           </div>
         </CardHeader>
@@ -419,7 +406,7 @@ export default function ExhibitionProductsManager({
             </div>
           ) : (
             <div className="overflow-x-auto">
-              {/* ✅ ENHANCED: Table with pricing information */}
+              {/* Products Table */}
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
@@ -459,17 +446,18 @@ export default function ExhibitionProductsManager({
                       </>
                     ) : (
                       <>
+                        {/* ✅ FIXED: Updated column headers for clarity */}
                         <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Store Price (Original)
+                          Original Price
+                        </th>
+                        <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Customer Pays
                         </th>
                         <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Exhibition Price
                         </th>
                         <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Final Customer Price
-                        </th>
-                        <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Pricing Status
+                          Discount Status
                         </th>
                       </>
                     )}
@@ -505,17 +493,15 @@ export default function ExhibitionProductsManager({
                             />
                           </td>
                         )}
-                        
-                        {/* ✅ ENHANCED: Product Info with discount indicators */}
+
+                        {/* Product Info */}
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-3">
-                            <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center overflow-hidden">
-                              <ProductImage 
-                                images={exhibitionProduct.product.images}
-                                name={exhibitionProduct.product.name}
-                                className="w-12 h-12 object-cover"
-                              />
-                            </div>
+                            <ProductImage 
+                              images={exhibitionProduct.product.images} 
+                              name={exhibitionProduct.product.name}
+                              className="h-12 w-12"
+                            />
                             <div>
                               <div className="font-medium text-gray-900">
                                 {exhibitionProduct.product.name}
@@ -523,31 +509,10 @@ export default function ExhibitionProductsManager({
                               <div className="text-sm text-gray-500">
                                 SKU: {exhibitionProduct.product.sku} • {exhibitionProduct.product.category.name}
                               </div>
-                              {/* ✅ ENHANCED: Show existing store discount */}
-                              <div className="flex items-center gap-2 mt-1">
-                                {pricing.hasStoreDiscount && (
-                                  <span className="inline-flex items-center gap-1">
-                                    <Percent className="h-3 w-3 text-blue-600" />
-                                    <span className="text-xs font-medium text-blue-600 bg-blue-100 px-2 py-0.5 rounded">
-                                      Store: {pricing.storeDiscount}% OFF
-                                    </span>
-                                  </span>
-                                )}
-                                {/* ✅ ENHANCED: Show clearance badge */}
-                                {exhibitionProduct.isClearance && (
-                                  <span className="inline-flex items-center gap-1">
-                                    <Tag className="h-3 w-3 text-red-600" />
-                                    <span className="text-xs font-medium text-red-600 bg-red-100 px-2 py-0.5 rounded">
-                                      CLEARANCE: {pricing.exhibitionDiscount}% OFF
-                                    </span>
-                                  </span>
-                                )}
-                              </div>
                             </div>
                           </div>
                         </td>
 
-                        {/* Tab Content */}
                         {activeTab === 'quantities' ? (
                           <>
                             {/* Quantity Taken */}
@@ -584,8 +549,12 @@ export default function ExhibitionProductsManager({
                             {/* Performance */}
                             <td className="px-6 py-4 text-center">
                               <div className="flex items-center justify-center gap-2">
-                                <PerformanceIcon className={`h-4 w-4 ${getPerformanceColor(exhibitionProduct.quantityTaken, exhibitionProduct.quantitySold)}`} />
-                                <span className={getPerformanceColor(exhibitionProduct.quantityTaken, exhibitionProduct.quantitySold)}>
+                                <PerformanceIcon className={`h-4 w-4 ${
+                                  sellRate >= 80 ? 'text-green-600' :
+                                  sellRate >= 50 ? 'text-blue-600' :
+                                  sellRate >= 20 ? 'text-yellow-600' : 'text-red-600'
+                                }`} />
+                                <span className="text-sm font-medium">
                                   {sellRate.toFixed(1)}%
                                 </span>
                               </div>
@@ -594,84 +563,108 @@ export default function ExhibitionProductsManager({
                             {/* Revenue */}
                             <td className="px-6 py-4 text-center">
                               <div className="font-medium">
-                                {formatPrice(exhibitionProduct.quantitySold * pricing.finalPrice)}
+                                {formatPrice(exhibitionProduct.quantitySold * pricing.finalExhibitionPrice)}
                               </div>
                               <div className="text-xs text-gray-500">
-                                {formatPrice(pricing.finalPrice)} each
+                                {formatPrice(pricing.finalExhibitionPrice)} each
                               </div>
                             </td>
                           </>
                         ) : (
                           <>
-                            {/* ✅ ENHANCED: Original Store Price */}
+                            {/* ✅ FIXED: Store Original Price - Before any discounts */}
                             <td className="px-6 py-4 text-center">
                               <div className="space-y-1">
                                 <div className="font-medium text-gray-600">
-                                  {formatPrice(pricing.originalStorePrice)}
+                                  {formatPrice(pricing.storeOriginalPrice)}
                                 </div>
-                                {pricing.hasStoreDiscount && (
-                                  <div className="text-xs text-gray-500">Before store discount</div>
+                                <div className="text-xs text-gray-500">
+                                  {pricing.hasStoreDiscount ? 'Before store discount' : 'Regular price'}
+                                </div>
+                              </div>
+                            </td>
+
+                            {/* ✅ FIXED: Customer Final Price - What customer actually pays */}
+                            <td className="px-6 py-4 text-center">
+                              <div className="space-y-1">
+                                <div className="font-bold text-green-600 text-lg">
+                                  {formatPrice(pricing.customerFinalPrice)}
+                                </div>
+                                {pricing.hasStoreDiscount ? (
+                                  <div className="text-xs text-green-600">
+                                    After {pricing.storeDiscount}% store discount
+                                  </div>
+                                ) : (
+                                  <div className="text-xs text-gray-500">
+                                    Regular customer price
+                                  </div>
+                                )}
+                                {pricing.storeSavings > 0 && (
+                                  <div className="text-xs text-green-600">
+                                    Saves {formatPrice(pricing.storeSavings)}
+                                  </div>
                                 )}
                               </div>
                             </td>
 
-                            {/* ✅ ENHANCED: Exhibition Price */}
+                            {/* ✅ FIXED: Exhibition Price - Price for this specific event */}
                             <td className="px-6 py-4 text-center">
                               <div className="space-y-1">
                                 <div className="font-medium">
-                                  {formatPrice(pricing.exhibitionPrice)}
+                                  {formatPrice(pricing.finalExhibitionPrice)}
                                 </div>
                                 {pricing.hasCustomExhibitionPrice ? (
-                                  <div className="text-xs text-blue-600">Custom Exhibition Price</div>
-                                ) : pricing.hasStoreDiscount ? (
-                                  <div className="text-xs text-gray-500">Store price (after {pricing.storeDiscount}% off)</div>
-                                ) : (
-                                  <div className="text-xs text-gray-500">Regular store price</div>
-                                )}
-                              </div>
-                            </td>
-
-                            {/* ✅ ENHANCED: Final Price with full breakdown */}
-                            <td className="px-6 py-4 text-center">
-                              <div className="space-y-1">
-                                <div className="font-bold text-lg">
-                                  {formatPrice(pricing.finalPrice)}
-                                </div>
-                                {pricing.totalSavings > 0 && (
-                                  <div className="text-xs text-green-600">
-                                    Save {formatPrice(pricing.totalSavings)} ({pricing.totalDiscountPercent.toFixed(1)}% off)
-                                  </div>
-                                )}
-                                {pricing.hasExhibitionDiscount && (
+                                  <div className="text-xs text-blue-600">Custom exhibition price</div>
+                                ) : pricing.hasExhibitionDiscount ? (
                                   <div className="text-xs text-red-600">
-                                    Exhibition: -{pricing.exhibitionDiscount}% off
+                                    Exhibition clearance (-{pricing.exhibitionDiscount}%)
                                   </div>
+                                ) : (
+                                  <div className="text-xs text-gray-500">Same as customer price</div>
                                 )}
                               </div>
                             </td>
 
-                            {/* ✅ ENHANCED: Status with more detail */}
+                            {/* ✅ FIXED: Pricing Status - Summary of all discounts */}
                             <td className="px-6 py-4 text-center">
                               <div className="space-y-1">
-                                {exhibitionProduct.isClearance ? (
-                                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                                    <Tag className="h-3 w-3 mr-1" />
-                                    Clearance
-                                  </span>
-                                ) : pricing.hasCustomExhibitionPrice ? (
-                                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                                    <DollarSign className="h-3 w-3 mr-1" />
-                                    Custom Price
-                                  </span>
-                                ) : pricing.hasStoreDiscount ? (
-                                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                    <Percent className="h-3 w-3 mr-1" />
-                                    Store Discount
-                                  </span>
-                                ) : (
-                                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                                    Regular Price
-                                  </span>
+                                {/* Store discount badge */}
+                                {pricing.hasStoreDiscount && (
+                                  <div>
+                                    <span className="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">
+                                      Store: {pricing.storeDiscount}% OFF
+                                    </span>
+                                  </div>
+                                )}
+                                
+                                {/* Exhibition discount badge */}
+                                {pricing.hasExhibitionDiscount && (
+                                  <div>
+                                    <span className="inline-block bg-red-100 text-red-800 text-xs px-2 py-1 rounded-full">
+                                      Exhibition: {pricing.exhibitionDiscount}% OFF
+                                    </span>
+                                  </div>
+                                )}
+                                
+                                {/* Custom price badge */}
+                                {pricing.hasCustomExhibitionPrice && !pricing.hasExhibitionDiscount && (
+                                  <div>
+                                    <span className="inline-block bg-purple-100 text-purple-800 text-xs px-2 py-1 rounded-full">
+                                      Custom Price
+                                    </span>
+                                  </div>
+                                )}
+                                
+                                {/* No discounts */}
+                                {!pricing.hasStoreDiscount && !pricing.hasExhibitionDiscount && !pricing.hasCustomExhibitionPrice && (
+                                  <span className="text-xs text-gray-500">Regular pricing</span>
+                                )}
+                                
+                                {/* Total savings summary */}
+                                {pricing.totalSavings > 0 && (
+                                  <div className="text-xs text-green-600 mt-1 font-medium">
+                                    Total saves: {formatPrice(pricing.totalSavings)}
+                                  </div>
                                 )}
                               </div>
                             </td>
@@ -703,7 +696,7 @@ export default function ExhibitionProductsManager({
                                 {activeTab === 'quantities' ? (
                                   <Button
                                     size="sm"
-                                    variant="ghost"
+                                    variant="outline"
                                     onClick={() => handleEdit(exhibitionProduct)}
                                   >
                                     <Edit className="h-4 w-4" />
@@ -711,17 +704,17 @@ export default function ExhibitionProductsManager({
                                 ) : (
                                   <Button
                                     size="sm"
-                                    variant="ghost"
+                                    variant="outline"
                                     onClick={() => handleOpenPricingModal(exhibitionProduct)}
                                   >
-                                    <DollarSign className="h-4 w-4" />
+                                    <Tag className="h-4 w-4" />
                                   </Button>
                                 )}
                                 <Button
                                   size="sm"
                                   variant="ghost"
                                   onClick={() => handleRemoveProduct(exhibitionProduct.id, exhibitionProduct.product.name)}
-                                  disabled={loading}
+                                  className="text-red-600 hover:text-red-700"
                                 >
                                   <Trash2 className="h-4 w-4" />
                                 </Button>
@@ -739,120 +732,195 @@ export default function ExhibitionProductsManager({
         </CardContent>
       </Card>
 
-      {/* ✅ PRESERVE: Add Product Modal */}
+      {/* Pricing Summary Card - Only shown on pricing tab */}
+      {activeTab === 'pricing' && pricingSummary && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <DollarSign className="h-5 w-5" />
+              Pricing Summary
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+              <div className="text-center p-4 bg-gray-50 rounded-lg">
+                <div className="text-sm text-gray-600">Total Original Value</div>
+                <div className="text-xl font-bold">
+                  {formatPrice(pricingSummary.totalOriginalValue)}
+                </div>
+                <div className="text-xs text-gray-500">Before all discounts</div>
+              </div>
+              
+              <div className="text-center p-4 bg-green-50 rounded-lg">
+                <div className="text-sm text-gray-600">Customer Value</div>
+                <div className="text-xl font-bold text-green-600">
+                  {formatPrice(pricingSummary.totalCustomerValue)}
+                </div>
+                <div className="text-xs text-green-600">What customers pay</div>
+              </div>
+              
+              <div className="text-center p-4 bg-blue-50 rounded-lg">
+                <div className="text-sm text-gray-600">Total Savings</div>
+                <div className="text-xl font-bold text-blue-600">
+                  {formatPrice(pricingSummary.totalSavings)}
+                </div>
+                <div className="text-xs text-blue-600">
+                  {((pricingSummary.totalSavings / pricingSummary.totalOriginalValue) * 100).toFixed(1)}% off
+                </div>
+              </div>
+              
+              <div className="text-center p-4 bg-purple-50 rounded-lg">
+                <div className="text-sm text-gray-600">Special Pricing</div>
+                <div className="text-xl font-bold text-purple-600">
+                  {pricingSummary.clearanceProducts + pricingSummary.customPricedProducts}
+                </div>
+                <div className="text-xs text-purple-600">
+                  {pricingSummary.clearanceProducts} clearance, {pricingSummary.customPricedProducts} custom
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Add Product Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[80vh] overflow-y-auto">
             <div className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold">Add Products to Exhibition</h3>
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-medium">Add Products to Exhibition</h3>
                 <Button variant="ghost" onClick={() => setShowAddModal(false)}>
                   <X className="h-4 w-4" />
                 </Button>
               </div>
 
-              <div className="mb-4 flex gap-4">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <Input
-                    type="text"
-                    placeholder="Search products..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-10"
-                  />
+              {/* Search and Filters */}
+              <div className="space-y-4 mb-6">
+                <div className="flex gap-4">
+                  <div className="flex-1">
+                    <Label htmlFor="search">Search Products</Label>
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                      <Input
+                        id="search"
+                        placeholder="Search by name or SKU..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="pl-10"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <Label htmlFor="category">Category</Label>
+                    <select
+                      id="category"
+                      value={categoryFilter}
+                      onChange={(e) => setCategoryFilter(e.target.value)}
+                      className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="">All Categories</option>
+                      {categories.map(category => (
+                        <option key={category} value={category}>{category}</option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
-                <select
-                  value={categoryFilter}
-                  onChange={(e) => setCategoryFilter(e.target.value)}
-                  className="px-3 py-2 border border-gray-300 rounded-md"
-                >
-                  <option value="">All Categories</option>
-                  {categories.map((category) => (
-                    <option key={category} value={category}>
-                      {category}
-                    </option>
-                  ))}
-                </select>
               </div>
 
-              <div className="mb-4 max-h-96 overflow-y-auto border border-gray-200 rounded-lg">
-                {filteredAvailableProducts.length === 0 ? (
-                  <div className="text-center py-8 text-gray-500">
-                    <Package className="mx-auto h-12 w-12 text-gray-400" />
-                    <p className="mt-2 text-sm">No available products found</p>
+              {/* Product Selection */}
+              <div className="space-y-4">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div>
+                    <Label htmlFor="product">Select Product *</Label>
+                    <select
+                      id="product"
+                      value={selectedProductId}
+                      onChange={(e) => setSelectedProductId(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="">Choose a product...</option>
+                      {filteredAvailableProducts.map(product => (
+                        <option key={product.id} value={product.id}>
+                          {product.name} - {product.sku} ({formatPrice(product.sellingPriceUSD)})
+                        </option>
+                      ))}
+                    </select>
                   </div>
-                ) : (
-                  <div className="divide-y divide-gray-200">
-                    {filteredAvailableProducts.map((product) => (
-                      <div
-                        key={product.id}
-                        className={`p-4 cursor-pointer hover:bg-gray-50 ${
-                          selectedProductId === product.id ? 'bg-blue-50 border-blue-200' : ''
-                        }`}
-                        onClick={() => setSelectedProductId(product.id)}
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center overflow-hidden">
-                            <ProductImage 
-                              images={product.images}
-                              name={product.name}
-                              className="w-12 h-12 object-cover"
-                            />
-                          </div>
+                  <div>
+                    <Label htmlFor="quantity">Quantity to Take *</Label>
+                    <Input
+                      id="quantity"
+                      type="number"
+                      value={addQuantityTaken}
+                      onChange={(e) => setAddQuantityTaken(parseInt(e.target.value) || 1)}
+                      min="1"
+                      placeholder="5"
+                    />
+                  </div>
+                </div>
+
+                {/* Selected Product Preview */}
+                {selectedProductId && (
+                  <div className="p-4 bg-gray-50 rounded-lg">
+                    {(() => {
+                      const product = availableProducts.find(p => p.id === selectedProductId)
+                      if (!product) return null
+                      
+                      const storeOriginalPrice = product.discountPercentage > 0 
+                        ? product.sellingPriceUSD / (1 - product.discountPercentage / 100)
+                        : product.sellingPriceUSD
+                      
+                      return (
+                        <div className="flex items-center gap-4">
+                          <ProductImage 
+                            images={product.images} 
+                            name={product.name}
+                            className="h-16 w-16"
+                          />
                           <div className="flex-1">
-                            <div className="font-medium text-gray-900">{product.name}</div>
-                            <div className="text-sm text-gray-500">
-                              SKU: {product.sku} • {product.category.name}
-                            </div>
-                            {/* ✅ ENHANCED: Show existing store discount */}
+                            <h4 className="font-medium">{product.name}</h4>
+                            <p className="text-sm text-gray-600">SKU: {product.sku} • {product.category.name}</p>
                             <div className="flex items-center gap-2 mt-1">
-                              <div className="text-sm font-medium text-green-600">
-                                Current: {formatPrice(product.sellingPriceUSD)}
-                              </div>
-                              {product.discountPercentage > 0 && (
-                                <span className="inline-flex items-center gap-1">
-                                  <Percent className="h-3 w-3 text-blue-600" />
-                                  <span className="text-xs font-medium text-blue-600 bg-blue-100 px-2 py-0.5 rounded">
+                              {product.discountPercentage > 0 ? (
+                                <>
+                                  <span className="text-sm text-gray-500 line-through">
+                                    {formatPrice(product.sellingPriceUSD)}
+                                  </span>
+                                  <span className="text-sm font-medium text-green-600">
+                                    {formatPrice(product.sellingPriceUSD * (1 - product.discountPercentage / 100))}
+                                  </span>
+                                  <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full">
                                     {product.discountPercentage}% OFF
                                   </span>
+                                </>
+                              ) : (
+                                <span className="text-sm font-medium">
+                                  {formatPrice(product.sellingPriceUSD)}
                                 </span>
                               )}
                             </div>
                           </div>
                           <div className="text-right">
-                            <div className="text-sm text-gray-500">Stock: {product.stockQuantity}</div>
+                            <div className="text-sm text-gray-600">Stock: {product.stockQuantity}</div>
+                            <div className="text-sm font-medium">
+                              Total: {formatPrice(product.sellingPriceUSD * addQuantityTaken)}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      )
+                    })()}
                   </div>
                 )}
               </div>
 
-              {selectedProductId && (
-                <div className="mb-4">
-                  <Label htmlFor="addQuantity">Quantity to Take</Label>
-                  <Input
-                    id="addQuantity"
-                    type="number"
-                    value={addQuantityTaken}
-                    onChange={(e) => setAddQuantityTaken(parseInt(e.target.value) || 1)}
-                    min="1"
-                    className="w-32"
-                  />
-                </div>
-              )}
-
-              <div className="flex justify-end gap-2">
+              {/* Action Buttons */}
+              <div className="flex justify-end gap-3 mt-6">
                 <Button variant="outline" onClick={() => setShowAddModal(false)}>
                   Cancel
                 </Button>
-                <Button 
-                  onClick={handleAddProduct}
-                  disabled={!selectedProductId || loading}
-                >
-                  Add Product
+                <Button onClick={handleAddProduct} disabled={!selectedProductId || addQuantityTaken <= 0 || loading}>
+                  {loading ? 'Adding...' : 'Add to Exhibition'}
                 </Button>
               </div>
             </div>
@@ -860,13 +928,13 @@ export default function ExhibitionProductsManager({
         </div>
       )}
 
-      {/* ✅ ENHANCED: Pricing Modal with discount hierarchy */}
+      {/* Pricing Modal */}
       {showPricingModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg w-full max-w-lg mx-4">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg max-w-lg w-full">
             <div className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold">Exhibition Pricing & Clearance</h3>
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-medium">Edit Exhibition Pricing</h3>
                 <Button variant="ghost" onClick={() => setShowPricingModal(false)}>
                   <X className="h-4 w-4" />
                 </Button>
@@ -888,12 +956,12 @@ export default function ExhibitionProductsManager({
                     placeholder="Custom price for this exhibition"
                   />
                   <p className="text-xs text-gray-500 mt-1">
-                    Leave empty to use current store price (after any store discounts)
+                    Leave empty to use store price. Set a custom price for this exhibition.
                   </p>
                 </div>
 
                 {/* Clearance Toggle */}
-                <div className="flex items-center gap-3 p-3 border rounded-lg">
+                <div className="flex items-center gap-3">
                   <input
                     type="checkbox"
                     id="isClearance"
@@ -904,11 +972,9 @@ export default function ExhibitionProductsManager({
                     })}
                     className="rounded border-gray-300"
                   />
-                  <div className="flex-1">
-                    <Label htmlFor="isClearance" className="font-medium">
-                      Mark as Clearance Item
-                    </Label>
-                    <p className="text-xs text-gray-500">
+                  <div>
+                    <Label htmlFor="isClearance">Mark as Exhibition Clearance</Label>
+                    <p className="text-xs text-gray-500 mt-1">
                       Apply additional exhibition discount on top of any existing store discount
                     </p>
                   </div>
@@ -937,20 +1003,25 @@ export default function ExhibitionProductsManager({
                   </div>
                 )}
 
-                {/* ✅ ENHANCED: Price Preview with full discount hierarchy */}
+                {/* Price Preview */}
                 <div className="bg-gray-50 p-3 rounded-lg">
                   <h4 className="font-medium text-gray-900 mb-2">Pricing Breakdown</h4>
                   <div className="space-y-2 text-sm">
-                    {/* Find the product to show its current store discount */}
                     {(() => {
-                      const product = availableProducts.find(p => p.id === selectedProductId)
+                      const product = availableProducts.find(p => 
+                        exhibitionProducts.find(ep => ep.id === pricingProductId)?.productId === p.id
+                      )
                       if (!product) return null
                       
-                      const originalStorePrice = product.discountPercentage > 0 
-                        ? product.sellingPriceUSD / (1 - product.discountPercentage / 100)
+                      const storeOriginalPrice = product.discountPercentage > 0 
+                        ? product.sellingPriceUSD  // $104.04 (original price)
                         : product.sellingPriceUSD
                       
-                      const exhibitionPrice = pricingData.exhibitionPrice || product.sellingPriceUSD
+                      const customerFinalPrice = product.discountPercentage > 0
+                        ? product.sellingPriceUSD * (1 - product.discountPercentage / 100)  // $93.64
+                        : product.sellingPriceUSD
+                      
+                      const exhibitionPrice = pricingData.exhibitionPrice || customerFinalPrice
                       const finalPrice = pricingData.isClearance && pricingData.discountPercentage > 0
                         ? exhibitionPrice * (1 - pricingData.discountPercentage / 100)
                         : exhibitionPrice
@@ -959,14 +1030,18 @@ export default function ExhibitionProductsManager({
                         <>
                           <div className="flex justify-between">
                             <span>Store Original Price:</span>
-                            <span className="font-medium">{formatPrice(originalStorePrice)}</span>
+                            <span className="font-medium">{formatPrice(storeOriginalPrice)}</span>
                           </div>
                           {product.discountPercentage > 0 && (
                             <div className="flex justify-between text-blue-600">
                               <span>Store Discount ({product.discountPercentage}%):</span>
-                              <span>-{formatPrice(originalStorePrice - product.sellingPriceUSD)}</span>
+                              <span>-{formatPrice(storeOriginalPrice - customerFinalPrice)}</span>
                             </div>
                           )}
+                          <div className="flex justify-between">
+                            <span>Customer Pays:</span>
+                            <span className="font-medium text-green-600">{formatPrice(customerFinalPrice)}</span>
+                          </div>
                           <div className="flex justify-between">
                             <span>Exhibition Price:</span>
                             <span className="font-medium">{formatPrice(exhibitionPrice)}</span>
@@ -983,8 +1058,8 @@ export default function ExhibitionProductsManager({
                           </div>
                           {(product.discountPercentage > 0 || (pricingData.isClearance && pricingData.discountPercentage > 0)) && (
                             <div className="text-center text-sm text-green-600 font-medium">
-                              Total Savings: {formatPrice(originalStorePrice - finalPrice)} 
-                              ({(((originalStorePrice - finalPrice) / originalStorePrice) * 100).toFixed(1)}% off)
+                              Total Savings: {formatPrice(storeOriginalPrice - finalPrice)} 
+                              ({(((storeOriginalPrice - finalPrice) / storeOriginalPrice) * 100).toFixed(1)}% off)
                             </div>
                           )}
                         </>
@@ -1010,148 +1085,17 @@ export default function ExhibitionProductsManager({
                 </div>
               </div>
 
-              <div className="flex justify-end gap-2 mt-6">
+              {/* Action Buttons */}
+              <div className="flex justify-end gap-3 mt-6">
                 <Button variant="outline" onClick={() => setShowPricingModal(false)}>
                   Cancel
                 </Button>
                 <Button onClick={handleSavePricing} disabled={loading}>
-                  Save Pricing
+                  {loading ? 'Saving...' : 'Save Pricing'}
                 </Button>
               </div>
             </div>
           </div>
-        </div>
-      )}
-
-      {/* ✅ NEW: Bulk Pricing Modal */}
-      {showBulkPricingModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg w-full max-w-md mx-4">
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold">Bulk Clearance</h3>
-                <Button variant="ghost" onClick={() => setShowBulkPricingModal(false)}>
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-
-              <div className="space-y-4">
-                <div>
-                  <p className="text-sm text-gray-600 mb-2">
-                    Apply clearance discount to {selectedProducts.length} selected products
-                  </p>
-                </div>
-
-                <div>
-                  <Label htmlFor="bulkDiscount">Exhibition Clearance Discount (%)</Label>
-                  <Input
-                    id="bulkDiscount"
-                    type="number"
-                    min="0"
-                    max="100"
-                    value={bulkDiscount}
-                    onChange={(e) => setBulkDiscount(parseFloat(e.target.value) || 0)}
-                    placeholder="Discount percentage for all selected items"
-                  />
-                  <p className="text-xs text-gray-500 mt-1">
-                    This will be applied as an additional clearance discount
-                  </p>
-                </div>
-
-                <div className="bg-orange-50 p-3 rounded-lg">
-                  <div className="flex items-start gap-2">
-                    <AlertTriangle className="h-5 w-5 text-orange-600 mt-0.5" />
-                    <div>
-                      <p className="text-sm font-medium text-orange-900">
-                        Bulk Clearance Action
-                      </p>
-                      <p className="text-xs text-orange-700">
-                        This will mark all selected products as clearance and apply the discount on top of any existing pricing.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex justify-end gap-2 mt-6">
-                <Button variant="outline" onClick={() => setShowBulkPricingModal(false)}>
-                  Cancel
-                </Button>
-                <Button 
-                  onClick={handleBulkClearance} 
-                  disabled={loading || selectedProducts.length === 0 || bulkDiscount <= 0}
-                  className="bg-red-600 hover:bg-red-700 text-white"
-                >
-                  <Tag className="h-4 w-4 mr-2" />
-                  Apply Clearance
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ✅ ENHANCED: Summary Cards with better calculations */}
-      {exhibitionProducts.length > 0 && (
-        <div className="grid gap-4 md:grid-cols-4">
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-2">
-                <Package className="h-5 w-5 text-blue-600" />
-                <div>
-                  <div className="text-sm text-gray-600">Total Products</div>
-                  <div className="text-xl font-bold">{exhibitionProducts.length}</div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-2">
-                <Tag className="h-5 w-5 text-red-600" />
-                <div>
-                  <div className="text-sm text-gray-600">Clearance Items</div>
-                  <div className="text-xl font-bold">
-                    {exhibitionProducts.filter(ep => ep.isClearance).length}
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-2">
-                <DollarSign className="h-5 w-5 text-green-600" />
-                <div>
-                  <div className="text-sm text-gray-600">Custom Pricing</div>
-                  <div className="text-xl font-bold">
-                    {exhibitionProducts.filter(ep => ep.exhibitionPrice && ep.exhibitionPrice !== ep.product.sellingPriceUSD).length}
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-2">
-                <TrendingUp className="h-5 w-5 text-purple-600" />
-                <div>
-                  <div className="text-sm text-gray-600">Avg. Final Price</div>
-                  <div className="text-xl font-bold">
-                    {exhibitionProducts.length > 0 ? formatPrice(
-                      exhibitionProducts.reduce((sum, ep) => {
-                        const pricing = calculatePricingHierarchy(ep)
-                        return sum + pricing.finalPrice
-                      }, 0) / exhibitionProducts.length
-                    ) : '$0'}
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
         </div>
       )}
     </div>
