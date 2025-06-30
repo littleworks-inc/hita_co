@@ -1,7 +1,8 @@
-// src/app/api/admin/exhibitions/[id]/products/[productId]/pricing/route.ts
+// src/app/api/admin/exhibitions/[id]/products/[productid]/pricing/route.ts
 // =====================================
 // Exhibition Product Pricing API Endpoint
 // Handles individual product pricing updates for exhibitions
+// ✅ FIXED: Parameter name to match folder structure
 // =====================================
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -10,7 +11,8 @@ import { db } from '@/lib/db'
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string; productId: string } }
+  // ✅ FIXED: Changed productId to productid to match folder name [productid]
+  { params }: { params: { id: string; productid: string } }
 ) {
   try {
     const session = await getSession()
@@ -19,7 +21,8 @@ export async function PUT(
     }
 
     const exhibitionId = params.id
-    const exhibitionProductId = params.productId
+    // ✅ FIXED: Use params.productid (lowercase) to match folder structure
+    const exhibitionProductId = params.productid
 
     // Validate exhibition exists
     const exhibition = await db.exhibition.findUnique({
@@ -75,9 +78,12 @@ export async function PUT(
       )
     }
 
-    // Calculate final price for validation
-    const basePrice = exhibitionPrice || existingExhibitionProduct.product.sellingPriceUSD
-    const finalPrice = isClearance ? basePrice * (1 - discountPercentage / 100) : basePrice
+    // ✅ FIXED: Use corrected pricing calculation (sellingPriceUSD is original price)
+    const originalPrice = existingExhibitionProduct.product.sellingPriceUSD
+    const basePrice = exhibitionPrice || originalPrice
+    const finalPrice = isClearance 
+      ? basePrice * (1 - discountPercentage / 100) 
+      : basePrice
 
     if (finalPrice < 0) {
       return NextResponse.json(
@@ -114,7 +120,7 @@ export async function PUT(
       where: { id: exhibitionProductId },
       data: {
         exhibitionPrice: exhibitionPrice,
-        originalPrice: existingExhibitionProduct.product.sellingPriceUSD, // Store original for reference
+        originalPrice: originalPrice, // Store original for reference
         discountPercentage: discountPercentage,
         isClearance: isClearance,
         salesNotes: salesNotes,
@@ -157,7 +163,8 @@ export async function PUT(
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string; productId: string } }
+  // ✅ FIXED: Changed productId to productid to match folder name
+  { params }: { params: { id: string; productid: string } }
 ) {
   try {
     const session = await getSession()
@@ -166,7 +173,8 @@ export async function GET(
     }
 
     const exhibitionId = params.id
-    const exhibitionProductId = params.productId
+    // ✅ FIXED: Use params.productid (lowercase)
+    const exhibitionProductId = params.productid
 
     // Get exhibition product with pricing details
     const exhibitionProduct = await db.exhibitionProduct.findUnique({
@@ -199,8 +207,9 @@ export async function GET(
       return NextResponse.json({ error: 'Exhibition product not found' }, { status: 404 })
     }
 
-    // Calculate final price
-    const basePrice = exhibitionProduct.exhibitionPrice || exhibitionProduct.product.sellingPriceUSD
+    // ✅ FIXED: Calculate final price using corrected logic
+    const originalPrice = exhibitionProduct.product.sellingPriceUSD
+    const basePrice = exhibitionProduct.exhibitionPrice || originalPrice
     const finalPrice = exhibitionProduct.isClearance && exhibitionProduct.discountPercentage
       ? basePrice * (1 - exhibitionProduct.discountPercentage / 100)
       : basePrice
@@ -208,12 +217,12 @@ export async function GET(
     return NextResponse.json({
       exhibitionProduct,
       pricing: {
-        originalPrice: exhibitionProduct.product.sellingPriceUSD,
+        originalPrice: originalPrice,
         exhibitionPrice: exhibitionProduct.exhibitionPrice,
         discountPercentage: exhibitionProduct.discountPercentage,
         finalPrice: finalPrice,
         isClearance: exhibitionProduct.isClearance,
-        savings: exhibitionProduct.product.sellingPriceUSD - finalPrice
+        savings: originalPrice - finalPrice
       },
       priceHistory: exhibitionProduct.priceHistory
     })
