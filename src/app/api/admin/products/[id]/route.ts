@@ -1,12 +1,13 @@
 // =====================================
-// src/app/api/admin/products/[id]/route.ts - COMPLETE FIXED VERSION
+// ENHANCED: src/app/api/admin/products/[id]/route.ts
+// Individual Product API with Complete Size System Support
 // =====================================
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth'
 import { db } from '@/lib/db'
 
-// GET /api/admin/products/[id] - Fetch single product
+// GET /api/admin/products/[id] - Fetch single product with sizes
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -24,7 +25,9 @@ export async function GET(
           select: { 
             id: true, 
             name: true,
-            slug: true 
+            slug: true,
+            defaultRequiresSizes: true,
+            defaultSizeType: true
           } 
         },
         country: { 
@@ -43,6 +46,23 @@ export async function GET(
             phone: true,
             email: true 
           } 
+        },
+        // ✅ NEW: Include size data
+        productSizes: {
+          select: {
+            id: true,
+            size: true,
+            sku: true,
+            stockQuantity: true,
+            lowStockAlert: true,
+            isActive: true,
+            sortOrder: true,
+            createdAt: true,
+            updatedAt: true
+          },
+          orderBy: {
+            sortOrder: 'asc'
+          }
         }
       }
     })
@@ -51,7 +71,21 @@ export async function GET(
       return NextResponse.json({ error: 'Product not found' }, { status: 404 })
     }
 
-    return NextResponse.json({ product })
+    // ✅ NEW: Calculate total stock for sized products
+    const enrichedProduct = {
+      ...product,
+      totalStock: product.requiresSizes && product.productSizes?.length 
+        ? product.productSizes.reduce((total, size) => total + size.stockQuantity, 0)
+        : product.stockQuantity,
+      availableSizes: product.requiresSizes 
+        ? product.productSizes?.filter(size => size.isActive).length || 0 
+        : null,
+      lowStockSizes: product.requiresSizes 
+        ? product.productSizes?.filter(size => size.stockQuantity <= size.lowStockAlert).length || 0 
+        : null
+    }
+
+    return NextResponse.json({ product: enrichedProduct })
 
   } catch (error) {
     console.error('Error fetching product:', error)
@@ -62,7 +96,7 @@ export async function GET(
   }
 }
 
-// PUT /api/admin/products/[id] - Update product
+// PUT /api/admin/products/[id] - Update product with size support
 export async function PUT(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -79,50 +113,145 @@ export async function PUT(
     // Check if product exists
     const existingProduct = await db.product.findUnique({
       where: { id },
-      select: { id: true, status: true, publishedAt: true }
+      include: {
+        productSizes: true
+      }
     })
 
     if (!existingProduct) {
       return NextResponse.json({ error: 'Product not found' }, { status: 404 })
     }
 
-    // Extract and validate required fields
+    // Extract all fields including new size fields
     const {
-      sku, name, description, shortDescription, categoryId, countryId, supplierId,
-      barcode, barcodeType, originalPrice, originalCurrency, quantity, gstPercentage,
-      shippingCost, conversionCharges, additionalExpenses, costPriceUSD, piecePriceUSD,
-      profitMargin, discountPercentage, showDiscountToCustomers, sellingPriceUSD,
-      stockQuantity, lowStockAlert, tags, images, seoTitle, seoDescription,
-      purchaseDate, invoiceNumber, isActive, isFeatured, status, publishedAt
+      sku,
+      name,
+      description,
+      shortDescription,
+      categoryId,
+      countryId,
+      supplierId,
+      barcode,
+      barcodeType,
+      originalPrice,
+      originalCurrency,
+      quantity,
+      gstPercentage,
+      shippingCost,
+      conversionCharges,
+      additionalExpenses,
+      costPriceUSD,
+      piecePriceUSD,
+      profitMargin,
+      discountPercentage,
+      showDiscountToCustomers,
+      sellingPriceUSD,
+      stockQuantity,
+      lowStockAlert,
+      tags,
+      images,
+      seoTitle,
+      seoDescription,
+      purchaseDate,
+      invoiceNumber,
+      isActive,
+      isFeatured,
+      status,
+      publishedAt,
+      archivedAt,
+      // ✅ NEW: Size system fields
+      requiresSizes,
+      sizeType,
+      productSizes
     } = data
 
     // Basic validation
-    if (!sku?.trim() || !name?.trim()) {
-      return NextResponse.json({ error: 'SKU and name are required' }, { status: 400 })
+    if (!sku || !name || !categoryId || !countryId || !supplierId) {
+      return NextResponse.json({
+        error: 'Missing required fields: sku, name, categoryId, countryId, supplierId'
+      }, { status: 400 })
     }
 
-    if (!categoryId || !countryId || !supplierId) {
-      return NextResponse.json({ error: 'Category, country, and supplier are required' }, { status: 400 })
+    // ✅ NEW: Size-specific validation
+    if (requiresSizes) {
+      if (!productSizes || !Array.isArray(productSizes) || productSizes.length === 0) {
+        return NextResponse.json({
+          error: 'At least one size is required for sized products'
+        }, { status: 400 })
+      }
+
+      // Validate size data
+      for (const size of productSizes) {
+        if (!size.size || !size.sku) {
+          return NextResponse.json({
+            error: 'Each size must have a size name and SKU'
+          }, { status: 400 })
+        }
+      }
+
+      // Check for duplicate size SKUs within this product
+      const sizeSKUs = productSizes.map(s => s.sku)
+      const duplicateSKUs = sizeSKUs.filter((sku, index) => sizeSKUs.indexOf(sku) !== index)
+      if (duplicateSKUs.length > 0) {
+        return NextResponse.json({
+          error: `Duplicate size SKUs found: ${duplicateSKUs.join(', ')}`
+        }, { status: 400 })
+      }
     }
 
-    // Validate discount percentage
-    if (discountPercentage !== undefined && (discountPercentage < 0 || discountPercentage >= 100)) {
-      return NextResponse.json(
-        { error: 'Discount percentage must be between 0 and 99.99' },
-        { status: 400 }
-      )
+    // Check for duplicate SKU (excluding current product)
+    if (sku !== existingProduct.sku) {
+      const duplicateProduct = await db.product.findUnique({
+        where: { sku }
+      })
+
+      if (duplicateProduct) {
+        return NextResponse.json({
+          error: 'A product with this SKU already exists'
+        }, { status: 400 })
+      }
     }
 
-    // Additional validation for publishing
+    // ✅ NEW: Check for duplicate size SKUs across all products (excluding current product's sizes)
+    if (requiresSizes && productSizes?.length > 0) {
+      const sizeSKUs = productSizes.map(s => s.sku)
+      const existingSizeSKUs = await db.productSize.findMany({
+        where: {
+          sku: { in: sizeSKUs },
+          productId: { not: id } // Exclude current product's sizes
+        },
+        select: { sku: true }
+      })
+
+      if (existingSizeSKUs.length > 0) {
+        return NextResponse.json({
+          error: `Size SKUs already exist: ${existingSizeSKUs.map(s => s.sku).join(', ')}`
+        }, { status: 400 })
+      }
+    }
+
+    // Validation for publishing
     if (status === 'PUBLISHED') {
       const validationErrors = []
-      if (!name?.trim()) validationErrors.push('Product name is required')
+
+      if (!name.trim()) validationErrors.push('Product name is required')
       if (!description?.trim()) validationErrors.push('Product description is required')
-      if (!categoryId) validationErrors.push('Category is required')
-      if (!supplierId) validationErrors.push('Supplier is required')
-      if (!countryId) validationErrors.push('Country is required')
+      if (!categoryId) validationErrors.push('Category must be selected')
+      if (!countryId) validationErrors.push('Country must be selected')
+      if (!supplierId) validationErrors.push('Supplier must be selected')
       if (!sellingPriceUSD || sellingPriceUSD <= 0) validationErrors.push('Selling price must be greater than 0')
       if (!images || images.length === 0) validationErrors.push('At least one product image is required')
+
+      // ✅ NEW: Size-specific publishing validation
+      if (requiresSizes) {
+        if (!productSizes || productSizes.length === 0) {
+          validationErrors.push('At least one size is required for publishing sized products')
+        }
+      } else {
+        if (stockQuantity < 0) {
+          validationErrors.push('Stock quantity cannot be negative')
+        }
+      }
 
       if (validationErrors.length > 0) {
         return NextResponse.json({
@@ -132,16 +261,15 @@ export async function PUT(
       }
     }
 
-    // ✅ FIXED: Use connect syntax for relations and remove non-existent fields
-    const updateData = {
-      sku: sku.trim(),
-      name: name.trim(),
+    // Prepare product data (INCLUDING SIZE FIELDS)
+    const productData = {
+      sku,
+      name,
       description: description || '',
       shortDescription: shortDescription || '',
-      // ✅ FIX: Use connect syntax for relations
-      category: { connect: { id: categoryId } },
-      country: { connect: { id: countryId } },
-      supplier: { connect: { id: supplierId } },
+      categoryId,
+      countryId,
+      supplierId,
       barcode: barcode || '',
       barcodeType: barcodeType || 'CODE128',
       originalPrice: parseFloat(originalPrice) || 0,
@@ -168,32 +296,76 @@ export async function PUT(
       isActive: isActive ?? true,
       isFeatured: isFeatured ?? false,
       status,
-      publishedAt: status === 'PUBLISHED' && !publishedAt ? new Date() : (publishedAt ? new Date(publishedAt) : null)
-      // ✅ REMOVED: lastEditedAt (doesn't exist in schema)
-      // ✅ REMOVED: publishedBy (doesn't exist in schema)
+      publishedAt: status === 'PUBLISHED' && !publishedAt ? new Date() : (publishedAt ? new Date(publishedAt) : null),
+      archivedAt: status === 'ARCHIVED' && !archivedAt ? new Date() : (archivedAt ? new Date(archivedAt) : null),
+      // ✅ NEW: Size system fields
+      requiresSizes: Boolean(requiresSizes),
+      sizeType: sizeType || null
     }
 
-    // Update product
-    const product = await db.product.update({
-      where: { id },
-      data: updateData,
-      include: {
-        category: { select: { name: true } },
-        country: { select: { name: true, currency: true } },
-        supplier: { select: { name: true } }
+    // ✅ NEW: Update product with sizes in a transaction
+    const result = await db.$transaction(async (prisma) => {
+      // Update the main product
+      const product = await prisma.product.update({
+        where: { id },
+        data: productData,
+        include: {
+          category: { select: { name: true } },
+          country: { select: { name: true, currency: true } },
+          supplier: { select: { name: true } }
+        }
+      })
+
+      // Handle size updates
+      if (requiresSizes) {
+        // Delete existing sizes
+        await prisma.productSize.deleteMany({
+          where: { productId: id }
+        })
+
+        // Create new sizes if provided
+        if (productSizes?.length > 0) {
+          const sizesData = productSizes.map((size, index) => ({
+            productId: id,
+            size: size.size,
+            sku: size.sku,
+            stockQuantity: parseInt(size.stockQuantity) || 0,
+            lowStockAlert: parseInt(size.lowStockAlert) || 5,
+            isActive: size.isActive ?? true,
+            sortOrder: size.sortOrder ?? index
+          }))
+
+          await prisma.productSize.createMany({
+            data: sizesData
+          })
+
+          // Fetch the created sizes to include in response
+          const createdSizes = await prisma.productSize.findMany({
+            where: { productId: id },
+            orderBy: { sortOrder: 'asc' }
+          })
+
+          return { ...product, productSizes: createdSizes }
+        }
+      } else {
+        // If switching from sized to non-sized, delete all sizes
+        await prisma.productSize.deleteMany({
+          where: { productId: id }
+        })
       }
+
+      return product
     })
 
-    const actionText = status === 'PUBLISHED' ? 'published' : 
-                     status === 'DRAFT' ? 'saved as draft' : 
-                     status === 'ARCHIVED' ? 'archived' : 'updated'
-
-    console.log(`Product ${product.name} ${actionText} successfully`)
+    console.log(`Product ${result.name} updated with status ${status} by user ${session?.userId || session?.id || 'unknown'}`)
+    if (requiresSizes) {
+      console.log(`✅ Updated ${productSizes?.length || 0} size variants`)
+    }
 
     return NextResponse.json({
       success: true,
-      message: `Product ${actionText} successfully`,
-      product
+      message: `Product updated successfully`,
+      product: result
     })
 
   } catch (error) {
@@ -222,7 +394,7 @@ export async function PUT(
   }
 }
 
-// DELETE /api/admin/products/[id] - Delete product
+// DELETE /api/admin/products/[id] - Delete product and all its sizes
 export async function DELETE(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -233,34 +405,53 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const { id } = params
+
     // Check if product exists
-    const product = await db.product.findUnique({
-      where: { id: params.id },
-      select: { id: true, name: true }
+    const existingProduct = await db.product.findUnique({
+      where: { id },
+      include: {
+        productSizes: true,
+        orderItems: true,
+        exhibitionItems: true
+      }
     })
 
-    if (!product) {
+    if (!existingProduct) {
       return NextResponse.json({ error: 'Product not found' }, { status: 404 })
     }
 
-    // Check if product has orders (prevent deletion if so)
-    const orderItemsCount = await db.orderItem.count({
-      where: { productId: params.id }
-    })
-
-    if (orderItemsCount > 0) {
+    // Check if product is used in orders
+    if (existingProduct.orderItems.length > 0) {
       return NextResponse.json({
-        error: 'Cannot delete product with existing orders. Consider archiving instead.',
-        suggestion: 'Archive the product to hide it from customers while preserving order history.'
+        error: 'Cannot delete product that has been ordered. Consider archiving instead.'
       }, { status: 400 })
     }
 
-    // Delete product
-    await db.product.delete({
-      where: { id: params.id }
+    // Check if product is used in exhibitions
+    if (existingProduct.exhibitionItems.length > 0) {
+      return NextResponse.json({
+        error: 'Cannot delete product that is in exhibitions. Remove from exhibitions first.'
+      }, { status: 400 })
+    }
+
+    // ✅ NEW: Delete product and all related data in a transaction
+    await db.$transaction(async (prisma) => {
+      // Delete all product sizes first (due to foreign key constraints)
+      await prisma.productSize.deleteMany({
+        where: { productId: id }
+      })
+
+      // Delete the main product
+      await prisma.product.delete({
+        where: { id }
+      })
     })
 
-    console.log(`Product ${product.name} deleted successfully`)
+    console.log(`Product ${existingProduct.name} deleted by user ${session?.userId || session?.id || 'unknown'}`)
+    if (existingProduct.productSizes.length > 0) {
+      console.log(`✅ Deleted ${existingProduct.productSizes.length} size variants`)
+    }
 
     return NextResponse.json({
       success: true,
