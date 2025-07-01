@@ -160,65 +160,65 @@ export default function ProductForm({ categories, countries, suppliers, product,
 
   // Form state - INCLUDING SIZE FIELDS
   const [formData, setFormData] = useState<Product>({
-  sku: product?.sku || '',
-  name: product?.name || '',
-  description: product?.description || '',
-  shortDescription: product?.shortDescription || '',
-  categoryId: product?.categoryId || '',
-  countryId: product?.countryId || countries.find(c => c.isDefault)?.id || '',
-  barcode: product?.barcode || '',
-  barcodeType: product?.barcodeType || 'CODE128',
-  supplierId: product?.supplierId || '',
-  purchaseDate: product?.purchaseDate || new Date().toISOString().split('T')[0],
-  invoiceNumber: product?.invoiceNumber || '',
-  originalPrice: product?.originalPrice || 0,
-  originalCurrency: product?.originalCurrency || 'INR',
-  quantity: product?.quantity || 1,
-  gstPercentage: product?.gstPercentage || 18,
-  shippingCost: product?.shippingCost || 0,
-  conversionCharges: product?.conversionCharges || 0,
-  additionalExpenses: product?.additionalExpenses || 0,
-  costPriceUSD: product?.costPriceUSD || 0,
-  piecePriceUSD: product?.piecePriceUSD || 0,
-  profitMargin: product?.profitMargin || 100,
-  discountPercentage: product?.discountPercentage || 0,
-  showDiscountToCustomers: product?.showDiscountToCustomers ?? false,
-  sellingPriceUSD: product?.sellingPriceUSD || 0,
-  stockQuantity: product?.stockQuantity || 0,
-  lowStockAlert: product?.lowStockAlert || 5,
-  isActive: product?.isActive ?? true,
-  isFeatured: product?.isFeatured ?? false,
-  tags: product?.tags || [],
-  images: product?.images || [],
-  seoTitle: product?.seoTitle || '',
-  seoDescription: product?.seoDescription || '',
-  status: product?.status || 'DRAFT',
-  publishedAt: product?.publishedAt || null,
-  archivedAt: product?.archivedAt || null,
-  // ✅ SIMPLIFIED: Only requiresSizes needed
-  requiresSizes: product?.requiresSizes ?? false,
-  productSizes: product?.productSizes || []
-})
+    sku: product?.sku || '',
+    name: product?.name || '',
+    description: product?.description || '',
+    shortDescription: product?.shortDescription || '',
+    categoryId: product?.categoryId || '',
+    countryId: product?.countryId || countries.find(c => c.isDefault)?.id || '',
+    barcode: product?.barcode || '',
+    barcodeType: product?.barcodeType || 'CODE128',
+    supplierId: product?.supplierId || '',
+    purchaseDate: product?.purchaseDate || new Date().toISOString().split('T')[0],
+    invoiceNumber: product?.invoiceNumber || '',
+    originalPrice: product?.originalPrice || 0,
+    originalCurrency: product?.originalCurrency || 'INR',
+    quantity: product?.quantity || 1,
+    gstPercentage: product?.gstPercentage || 18,
+    shippingCost: product?.shippingCost || 0,
+    conversionCharges: product?.conversionCharges || 0,
+    additionalExpenses: product?.additionalExpenses || 0,
+    costPriceUSD: product?.costPriceUSD || 0,
+    piecePriceUSD: product?.piecePriceUSD || 0,
+    profitMargin: product?.profitMargin || 100,
+    discountPercentage: product?.discountPercentage || 0,
+    showDiscountToCustomers: product?.showDiscountToCustomers ?? false,
+    sellingPriceUSD: product?.sellingPriceUSD || 0,
+    stockQuantity: product?.stockQuantity || 0,
+    lowStockAlert: product?.lowStockAlert || 5,
+    isActive: product?.isActive ?? true,
+    isFeatured: product?.isFeatured ?? false,
+    tags: product?.tags || [],
+    images: product?.images || [],
+    seoTitle: product?.seoTitle || '',
+    seoDescription: product?.seoDescription || '',
+    status: product?.status || 'DRAFT',
+    publishedAt: product?.publishedAt || null,
+    archivedAt: product?.archivedAt || null,
+    // ✅ SIMPLIFIED: Only requiresSizes needed
+    requiresSizes: product?.requiresSizes ?? false,
+    productSizes: product?.productSizes || []
+  })
 
   // ✅ Handle category change with size auto-detection
   const handleCategoryChange = (categoryId: string) => {
-  const category = categories.find(c => c.id === categoryId)
-  
-  setFormData(prev => ({
-    ...prev,
-    categoryId,
-    // Auto-set size requirements based on category defaults
-    requiresSizes: category?.defaultRequiresSizes ?? prev.requiresSizes,
-    // Reset sizes if switching between sized/non-sized categories
-    productSizes: category?.defaultRequiresSizes ? prev.productSizes : []
-  }))
+    const category = categories.find(c => c.id === categoryId)
 
-  // Auto-generate SKU
-  if (formData.name && !originalSku) {
-    const newSku = generateSKU(formData.name, category?.name || '')
-    setFormData(prev => ({ ...prev, sku: newSku }))
+    setFormData(prev => ({
+      ...prev,
+      categoryId,
+      // Auto-set size requirements based on category defaults
+      requiresSizes: category?.defaultRequiresSizes ?? prev.requiresSizes,
+      // Reset sizes if switching between sized/non-sized categories
+      productSizes: category?.defaultRequiresSizes ? prev.productSizes : []
+    }))
+
+    // Auto-generate SKU
+    if (formData.name && !originalSku) {
+      const newSku = generateSKU(formData.name, category?.name || '')
+      setFormData(prev => ({ ...prev, sku: newSku }))
+    }
   }
-}
 
   // ✅ Size management functions
   const addSize = (size: string) => {
@@ -421,63 +421,57 @@ export default function ProductForm({ categories, countries, suppliers, product,
   }
 
   // AI generation handler
-  const handleAIGenerate = async (type: string) => {
-    setIsGeneratingAI(true)
-    setErrors(prev => ({ ...prev, aiGeneration: '' }))
+  const handleAIGenerate = async (type: string, userInput?: any) => {
+  setIsGeneratingAI(true)
+  setErrors(prev => ({ ...prev, aiGeneration: '' }))
 
-    try {
-      const aiInputData: AIInputData = {
-        fabricType: '',
-        occasion: '',
-        specialFeatures: '',
-        craftmanship: '',
-        careInstructions: '',
-        sizing: formData.requiresSizes ? `Available sizes: ${formData.productSizes?.map(s => s.size).join(', ')}` : 'One size fits all',
-        targetKeywords: ''
-      }
-
-      const response = await fetch('/api/admin/ai/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          type,
-          context: {
-            name: formData.name,
-            category: categories.find(c => c.id === formData.categoryId)?.name,
-            userInput: aiInputData
-          },
-          options: {
-            maxTokens: type === 'short_description' ? 100 : 200
-          }
-        })
-      })
-
-      const data = await response.json()
-
-      if (data.success) {
-        if (type === 'short_description') {
-          handleInputChange('shortDescription', data.content)
-        } else if (type === 'product_description') {
-          handleInputChange('description', data.content)
-        } else if (type === 'seo_content') {
-          if (data.content.title) handleInputChange('seoTitle', data.content.title)
-          if (data.content.description) handleInputChange('seoDescription', data.content.description)
+  try {
+    const response = await fetch('/api/admin/ai/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        type,
+        context: {
+          name: formData.name,
+          category: categories.find(c => c.id === formData.categoryId)?.name,
+          userInput: userInput || {}, // ✅ FIXED: Include user input
+          // ✅ NEW: Include size information
+          sizing: formData.requiresSizes && formData.productSizes?.length 
+            ? `Available in sizes: ${formData.productSizes.map(s => s.size).join(', ')}` 
+            : 'One size fits all'
+        },
+        options: {
+          maxTokens: type === 'short_description' ? 100 : 200
         }
+      })
+    })
 
-        setSuccessMessage(`${type.replace('_', ' ')} generated successfully!`)
-        setTimeout(() => setSuccessMessage(''), 3000)
-      } else {
-        setErrors(prev => ({ ...prev, aiGeneration: data.error }))
+    const data = await response.json()
+
+    if (data.success) {
+      if (type === 'short_description') {
+        handleInputChange('shortDescription', data.content)
+      } else if (type === 'product_description') {
+        handleInputChange('description', data.content)
+      } else if (type === 'seo_content') {
+        if (data.content.title) handleInputChange('seoTitle', data.content.title)
+        if (data.content.description) handleInputChange('seoDescription', data.content.description)
       }
-    } catch (error) {
-      setErrors(prev => ({
-        ...prev,
-        aiGeneration: `Failed to generate content: ${error instanceof Error ? error.message : 'Unknown error'}`
-      }))
-    } finally {
-      setIsGeneratingAI(false)
+
+      setSuccessMessage(`${type.replace('_', ' ')} generated successfully!`)
+      setTimeout(() => setSuccessMessage(''), 3000)
+    } else {
+      setErrors(prev => ({ ...prev, aiGeneration: data.error }))
     }
+  } catch (error) {
+    setErrors(prev => ({
+      ...prev,
+      aiGeneration: `Failed to generate content: ${error instanceof Error ? error.message : 'Unknown error'}`
+    }))
+  } finally {
+    setIsGeneratingAI(false)
   }
+}
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
@@ -1016,12 +1010,13 @@ export default function ProductForm({ categories, countries, suppliers, product,
 
         {/* 6. AI Generation Panel */}
         <AIGenerationPanel
+          productName={formData.name}
+          categoryName={categories.find(c => c.id === formData.categoryId)?.name || ''}
+          images={formData.images || []} // ✅ FIXED: Ensure array is passed
           onGenerate={handleAIGenerate}
           isGenerating={isGeneratingAI}
-          productName={formData.name}
-          categoryName={categories.find(c => c.id === formData.categoryId)?.name}
-          hasSizes={formData.requiresSizes}
-          sizes={formData.productSizes?.map(s => s.size) || []}
+          hasSizes={formData.requiresSizes} // ✅ NEW: Pass size info
+          sizes={formData.productSizes?.map(s => s.size) || []} // ✅ NEW: Pass available sizes
         />
 
         {/* Action Buttons */}

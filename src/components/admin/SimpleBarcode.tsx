@@ -1,13 +1,11 @@
-// =====================================
-// ENHANCED: Simple Working Barcode Component
-// src/components/admin/SimpleBarcode.tsx
-// =====================================
+// ✅ FIXED: src/components/admin/SimpleBarcode.tsx
+// Fixed canvas null reference and timing issues
 
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
-import { Copy, AlertCircle, CheckCircle, Eye, EyeOff } from 'lucide-react'
+import { Copy, AlertCircle, CheckCircle, Eye, EyeOff, RefreshCw } from 'lucide-react'
 
 interface SimpleBarcodeProps {
   barcode: string
@@ -49,17 +47,50 @@ export default function SimpleBarcode({
   const [copied, setCopied] = useState(false)
   const [showValue, setShowValue] = useState(true)
   const [isInitialized, setIsInitialized] = useState(false)
+  const [canvasReady, setCanvasReady] = useState(false)
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
+  // ✅ FIXED: Check canvas readiness in a separate effect
   useEffect(() => {
-    if (barcode && canvasRef.current) {
+    const checkCanvas = () => {
+      if (canvasRef.current) {
+        setCanvasReady(true)
+        return true
+      }
+      return false
+    }
+
+    // Check immediately
+    if (checkCanvas()) return
+
+    // If not ready, try again after a short delay
+    const timer = setTimeout(() => {
+      checkCanvas()
+    }, 100)
+
+    return () => clearTimeout(timer)
+  }, [])
+
+  // ✅ FIXED: Only generate barcode when canvas is ready
+  useEffect(() => {
+    if (barcode && canvasReady && canvasRef.current) {
       generateBarcode()
     }
-  }, [barcode, barcodeType, size, showValue])
+  }, [barcode, barcodeType, size, showValue, canvasReady])
 
-  const generateBarcode = async () => {
+  const generateBarcode = useCallback(async () => {
+    // ✅ FIXED: Multiple safety checks
     if (!barcode || !canvasRef.current) {
       setError('No barcode provided or canvas not ready')
+      return
+    }
+
+    const canvas = canvasRef.current
+    const ctx = canvas.getContext('2d')
+    
+    // ✅ FIXED: Explicit null check for context
+    if (!ctx) {
+      setError('Could not get canvas context - browser may not support canvas')
       return
     }
 
@@ -69,13 +100,6 @@ export default function SimpleBarcode({
     try {
       // Dynamic import to ensure JsBarcode is available
       const JsBarcode = (await import('jsbarcode')).default
-
-      const canvas = canvasRef.current
-      const ctx = canvas.getContext('2d')
-      
-      if (!ctx) {
-        throw new Error('Could not get canvas context')
-      }
 
       // Get size configuration
       const config = getSizeConfig(size)
@@ -128,63 +152,73 @@ export default function SimpleBarcode({
         throw new Error('Barcode cannot be empty after processing')
       }
 
-      // Generate the barcode using JsBarcode
-      JsBarcode(canvas, processedBarcode, {
-        format: format,
-        width: config.width,
-        height: config.height,
-        displayValue: config.displayValue && showValue,
-        fontSize: config.fontSize,
-        textMargin: 8,
-        margin: config.margin,
-        background: '#ffffff',
-        lineColor: '#000000',
-        fontOptions: 'bold',
-        font: 'monospace',
-        textAlign: 'center',
-        textPosition: 'bottom',
-        valid: (valid: boolean) => {
-          console.log('JsBarcode validation result:', valid)
-          if (!valid) {
-            throw new Error(`Invalid barcode: ${processedBarcode} for format ${format}`)
+      // ✅ FIXED: Wrap JsBarcode call in try-catch with better error handling
+      try {
+        // Generate the barcode using JsBarcode
+        JsBarcode(canvas, processedBarcode, {
+          format: format,
+          width: config.width,
+          height: config.height,
+          displayValue: config.displayValue && showValue,
+          fontSize: config.fontSize,
+          textMargin: 8,
+          margin: config.margin,
+          background: '#ffffff',
+          lineColor: '#000000',
+          fontOptions: 'bold',
+          font: 'monospace',
+          textAlign: 'center',
+          textPosition: 'bottom',
+          valid: (valid: boolean) => {
+            console.log('JsBarcode validation result:', valid)
+            if (!valid) {
+              throw new Error(`Invalid barcode: ${processedBarcode} for format ${format}`)
+            }
           }
-        }
-      })
+        })
 
-      console.log('✅ Barcode generated successfully:', processedBarcode)
-      setError(null)
-      setIsInitialized(true)
+        console.log('✅ Barcode generated successfully:', processedBarcode)
+        setError(null)
+        setIsInitialized(true)
+
+      } catch (jsBarcodeError) {
+        // Handle JsBarcode-specific errors
+        console.error('JsBarcode error:', jsBarcodeError)
+        throw new Error(`Barcode generation failed: ${jsBarcodeError instanceof Error ? jsBarcodeError.message : 'Unknown JsBarcode error'}`)
+      }
 
     } catch (err) {
       console.error('❌ Barcode generation failed:', err)
       const errorMessage = err instanceof Error ? err.message : 'Failed to generate barcode'
       setError(errorMessage)
       
-      // Draw error message on canvas
-      const canvas = canvasRef.current
-      const ctx = canvas?.getContext('2d')
-      if (canvas && ctx) {
-        // Set canvas size for error display
-        canvas.width = 400
-        canvas.height = 100
-        
-        // Clear with white background
-        ctx.fillStyle = '#ffffff'
-        ctx.fillRect(0, 0, canvas.width, canvas.height)
-        
-        // Draw error
-        ctx.fillStyle = '#ef4444'
-        ctx.font = 'bold 14px Arial'
-        ctx.textAlign = 'center'
-        ctx.fillText('⚠️ Barcode Generation Failed', canvas.width / 2, canvas.height / 2 - 10)
-        ctx.font = '11px Arial'
-        ctx.fillStyle = '#666666'
-        ctx.fillText(errorMessage.slice(0, 50), canvas.width / 2, canvas.height / 2 + 15)
+      // ✅ FIXED: Only draw error if canvas and context are available
+      if (canvasRef.current) {
+        const canvas = canvasRef.current
+        const ctx = canvas.getContext('2d')
+        if (ctx) {
+          // Set canvas size for error display
+          canvas.width = 400
+          canvas.height = 100
+          
+          // Clear with white background
+          ctx.fillStyle = '#ffffff'
+          ctx.fillRect(0, 0, canvas.width, canvas.height)
+          
+          // Draw error
+          ctx.fillStyle = '#ef4444'
+          ctx.font = 'bold 14px Arial'
+          ctx.textAlign = 'center'
+          ctx.fillText('⚠️ Barcode Generation Failed', canvas.width / 2, canvas.height / 2 - 10)
+          ctx.font = '11px Arial'
+          ctx.fillStyle = '#666666'
+          ctx.fillText(errorMessage.slice(0, 50), canvas.width / 2, canvas.height / 2 + 15)
+        }
       }
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [barcode, barcodeType, size, showValue])
 
   const copyBarcode = async () => {
     try {
@@ -198,6 +232,12 @@ export default function SimpleBarcode({
 
   const toggleValueDisplay = () => {
     setShowValue(!showValue)
+  }
+
+  const retryGeneration = () => {
+    if (canvasRef.current) {
+      generateBarcode()
+    }
   }
 
   if (!barcode || barcode.trim() === '') {
@@ -221,12 +261,32 @@ export default function SimpleBarcode({
             <div className="text-xs text-red-600 mt-1">
               Check that your barcode is valid for the {barcodeType} format
             </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={retryGeneration}
+              className="mt-2"
+            >
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Retry Generation
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Canvas Not Ready Warning */}
+      {!canvasReady && (
+        <div className="flex items-center gap-2 p-2 bg-yellow-50 border border-yellow-200 rounded-lg">
+          <AlertCircle className="h-4 w-4 text-yellow-600" />
+          <div className="text-sm text-yellow-800">
+            Canvas is loading...
           </div>
         </div>
       )}
 
       {/* Success Message */}
-      {!error && isInitialized && (
+      {!error && isInitialized && canvasReady && (
         <div className="flex items-center gap-2 p-2 bg-green-50 border border-green-200 rounded-lg">
           <CheckCircle className="h-4 w-4 text-green-600" />
           <div className="text-sm text-green-800">
@@ -306,6 +366,19 @@ export default function SimpleBarcode({
             {showValue ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             {showValue ? 'Hide Value' : 'Show Value'}
           </Button>
+
+          {error && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={retryGeneration}
+              className="flex items-center gap-2"
+            >
+              <RefreshCw className="h-4 w-4" />
+              Retry
+            </Button>
+          )}
         </div>
       )}
 
@@ -317,10 +390,10 @@ export default function SimpleBarcode({
             <div><strong>Original:</strong> {barcode}</div>
             <div><strong>Type:</strong> {barcodeType}</div>
             <div><strong>Size:</strong> {size}</div>
-            <div><strong>Canvas Ready:</strong> {canvasRef.current ? 'Yes' : 'No'}</div>
+            <div><strong>Canvas Ready:</strong> {canvasReady ? 'Yes' : 'No'}</div>
+            <div><strong>Canvas Ref:</strong> {canvasRef.current ? 'Available' : 'Null'}</div>
             <div><strong>Initialized:</strong> {isInitialized ? 'Yes' : 'No'}</div>
             <div><strong>Error:</strong> {error || 'None'}</div>
-            <div><strong>Loading:</strong> {isLoading ? 'Yes' : 'No'}</div>
           </div>
         </details>
       )}
