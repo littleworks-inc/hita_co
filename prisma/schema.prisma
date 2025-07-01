@@ -1,5 +1,5 @@
-// ✅ Complete prisma/schema.prisma with Exhibition POS System
-// Enhanced schema with Shipping System + Return Policy + Exhibition POS
+// ✅ Complete prisma/schema.prisma with Exhibition POS System + Flexible Size System
+// Enhanced schema with Shipping System + Return Policy + Exhibition POS + Size Management
 
 generator client {
   provider = "prisma-client-js"
@@ -23,16 +23,21 @@ model User {
 }
 
 model Category {
-  id          String     @id @default(cuid())
-  name        String     @unique
-  description String?
-  slug        String     @unique
-  parentId    String?
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
-  parent      Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id])
-  children    Category[] @relation("CategoryHierarchy")
-  products    Product[]
+  id                    String     @id @default(cuid())
+  name                  String     @unique
+  description           String?
+  slug                  String     @unique
+  parentId              String?
+  
+  // ✅ SIMPLIFIED: Remove defaultSizeType field
+  defaultRequiresSizes  Boolean    @default(false)  // Keep this
+  // defaultSizeType    String?                     // ✅ REMOVE THIS LINE
+  
+  createdAt             DateTime   @default(now())
+  updatedAt             DateTime   @updatedAt
+  parent                Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children              Category[] @relation("CategoryHierarchy")
+  products              Product[]
 
   @@map("categories")
 }
@@ -119,7 +124,7 @@ enum OrderStatus {
   REFUNDED
 }
 
-// ✅ NEW: Exhibition Payment Methods
+// ✅ Exhibition Payment Methods
 enum ExhibitionPaymentMethod {
   CASH
   ZELLE
@@ -169,15 +174,62 @@ model Product {
   archivedAt              DateTime?
   showDiscountToCustomers Boolean             @default(false)
   
+  // ✅ SIMPLIFIED: Size system fields - remove sizeType
+  requiresSizes           Boolean             @default(false)  // Keep this
+  // sizeType             SizeType?                           // ✅ REMOVE THIS LINE
+  
   // Relations
   exhibitionItems         ExhibitionProduct[]
   orderItems              OrderItem[]
-  exhibitionSaleItems     ExhibitionSaleItem[]  // ✅ NEW: For exhibition POS
+  exhibitionSaleItems     ExhibitionSaleItem[]
+  productSizes            ProductSize[]       
+  cartItems               CartItem[]          
   category                Category            @relation(fields: [categoryId], references: [id])
   country                 Country             @relation(fields: [countryId], references: [id])
   supplier                Supplier            @relation(fields: [supplierId], references: [id])
 
   @@map("products")
+}
+
+// ✅ NEW: Product Size Variants Model
+model ProductSize {
+  id                    String                 @id @default(cuid())
+  productId             String
+  size                  String                 // "XS", "S", "M", "L", "XL", "XXL", "6", "7", "8", etc.
+  sku                   String                 @unique // "KURTA-001-S", "KURTA-001-M"
+  stockQuantity         Int                    @default(0)
+  lowStockAlert         Int                    @default(5)
+  isActive              Boolean                @default(true)
+  sortOrder             Int                    @default(0)  // For custom size ordering
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+  
+  // Relations
+  product               Product                @relation(fields: [productId], references: [id], onDelete: Cascade)
+  exhibitionSizes       ExhibitionProductSize[]
+  orderItems            OrderItem[]
+  cartItems             CartItem[]
+  exhibitionSaleItems   ExhibitionSaleItem[]   // ✅ NEW: Exhibition sale items
+
+  @@map("product_sizes")
+}
+
+// ✅ NEW: Exhibition Size Tracking
+model ExhibitionProductSize {
+  id                    String              @id @default(cuid())
+  exhibitionProductId   String
+  productSizeId         String
+  quantityTaken         Int                 @default(0)  // How many of this size taken to exhibition
+  quantitySold          Int                 @default(0)  // How many sold at exhibition
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+  
+  // Relations
+  exhibitionProduct     ExhibitionProduct   @relation(fields: [exhibitionProductId], references: [id], onDelete: Cascade)
+  productSize           ProductSize         @relation(fields: [productSizeId], references: [id], onDelete: Cascade)
+
+  @@unique([exhibitionProductId, productSizeId])
+  @@map("exhibition_product_sizes")
 }
 
 model Order {
@@ -209,16 +261,38 @@ model Order {
 }
 
 model OrderItem {
-  id           String  @id @default(cuid())
-  orderId      String
-  productId    String
-  quantity     Int
-  pricePerItem Float
-  totalPrice   Float
-  order        Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  product      Product @relation(fields: [productId], references: [id])
+  id             String       @id @default(cuid())
+  orderId        String
+  productId      String
+  productSizeId  String?      // ✅ NEW: Optional size reference
+  sizeLabel      String?      // ✅ NEW: Size display text ("Medium", "Large")
+  quantity       Int
+  pricePerItem   Float
+  totalPrice     Float
+  order          Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product        Product      @relation(fields: [productId], references: [id])
+  productSize    ProductSize? @relation(fields: [productSizeId], references: [id])
 
   @@map("order_items")
+}
+
+// ✅ NEW: Cart Item Model (for persistent cart)
+model CartItem {
+  id             String       @id @default(cuid())
+  sessionId      String       // For guest users
+  userId         String?      // For logged-in users (future)
+  productId      String
+  productSizeId  String?      // ✅ NEW: Optional size reference
+  quantity       Int
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  
+  // Relations
+  product        Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productSize    ProductSize? @relation(fields: [productSizeId], references: [id])
+
+  @@unique([sessionId, productId, productSizeId])
+  @@map("cart_items")
 }
 
 model Exhibition {
@@ -237,7 +311,7 @@ model Exhibition {
   // Relations
   products         ExhibitionProduct[]
   orders           Order[]
-  sales            ExhibitionSale[]    // ✅ NEW: For exhibition POS
+  sales            ExhibitionSale[]
 
   @@map("exhibitions")
 }
@@ -249,14 +323,14 @@ model ExhibitionProduct {
   quantityTaken Int
   quantitySold  Int        @default(0)
   
-  // ✅ NEW: Exhibition-specific pricing fields
+  // Exhibition-specific pricing fields
   exhibitionPrice     Float?    // Override price for this exhibition
   originalPrice       Float?    // Store the original price for reference
   discountPercentage  Float?    @default(0) // Clearance discount
   isClearance         Boolean   @default(false) // Mark as clearance item
   priceHistory        Json?     // Track price changes during exhibition
   
-  // ✅ NEW: Sales tracking fields
+  // Sales tracking fields
   salesNotes          String?   // Notes about sales performance
   lastSaleDate        DateTime? // When was last item sold
   priceChangedAt      DateTime? // When price was last updated
@@ -264,13 +338,14 @@ model ExhibitionProduct {
   // Relations
   exhibition    Exhibition @relation(fields: [exhibitionId], references: [id], onDelete: Cascade)
   product       Product    @relation(fields: [productId], references: [id])
-  saleItems     ExhibitionSaleItem[]  // ✅ NEW: For exhibition POS
+  saleItems     ExhibitionSaleItem[]
+  exhibitionSizes ExhibitionProductSize[]  // ✅ NEW: Size tracking
 
   @@unique([exhibitionId, productId])
   @@map("exhibition_products")
 }
 
-// ✅ NEW: Exhibition Sales (POS System)
+// Exhibition Sales (POS System)
 model ExhibitionSale {
   id                    String                    @id @default(cuid())
   exhibitionId          String
@@ -282,65 +357,64 @@ model ExhibitionSale {
   customerEmail         String?
   
   // Sale Details
-  subtotal              Float                     // Original prices total
-  customDiscount        Float      @default(0)   // Custom discount amount
-  bundleDiscount        Float      @default(0)   // Bundle/negotiation discount
-  finalTotal            Float                     // What customer actually paid
+  subtotal              Float
+  tax                   Float                     @default(0)
+  discount              Float                     @default(0)
+  total                 Float
   
-  // Payment Information
+  // Payment Info
   paymentMethod         ExhibitionPaymentMethod
-  cashAmount            Float?                    // For cash payments
-  zelleAmount           Float?                    // For Zelle payments
-  cardAmount            Float?                    // For card payments
-  paymentNotes          String?                   // Payment details/confirmation
+  paymentDetails        Json?                     // For split payments, references, etc.
+  cashReceived          Float?                    // For cash transactions
+  changeGiven           Float?                    // For cash transactions
   
-  // Sale Metadata
-  bargainApplied        Boolean    @default(false) // Was price negotiated?
-  bargainReason         String?                   // Why discount was given
-  salesPersonNotes      String?                   // Internal notes
+  // Status & Tracking
+  isCompleted           Boolean                   @default(false)
+  completedAt           DateTime?
+  receiptPrinted        Boolean                   @default(false)
+  receiptEmailSent      Boolean                   @default(false)
+  staffNotes            String?
   
-  createdAt             DateTime   @default(now())
-  updatedAt             DateTime   @updatedAt
+  createdAt             DateTime                  @default(now())
+  updatedAt             DateTime                  @updatedAt
   
   // Relations
-  exhibition            Exhibition @relation(fields: [exhibitionId], references: [id])
+  exhibition            Exhibition                @relation(fields: [exhibitionId], references: [id])
   items                 ExhibitionSaleItem[]
-  
+
   @@map("exhibition_sales")
 }
 
-// ✅ NEW: Exhibition Sale Items
+// Individual items within an exhibition sale
 model ExhibitionSaleItem {
-  id                    String          @id @default(cuid())
+  id                    String            @id @default(cuid())
   saleId                String
   exhibitionProductId   String
   productId             String
+  productSizeId         String?           // ✅ NEW: Size reference
+  sizeLabel             String?           // ✅ NEW: Size display
   
-  // Item Details
-  productName           String          // Store name at time of sale
-  productSku            String          // Store SKU at time of sale
-  categoryName          String          // Store category at time of sale
+  // Pricing (at time of sale)
+  originalPrice         Float             // Product's original price
+  exhibitionPrice       Float             // Exhibition price (if different)
+  discountApplied       Float             @default(0) // Individual item discount
+  finalPrice            Float             // What was actually charged
   
-  // Pricing
-  originalPrice         Float           // Original store price
-  exhibitionPrice       Float           // Exhibition price (if different)
-  customPrice           Float?          // Custom bargained price for this item
-  finalPrice            Float           // What was actually charged
-  
-  quantity              Int             @default(1)
-  lineTotal             Float           // finalPrice * quantity
+  quantity              Int               @default(1)
+  lineTotal             Float             // finalPrice * quantity
   
   // Metadata
-  wasScanned            Boolean         @default(false) // Was barcode scanned?
-  scanMethod            String?         // "BARCODE" or "SKU" or "MANUAL"
-  appliedDiscount       Float           @default(0)     // Individual item discount
+  wasScanned            Boolean           @default(false) // Was barcode scanned?
+  scanMethod            String?           // "BARCODE" or "SKU" or "MANUAL"
+  appliedDiscount       Float             @default(0)     // Individual item discount
   
-  createdAt             DateTime        @default(now())
+  createdAt             DateTime          @default(now())
   
   // Relations
-  sale                  ExhibitionSale  @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  sale                  ExhibitionSale    @relation(fields: [saleId], references: [id], onDelete: Cascade)
   exhibitionProduct     ExhibitionProduct @relation(fields: [exhibitionProductId], references: [id])
-  product               Product         @relation(fields: [productId], references: [id])
+  product               Product           @relation(fields: [productId], references: [id])
+  productSize           ProductSize?      @relation(fields: [productSizeId], references: [id])
   
   @@map("exhibition_sale_items")
 }
@@ -368,7 +442,7 @@ model StoreSetting {
   timezone                  String        @default("America/New_York")
   defaultShippingZoneId     String?
   
-  // ✅ Return Policy Fields with No Returns Option
+  // Return Policy Fields with No Returns Option
   returnsEnabled            Boolean?      @default(true)
   returnPeriodDays          Int?          @default(30)
   returnPolicyUrl           String?
