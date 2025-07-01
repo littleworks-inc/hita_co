@@ -29,32 +29,52 @@ model Category {
   slug                  String     @unique
   parentId              String?
   
-  // ✅ SIMPLIFIED: Remove defaultSizeType field
-  defaultRequiresSizes  Boolean    @default(false)  // Keep this
-  // defaultSizeType    String?                     // ✅ REMOVE THIS LINE
+  // ✅ NEW: Category-specific business defaults
+  defaultProfitMargin   Float?     // Recommended profit margin for this category
+  defaultDiscountMax    Float?     // Maximum discount allowed for this category
+  suggestedTags         String[]   // Common tags for this category
+  averagePrice          Float?     // Average price point for pricing guidance
+  seasonality           String?    // JSON for seasonal data
+  
+  // Size system defaults
+  defaultRequiresSizes  Boolean    @default(false)
   
   createdAt             DateTime   @default(now())
   updatedAt             DateTime   @updatedAt
+  
+  // Relations
   parent                Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id])
   children              Category[] @relation("CategoryHierarchy")
   products              Product[]
-
+  configurationSettings ConfigurationSetting[]
+  
   @@map("categories")
 }
 
 model Country {
-  id             String    @id @default(cuid())
-  name           String    @unique
-  code           String    @unique
-  currency       String
-  currencySymbol String
-  exchangeRate   Float?
-  isDefault      Boolean   @default(false)
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-  products       Product[]
-  countryZones   CountryShippingZone[]
-
+  id                    String    @id @default(cuid())
+  name                  String    @unique
+  code                  String    @unique
+  currency              String
+  currencySymbol        String
+  exchangeRate          Float?
+  isDefault             Boolean   @default(false)
+  
+  // ✅ NEW: Country-specific business defaults
+  defaultGstPercentage  Float?    // Default GST/Tax rate for this country
+  defaultShippingCost   Float?    // Typical shipping cost within country
+  defaultTaxName        String?   // "GST", "VAT", "Sales Tax", etc.
+  businessHours         String?   // JSON string for business hours
+  holidays              String[]  // Array of holiday dates
+  
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  
+  // Relations
+  products              Product[]
+  countryZones          CountryShippingZone[]
+  configurationSettings ConfigurationSetting[]
+  
   @@map("countries")
 }
 
@@ -502,4 +522,38 @@ model ShippingRate {
   shippingZone          ShippingZone @relation(fields: [shippingZoneId], references: [id], onDelete: Cascade)
 
   @@map("shipping_rates")
+}
+
+model ConfigurationSetting {
+  id              String   @id @default(cuid())
+  category        String   // 'PRODUCT_DEFAULTS', 'COUNTRY_DEFAULTS', 'CATEGORY_DEFAULTS', 'BUSINESS_RULES'
+  key             String   // 'gst_percentage', 'shipping_cost', 'profit_margin', etc.
+  value           String   // JSON string for complex values, simple string for basic values
+  dataType        String   // 'number', 'string', 'boolean', 'json'
+  description     String?  // Human-readable description
+  countryId       String?  // For country-specific settings
+  categoryId      String?  // For category-specific settings
+  isUserEditable  Boolean  @default(true)  // Can admin modify this?
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Relations
+  country         Country?  @relation(fields: [countryId], references: [id])
+  category        Category? @relation(fields: [categoryId], references: [id])
+  
+  @@unique([category, key, countryId, categoryId])
+  @@map("configuration_settings")
+}
+
+model ConfigurationTemplate {
+  id          String   @id @default(cuid())
+  name        String   @unique  // 'ETHNIC_FASHION_DEFAULT', 'JEWELRY_TEMPLATE', etc.
+  description String?
+  isActive    Boolean  @default(true)
+  settings    String   // JSON string of configuration values
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@map("configuration_templates")
 }

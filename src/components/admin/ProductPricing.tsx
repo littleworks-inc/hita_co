@@ -1,15 +1,20 @@
 // =====================================
-// src/components/admin/ProductPricing.tsx - ENHANCED WITH DISCOUNT CONTROLS
+// src/components/admin/ProductPricing.tsx - CLEAN VERSION
+// No business assumptions, just clean descriptive placeholders
 // =====================================
 'use client'
 
 import { Card, CardContent, CardHeader, CardTitle, Input, Label } from '@/components/ui'
-import { DollarSign, Eye, EyeOff, Info, Tag } from 'lucide-react'
-import { useState } from 'react'
+import { DollarSign, Eye, EyeOff, Info } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { cleanConfigurationService } from '@/lib/clean-configuration-service'
 
 interface Country {
+  id: string
+  name: string
   currency: string
   currencySymbol: string
+  exchangeRate: number | null
 }
 
 interface Product {
@@ -25,7 +30,9 @@ interface Product {
   profitMargin: number
   discountPercentage: number
   sellingPriceUSD: number
-  showDiscountToCustomers: boolean // NEW: Discount visibility control
+  showDiscountToCustomers: boolean
+  categoryId: string
+  countryId: string
 }
 
 interface ProductPricingProps {
@@ -34,6 +41,12 @@ interface ProductPricingProps {
   exchangeRate: number
   errors: Record<string, string>
   onInputChange: (field: keyof Product, value: any) => void
+  showCostBreakdown: boolean
+  onToggleCostBreakdown: () => void
+  pricingMode: 'automatic' | 'manual'
+  onPricingModeChange: (mode: 'automatic' | 'manual') => void
+  showCustomerPreview: boolean
+  onToggleCustomerPreview: () => void
 }
 
 export default function ProductPricing({
@@ -41,11 +54,56 @@ export default function ProductPricing({
   selectedCountry,
   exchangeRate,
   errors,
-  onInputChange
+  onInputChange,
+  showCostBreakdown,
+  onToggleCostBreakdown,
+  pricingMode,
+  onPricingModeChange,
+  showCustomerPreview,
+  onToggleCustomerPreview
 }: ProductPricingProps) {
-  const [showCustomerPreview, setShowCustomerPreview] = useState(false)
+  
+  // ✅ CLEAN: Only descriptive placeholders, no business logic
+  const [placeholders, setPlaceholders] = useState({
+    originalPrice: 'Enter original price',
+    quantity: 'Enter quantity',
+    gstPercentage: 'Enter tax/GST %',
+    shippingCost: 'Enter shipping cost',
+    conversionCharges: 'Enter conversion charges',
+    additionalExpenses: 'Enter additional expenses',
+    profitMargin: 'Enter profit margin %'
+  })
 
-  // ✅ SAFE NUMBER FORMATTING - Handle undefined/null values
+  // ✅ Load clean configuration
+  useEffect(() => {
+    loadCleanConfiguration()
+  }, [formData.countryId])
+
+  const loadCleanConfiguration = async () => {
+    try {
+      const context = {
+        countryId: formData.countryId || undefined
+      }
+
+      const config = await cleanConfigurationService.getCleanProductConfiguration(context)
+      
+      setPlaceholders({
+        originalPrice: config.originalPrice.placeholder,
+        quantity: config.quantity.placeholder,
+        gstPercentage: config.gstPercentage.placeholder,
+        shippingCost: config.shippingCost.placeholder,
+        conversionCharges: config.conversionCharges.placeholder,
+        additionalExpenses: config.additionalExpenses.placeholder,
+        profitMargin: config.profitMargin.placeholder
+      })
+
+    } catch (error) {
+      console.error('Failed to load configuration:', error)
+      // Keep default descriptive placeholders
+    }
+  }
+
+  // ✅ SAFE NUMBER FORMATTING
   const safeToFixed = (value: number | undefined | null, digits: number = 2): string => {
     if (value === undefined || value === null || isNaN(value)) {
       return '0.00'
@@ -53,7 +111,6 @@ export default function ProductPricing({
     return Number(value).toFixed(digits)
   }
 
-  // ✅ SAFE NUMBER DISPLAY - For calculations that might result in undefined
   const safeNumber = (value: number | undefined | null): number => {
     if (value === undefined || value === null || isNaN(value)) {
       return 0
@@ -61,7 +118,7 @@ export default function ProductPricing({
     return Number(value)
   }
 
-  // ✅ SAFE CALCULATION - Handle division by zero and undefined values
+  // ✅ PROFIT CALCULATION
   const safeProfitCalculation = (): { profit: string; percentage: string } => {
     const sellingPrice = safeNumber(formData.sellingPriceUSD)
     const costPrice = safeNumber(formData.costPriceUSD)
@@ -79,14 +136,12 @@ export default function ProductPricing({
     }
   }
 
-  // 🎯 NEW: Calculate original price for display (before discount)
+  // ✅ ORIGINAL PRICE CALCULATION FOR DISPLAY
   const calculateOriginalPriceForDisplay = (): number => {
     const sellingPrice = safeNumber(formData.sellingPriceUSD)
     const discountPercent = safeNumber(formData.discountPercentage)
     
     if (discountPercent === 0) return sellingPrice
-    
-    // Original price = selling price / (1 - discount/100)
     return sellingPrice / (1 - discountPercent / 100)
   }
 
@@ -99,39 +154,41 @@ export default function ProductPricing({
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <DollarSign className="h-5 w-5" />
-          Pricing & Discount System
+          Pricing & Cost Management
         </CardTitle>
       </CardHeader>
+      
       <CardContent className="space-y-6">
-        {/* Original Purchase Details */}
+        {/* ✅ CURRENCY CONTEXT (factual information only) */}
+        {selectedCountry && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+            <div className="flex items-center gap-2 text-sm">
+              <Info className="h-4 w-4 text-blue-600" />
+              <span className="text-blue-800">
+                Currency: {selectedCountry.currency} ({selectedCountry.currencySymbol}) • 
+                Exchange Rate: 1 USD = {exchangeRate || 1} {selectedCountry.currency}
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* ✅ CLEAN: Original Purchase Details */}
         <div className="grid gap-4 md:grid-cols-3">
           <div className="space-y-2">
-            <Label htmlFor="originalPrice">Original Price *</Label>
+            <Label htmlFor="originalPrice">
+              Original Price * ({selectedCountry?.currencySymbol || '$'})
+            </Label>
             <Input
               id="originalPrice"
               type="number"
               step="0.01"
-              value={formData.originalPrice || 0}
+              value={formData.originalPrice || ''}
               onChange={(e) => onInputChange('originalPrice', parseFloat(e.target.value) || 0)}
-              placeholder="1000"
+              placeholder={placeholders.originalPrice}
               className={errors.originalPrice ? 'border-red-500' : ''}
             />
             {errors.originalPrice && <p className="text-sm text-red-500">{errors.originalPrice}</p>}
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="originalCurrency">Currency</Label>
-            <select
-              id="originalCurrency"
-              value={formData.originalCurrency || 'INR'}
-              onChange={(e) => onInputChange('originalCurrency', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="INR">INR</option>
-              <option value="USD">USD</option>
-              <option value="EUR">EUR</option>
-              <option value="GBP">GBP</option>
-            </select>
+            <p className="text-xs text-gray-500">The price you paid for this product</p>
           </div>
 
           <div className="space-y-2">
@@ -139,69 +196,105 @@ export default function ProductPricing({
             <Input
               id="quantity"
               type="number"
-              value={formData.quantity || 1}
+              min="1"
+              value={formData.quantity || ''}
               onChange={(e) => onInputChange('quantity', parseInt(e.target.value) || 1)}
-              placeholder="5"
+              placeholder={placeholders.quantity}
               className={errors.quantity ? 'border-red-500' : ''}
             />
             {errors.quantity && <p className="text-sm text-red-500">{errors.quantity}</p>}
+            <p className="text-xs text-gray-500">Number of pieces you bought</p>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Currency</Label>
+            <div className="px-3 py-2 bg-gray-50 border border-gray-300 rounded-md text-gray-700">
+              {selectedCountry?.currency || 'USD'} ({selectedCountry?.currencySymbol || '$'})
+            </div>
+            <p className="text-xs text-gray-500">Auto-set from Country of Origin</p>
           </div>
         </div>
 
-        {/* Additional Costs */}
+        {/* ✅ CLEAN: Additional Costs - No Assumptions */}
         <div className="grid gap-4 md:grid-cols-4">
           <div className="space-y-2">
-            <Label htmlFor="gstPercentage">GST/Tax (%)</Label>
+            <Label htmlFor="gstPercentage">Tax/GST (%)</Label>
             <Input
               id="gstPercentage"
               type="number"
               step="0.01"
-              value={formData.gstPercentage || 0}
+              min="0"
+              max="100"
+              value={formData.gstPercentage || ''}
               onChange={(e) => onInputChange('gstPercentage', parseFloat(e.target.value) || 0)}
-              placeholder="18"
+              placeholder={placeholders.gstPercentage}
             />
+            <p className="text-xs text-gray-500">Tax rate applicable (if any)</p>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="shippingCost">Shipping Cost</Label>
+            <Label htmlFor="shippingCost">
+              Shipping Cost ({selectedCountry?.currencySymbol || '$'})
+            </Label>
             <Input
               id="shippingCost"
               type="number"
               step="0.01"
-              value={formData.shippingCost || 0}
+              min="0"
+              value={formData.shippingCost || ''}
               onChange={(e) => onInputChange('shippingCost', parseFloat(e.target.value) || 0)}
-              placeholder="50"
+              placeholder={placeholders.shippingCost}
             />
+            <p className="text-xs text-gray-500">Cost to ship to you</p>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="conversionCharges">Conversion Charges</Label>
+            <Label htmlFor="conversionCharges">
+              Conversion Charges ({selectedCountry?.currencySymbol || '$'})
+            </Label>
             <Input
               id="conversionCharges"
               type="number"
               step="0.01"
-              value={formData.conversionCharges || 0}
+              min="0"
+              value={formData.conversionCharges || ''}
               onChange={(e) => onInputChange('conversionCharges', parseFloat(e.target.value) || 0)}
-              placeholder="25"
+              placeholder={placeholders.conversionCharges}
             />
+            <p className="text-xs text-gray-500">Currency/payment processing fees</p>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="additionalExpenses">Additional Expenses</Label>
+            <Label htmlFor="additionalExpenses">
+              Additional Expenses ({selectedCountry?.currencySymbol || '$'})
+            </Label>
             <Input
               id="additionalExpenses"
               type="number"
               step="0.01"
-              value={formData.additionalExpenses || 0}
+              min="0"
+              value={formData.additionalExpenses || ''}
               onChange={(e) => onInputChange('additionalExpenses', parseFloat(e.target.value) || 0)}
-              placeholder="100"
+              placeholder={placeholders.additionalExpenses}
             />
+            <p className="text-xs text-gray-500">Customs, duties, other costs</p>
           </div>
         </div>
 
-        {/* Calculated Costs */}
+        {/* ✅ CALCULATED COSTS */}
         <div className="bg-gray-50 p-4 rounded-md">
-          <h4 className="font-medium text-gray-900 mb-3">Calculated Costs</h4>
+          <div className="flex items-center justify-between mb-3">
+            <h4 className="font-medium text-gray-900">Calculated Costs</h4>
+            <button
+              type="button"
+              onClick={onToggleCostBreakdown}
+              className="text-sm text-blue-600 hover:text-blue-800 flex items-center gap-1"
+            >
+              {showCostBreakdown ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              {showCostBreakdown ? 'Hide' : 'Show'} breakdown
+            </button>
+          </div>
+          
           <div className="grid gap-4 md:grid-cols-3">
             <div>
               <Label>Total Cost (USD)</Label>
@@ -218,13 +311,60 @@ export default function ProductPricing({
             <div>
               <Label>Exchange Rate</Label>
               <div className="text-sm text-gray-600">
-                1 USD = {exchangeRate || 1} {selectedCountry?.currency || 'INR'}
+                1 USD = {exchangeRate || 1} {selectedCountry?.currency || 'USD'}
               </div>
             </div>
           </div>
+
+          {/* ✅ DETAILED COST BREAKDOWN */}
+          {showCostBreakdown && (
+            <div className="mt-4 pt-4 border-t border-gray-200">
+              <h5 className="text-sm font-medium text-gray-700 mb-2">Cost Breakdown Detail</h5>
+              <div className="grid gap-2 text-xs">
+                <div className="flex justify-between">
+                  <span>Original Price:</span>
+                  <span>{selectedCountry?.currencySymbol || '$'}{safeToFixed(formData.originalPrice)}</span>
+                </div>
+                {formData.gstPercentage > 0 && (
+                  <div className="flex justify-between">
+                    <span>Tax/GST ({formData.gstPercentage}%):</span>
+                    <span>{selectedCountry?.currencySymbol || '$'}{safeToFixed(formData.originalPrice * (formData.gstPercentage / 100))}</span>
+                  </div>
+                )}
+                {formData.shippingCost > 0 && (
+                  <div className="flex justify-between">
+                    <span>Shipping:</span>
+                    <span>{selectedCountry?.currencySymbol || '$'}{safeToFixed(formData.shippingCost)}</span>
+                  </div>
+                )}
+                {formData.conversionCharges > 0 && (
+                  <div className="flex justify-between">
+                    <span>Conversion:</span>
+                    <span>{selectedCountry?.currencySymbol || '$'}{safeToFixed(formData.conversionCharges)}</span>
+                  </div>
+                )}
+                {formData.additionalExpenses > 0 && (
+                  <div className="flex justify-between">
+                    <span>Additional:</span>
+                    <span>{selectedCountry?.currencySymbol || '$'}{safeToFixed(formData.additionalExpenses)}</span>
+                  </div>
+                )}
+                <div className="border-t border-gray-300 pt-1 mt-1 flex justify-between font-medium">
+                  <span>Total Local Cost:</span>
+                  <span>{selectedCountry?.currencySymbol || '$'}{safeToFixed(
+                    formData.originalPrice + 
+                    (formData.originalPrice * (formData.gstPercentage / 100)) + 
+                    formData.shippingCost + 
+                    formData.conversionCharges + 
+                    formData.additionalExpenses
+                  )}</span>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* 🚀 ENHANCED: Profit & Discount Section */}
+        {/* ✅ CLEAN: Profit & Discount Section */}
         <div className="grid gap-4 md:grid-cols-2">
           <div className="space-y-2">
             <Label htmlFor="profitMargin">Profit Margin (%)</Label>
@@ -232,169 +372,130 @@ export default function ProductPricing({
               id="profitMargin"
               type="number"
               step="0.01"
-              value={formData.profitMargin || 0}
+              min="0"
+              value={formData.profitMargin || ''}
               onChange={(e) => onInputChange('profitMargin', parseFloat(e.target.value) || 0)}
-              placeholder="100"
+              placeholder={placeholders.profitMargin}
             />
+            <p className="text-xs text-gray-500">Your desired profit margin</p>
+            
+            {/* Profit calculation display */}
+            {formData.piecePriceUSD > 0 && formData.profitMargin > 0 && (
+              <div className="text-sm text-gray-600">
+                Profit: ${profit} ({percentage}%)
+              </div>
+            )}
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="discountPercentage">Discount (%)</Label>
+            <Label htmlFor="discountPercentage">Discount Percentage (%)</Label>
             <Input
               id="discountPercentage"
               type="number"
               step="0.01"
-              value={formData.discountPercentage || 0}
+              min="0"
+              max="100"
+              value={formData.discountPercentage || ''}
               onChange={(e) => onInputChange('discountPercentage', parseFloat(e.target.value) || 0)}
-              placeholder="10"
+              placeholder="Enter discount (optional)"
             />
+            <p className="text-xs text-gray-500">Discount to offer customers</p>
+            
+            {/* Discount visibility toggle */}
+            <div className="flex items-center gap-2 mt-2">
+              <input
+                type="checkbox"
+                id="showDiscountToCustomers"
+                checked={formData.showDiscountToCustomers}
+                onChange={(e) => onInputChange('showDiscountToCustomers', e.target.checked)}
+                className="rounded"
+              />
+              <label htmlFor="showDiscountToCustomers" className="text-sm text-gray-700">
+                Show discount to customers
+              </label>
+            </div>
           </div>
         </div>
 
-        {/* 🎯 NEW: Discount Visibility Control */}
-        {hasDiscount && (
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-            <div className="flex items-start justify-between">
-              <div className="flex items-start gap-3">
-                <Tag className="h-5 w-5 text-yellow-600 mt-0.5" />
-                <div>
-                  <Label className="text-yellow-800 font-medium">Customer Discount Display</Label>
-                  <p className="text-sm text-yellow-700 mt-1">
-                    Control whether customers see the discount on the frontend
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => onInputChange('showDiscountToCustomers', !formData.showDiscountToCustomers)}
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                    formData.showDiscountToCustomers 
-                      ? 'bg-green-600' 
-                      : 'bg-gray-200'
-                  }`}
-                >
-                  <span
-                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                      formData.showDiscountToCustomers 
-                        ? 'translate-x-6' 
-                        : 'translate-x-1'
-                    }`}
-                  />
-                </button>
-                <span className="text-sm font-medium text-yellow-800">
-                  {formData.showDiscountToCustomers ? 'Visible' : 'Hidden'}
-                </span>
-              </div>
-            </div>
-
-            {/* Show customer preview button */}
-            <div className="mt-3 pt-3 border-t border-yellow-200">
-              <button
-                type="button"
-                onClick={() => setShowCustomerPreview(!showCustomerPreview)}
-                className="flex items-center gap-2 text-sm text-yellow-700 hover:text-yellow-800"
-              >
-                {showCustomerPreview ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                {showCustomerPreview ? 'Hide' : 'Preview'} customer view
-              </button>
-            </div>
+        {/* ✅ CUSTOMER PRICE PREVIEW */}
+        <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h4 className="font-medium text-purple-900">Customer Price Preview</h4>
+            <button
+              type="button"
+              onClick={onToggleCustomerPreview}
+              className="text-sm text-purple-600 hover:text-purple-800 flex items-center gap-1"
+            >
+              {showCustomerPreview ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              {showCustomerPreview ? 'Hide' : 'Show'} preview
+            </button>
           </div>
-        )}
 
-        {/* 🎯 NEW: Customer Price Preview */}
-        {hasDiscount && showCustomerPreview && (
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <h4 className="font-medium text-blue-900 mb-3 flex items-center gap-2">
-              <Eye className="h-4 w-4" />
-              Customer Price Preview
-            </h4>
-            
-            <div className="space-y-3">
-              {/* When discount is visible to customers */}
-              {formData.showDiscountToCustomers ? (
-                <div className="bg-white p-3 rounded border">
-                  <p className="text-xs text-gray-500 mb-2">Customer sees:</p>
-                  <div className="flex items-center gap-3">
-                    <span className="text-gray-400 line-through text-lg">
-                      ${safeToFixed(originalPriceForDisplay)}
-                    </span>
-                    <span className="text-2xl font-bold text-gray-900">
-                      ${safeToFixed(formData.sellingPriceUSD)}
-                    </span>
-                    <span className="bg-red-100 text-red-600 text-xs font-bold px-2 py-1 rounded-full">
-                      {formData.discountPercentage}% OFF
+          {showCustomerPreview && (
+            <div className="space-y-2">
+              {hasDiscount && formData.showDiscountToCustomers ? (
+                <div>
+                  <div className="text-sm text-gray-500 line-through">
+                    Was: ${safeToFixed(originalPriceForDisplay)}
+                  </div>
+                  <div className="text-lg font-bold text-purple-800 flex items-center gap-2">
+                    Now: ${safeToFixed(formData.sellingPriceUSD)}
+                    <span className="bg-red-100 text-red-800 px-2 py-1 rounded text-xs">
+                      Save {formData.discountPercentage}%
                     </span>
                   </div>
-                  <p className="text-xs text-green-600 mt-1">
-                    Savings: ${safeToFixed(originalPriceForDisplay - formData.sellingPriceUSD)}
-                  </p>
                 </div>
               ) : (
-                /* When discount is hidden from customers */
-                <div className="bg-white p-3 rounded border">
-                  <p className="text-xs text-gray-500 mb-2">Customer sees:</p>
-                  <div className="flex items-center gap-3">
-                    <span className="text-2xl font-bold text-gray-900">
-                      ${safeToFixed(formData.sellingPriceUSD)}
-                    </span>
-                  </div>
-                  <p className="text-xs text-gray-600 mt-1">
-                    No discount information shown
-                  </p>
+                <div className="text-lg font-bold text-purple-800">
+                  ${safeToFixed(formData.sellingPriceUSD)}
                 </div>
               )}
-
-              {/* Internal admin info */}
-              <div className="bg-gray-100 p-2 rounded text-xs text-gray-600">
-                <strong>Admin Info:</strong> Original selling price (before discount): ${safeToFixed(originalPriceForDisplay)}
+              
+              <div className="text-xs text-gray-600">
+                This is how customers will see the pricing on your website.
               </div>
             </div>
-          </div>
-        )}
-
-        {/* Final Selling Price Summary */}
-        <div className="bg-blue-50 p-4 rounded-md">
-          <Label>Final Selling Price (USD)</Label>
-          <div className="text-2xl font-bold text-blue-600">
-            ${safeToFixed(formData.sellingPriceUSD)}
-          </div>
-          <p className="text-sm text-gray-600 mt-1">
-            Profit: ${profit} ({percentage}%)
-          </p>
-          {hasDiscount && (
-            <p className="text-sm text-blue-600 mt-1">
-              Includes {formData.discountPercentage}% discount • 
-              Original: ${safeToFixed(originalPriceForDisplay)}
-            </p>
           )}
         </div>
 
-        {/* 🎯 NEW: Discount Business Rules Info */}
-        {hasDiscount && (
-          <div className="bg-gray-50 p-3 rounded-md">
-            <div className="flex items-start gap-2">
-              <Info className="h-4 w-4 text-gray-500 mt-0.5" />
-              <div className="text-xs text-gray-600">
-                <strong>Discount Logic:</strong> The selling price is already calculated with the discount applied. 
-                When shown to customers, we calculate the "original price" for display purposes: 
-                Original = ${safeToFixed(formData.sellingPriceUSD)} ÷ (1 - {formData.discountPercentage}%) = ${safeToFixed(originalPriceForDisplay)}
-              </div>
-            </div>
+        {/* ✅ PRICING MODE CONTROLS */}
+        <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+          <div className="text-sm text-gray-700">Pricing Mode:</div>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => onPricingModeChange('automatic')}
+              className={`px-3 py-1 text-xs rounded ${
+                pricingMode === 'automatic' 
+                  ? 'bg-blue-600 text-white' 
+                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+              }`}
+            >
+              Auto Calculate
+            </button>
+            <button
+              type="button"
+              onClick={() => onPricingModeChange('manual')}
+              className={`px-3 py-1 text-xs rounded ${
+                pricingMode === 'manual' 
+                  ? 'bg-blue-600 text-white' 
+                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+              }`}
+            >
+              Manual Entry
+            </button>
           </div>
-        )}
+        </div>
       </CardContent>
     </Card>
   )
 }
 
-// 🚀 FEATURES INCLUDED:
-// ✅ Enhanced discount percentage input
-// ✅ Customer discount visibility toggle
-// ✅ Real-time customer price preview
-// ✅ Original price calculation for display
-// ✅ Discount business logic explanation
-// ✅ Visual feedback for discount states
-// ✅ Safe number handling throughout
-// ✅ Responsive design
-// ✅ Accessibility features
+// ✅ CLEAN FEATURES:
+// ✅ No hardcoded placeholder values
+// ✅ No business assumptions or smart defaults
+// ✅ Clean, descriptive placeholders
+// ✅ Currency context (factual information only)
+// ✅ Admin has complete control over all values
+// ✅ Clear guidance text without making decisions for admin
+// ✅ Professional appearance with helpful descriptions
