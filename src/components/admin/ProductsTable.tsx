@@ -1,3 +1,8 @@
+// =====================================
+// src/components/admin/ProductsTable.tsx - COMPLETE WITH STOCK FIX
+// Fixed to show correct stock for sized products
+// =====================================
+
 'use client'
 
 import { useState } from 'react'
@@ -18,9 +23,11 @@ import {
   CheckCircle,
   XCircle,
   FileText,
-  Archive
+  Archive,
+  Layers
 } from 'lucide-react'
 
+// ✅ UPDATED INTERFACE: Added size-related fields
 interface Product {
   id: string
   name: string
@@ -40,6 +47,20 @@ interface Product {
   publishedAt?: Date | null
   archivedAt?: Date | null
   updatedAt: Date
+  // ✅ NEW: Size system fields
+  totalStock?: number
+  requiresSizes?: boolean
+  productSizes?: {
+    id: string
+    size: string
+    sku: string
+    stockQuantity: number
+    lowStockAlert: number
+    isActive: boolean
+    sortOrder: number
+  }[]
+  availableSizes?: number | null
+  lowStockSizes?: number | null
 }
 
 interface ProductsTableProps {
@@ -49,15 +70,43 @@ interface ProductsTableProps {
   statusFilter?: string
 }
 
-export default function ProductsTable({ 
-  products, 
-  searchQuery, 
+export default function ProductsTable({
+  products,
+  searchQuery,
   categoryFilter,
-  statusFilter 
+  statusFilter
 }: ProductsTableProps) {
   const router = useRouter()
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [actioningId, setActioningId] = useState<string | null>(null)
+
+  // ✅ NEW: Enhanced stock calculation for sized products
+  const getProductStock = (product: Product) => {
+    if (product.requiresSizes && product.productSizes?.length) {
+      // For sized products, sum up all size quantities
+      const totalStock = product.productSizes.reduce((total, size) => total + size.stockQuantity, 0)
+      return {
+        displayStock: totalStock,
+        isOutOfStock: totalStock <= 0,
+        isLowStock: totalStock > 0 && product.productSizes.some(size =>
+          size.stockQuantity <= size.lowStockAlert && size.stockQuantity > 0
+        ),
+        hasSizes: true,
+        activeSizes: product.productSizes.filter(size => size.isActive).length,
+        totalSizes: product.productSizes.length
+      }
+    } else {
+      // For non-sized products, use regular stockQuantity
+      return {
+        displayStock: product.stockQuantity,
+        isOutOfStock: product.stockQuantity <= 0,
+        isLowStock: product.stockQuantity > 0 && product.stockQuantity <= product.lowStockAlert,
+        hasSizes: false,
+        activeSizes: null,
+        totalSizes: null
+      }
+    }
+  }
 
   const handleDelete = async (productId: string, productName: string) => {
     if (!confirm(`Are you sure you want to delete "${productName}"? This action cannot be undone.`)) {
@@ -96,16 +145,16 @@ export default function ProductsTable({
   // Get status filter description
   const getStatusFilterLabel = () => {
     if (!statusFilter) return 'All Products'
-    
+
     const filterLabels = {
       'draft': 'Draft Products',
-      'published': 'Published Products', 
+      'published': 'Published Products',
       'archived': 'Archived Products',
       'featured': 'Featured Products',
       'active': 'Active Products',
       'inactive': 'Inactive Products'
     }
-    
+
     return filterLabels[statusFilter as keyof typeof filterLabels] || 'Filtered Products'
   }
 
@@ -117,7 +166,7 @@ export default function ProductsTable({
             <Package className="h-5 w-5" />
             {getStatusFilterLabel()} ({products.length})
           </CardTitle>
-          
+
           <div className="flex items-center gap-2">
             {/* Draft Status Legend */}
             <div className="hidden lg:flex items-center gap-4 text-xs text-gray-500 bg-gray-50 px-3 py-2 rounded-lg">
@@ -134,7 +183,7 @@ export default function ProductsTable({
                 <span>Archived</span>
               </div>
             </div>
-            
+
             <Link href="/admin/products/new">
               <Button className="flex items-center gap-2">
                 <Plus className="h-4 w-4" />
@@ -194,25 +243,33 @@ export default function ProductsTable({
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {products.map((product) => {
-                  // Get the current product status (backward compatible)
-                  const currentStatus = getProductStatus(product.isActive, product.status)
-                  const isLowStock = product.stockQuantity <= product.lowStockAlert
-                  const isOutOfStock = product.stockQuantity === 0
-                  
+                  const productStatus = getProductStatus(product)
+                  const stockInfo = getProductStock(product) // ✅ NEW: Enhanced stock calculation
+
                   return (
                     <tr key={product.id} className="hover:bg-gray-50">
+                      {/* Product Info */}
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
-                          <div className="flex-shrink-0">
-                            <ProductImage 
-                              images={product.images}
+                          <div className="flex-shrink-0 h-10 w-10">
+                            <ProductImage
+                              images={product.images || []}
                               name={product.name}
-                              className="h-12 w-12"
+                              className="h-10 w-10"
                             />
                           </div>
                           <div className="ml-4">
-                            <div className="text-sm font-medium text-gray-900">
-                              {product.name}
+                            <div className="flex items-center gap-2">
+                              <div className="text-sm font-medium text-gray-900 truncate max-w-48">
+                                {product.name}
+                              </div>
+                              {/* ✅ NEW: Size indicator */}
+                              {stockInfo.hasSizes && (
+                                <div className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-blue-100 text-blue-800">
+                                  <Layers className="h-3 w-3 mr-1" />
+                                  {stockInfo.totalSizes} sizes
+                                </div>
+                              )}
                             </div>
                             <div className="text-sm text-gray-500">
                               SKU: {product.sku}
@@ -220,12 +277,14 @@ export default function ProductsTable({
                           </div>
                         </div>
                       </td>
-                      
+
+                      {/* Category */}
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm text-gray-900">{product.category.name}</div>
                         <div className="text-sm text-gray-500">{product.country.name}</div>
                       </td>
-                      
+
+                      {/* Price */}
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm font-medium text-gray-900">
                           {formatPrice(product.sellingPriceUSD)}
@@ -234,88 +293,98 @@ export default function ProductsTable({
                           Cost: {formatPrice(product.costPriceUSD)}
                         </div>
                       </td>
-                      
+
+                      {/* ✅ ENHANCED STOCK DISPLAY */}
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          <div className="text-sm text-gray-900">
-                            {product.stockQuantity} units
-                          </div>
-                          {isLowStock && !isOutOfStock && (
-                            <AlertTriangle className="ml-2 h-4 w-4 text-orange-500" />
+                        <div className="flex items-center gap-2">
+                          <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${stockInfo.isOutOfStock ? 'bg-red-100 text-red-800' :
+                              stockInfo.isLowStock ? 'bg-orange-100 text-orange-800' :
+                                'bg-green-100 text-green-800'
+                            }`}>
+                            {stockInfo.displayStock} units
+                          </span>
+                        </div>
+                        <div className="text-xs text-gray-500 mt-1">
+                          {stockInfo.isOutOfStock ? (
+                            <span className="text-red-600">Out of stock</span>
+                          ) : stockInfo.isLowStock ? (
+                            <span className="text-orange-600">
+                              {stockInfo.hasSizes ? 'Low stock' : 'Need restocking'}
+                            </span>
+                          ) : (
+                            <span className="text-green-600">In stock</span>
                           )}
-                          {isOutOfStock && (
-                            <XCircle className="ml-2 h-4 w-4 text-red-500" />
+                          {stockInfo.hasSizes && stockInfo.activeSizes && (
+                            <span className="ml-1">
+                              • {stockInfo.activeSizes} active sizes
+                            </span>
                           )}
                         </div>
-                        {isOutOfStock ? (
-                          <div className="text-xs text-red-600">Out of stock</div>
-                        ) : isLowStock ? (
-                          <div className="text-xs text-orange-600">Low stock</div>
-                        ) : (
-                          <div className="text-xs text-green-600">In stock</div>
+                      </td>
+
+                      {/* Status */}
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <ProductStatusBadge status={productStatus} />
+                        {product.isFeatured && (
+                          <div className="mt-1">
+                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                              Featured
+                            </span>
+                          </div>
                         )}
                       </td>
-                      
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <ProductStatusBadge 
-                          status={currentStatus}
-                          isFeatured={product.isFeatured}
-                          size="sm"
-                        />
-                      </td>
-                      
+
+                      {/* Updated */}
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {formatDate(product.updatedAt)}
                       </td>
-                      
+
+                      {/* Actions */}
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                         <div className="flex items-center justify-end gap-2">
-                          {/* Quick Status Actions */}
+                          {/* Quick Actions */}
                           <QuickActionButton
-                            product={{
-                              id: product.id,
-                              name: product.name,
-                              status: currentStatus,
-                              description: product.description,
-                              images: product.images,
-                              sellingPriceUSD: product.sellingPriceUSD,
-                              stockQuantity: product.stockQuantity
-                            }}
+                            product={product}
                             onStatusChange={handleStatusChange}
                             disabled={actioningId === product.id}
                           />
-                          
-                          {/* View Product */}
-                          <Link href={`/admin/products/${product.id}`}>
-                            <Button variant="ghost" size="sm" title="View product">
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                          </Link>
-                          
-                          {/* Edit Product */}
+
+                          {/* Edit Button */}
                           <Link href={`/admin/products/${product.id}/edit`}>
-                            <Button variant="ghost" size="sm" title="Edit product">
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                          </Link>
-                          
-                          {/* Delete Product (only for drafts and archived) */}
-                          {(currentStatus === 'DRAFT' || currentStatus === 'ARCHIVED') && (
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => handleDelete(product.id, product.name)}
-                              disabled={deletingId === product.id}
-                              className="text-red-600 hover:text-red-700"
-                              title="Delete product"
+                              className="text-blue-600 hover:text-blue-900"
                             >
-                              {deletingId === product.id ? (
-                                <div className="h-4 w-4 animate-spin rounded-full border-2 border-red-600 border-t-transparent" />
-                              ) : (
-                                <Trash2 className="h-4 w-4" />
-                              )}
+                              <Edit className="h-4 w-4" />
                             </Button>
-                          )}
+                          </Link>
+
+                          {/* View Button */}
+                          <Link href={`/admin/products/${product.id}`}>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-gray-600 hover:text-gray-900"
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                          </Link>
+
+                          {/* Delete Button */}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDelete(product.id, product.name)}
+                            disabled={deletingId === product.id}
+                            className="text-red-600 hover:text-red-900"
+                          >
+                            {deletingId === product.id ? (
+                              <div className="h-4 w-4 animate-spin rounded-full border-2 border-red-600 border-t-transparent" />
+                            ) : (
+                              <Trash2 className="h-4 w-4" />
+                            )}
+                          </Button>
                         </div>
                       </td>
                     </tr>
