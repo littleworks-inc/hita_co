@@ -22,13 +22,19 @@ export default async function EditProductPage({ params }: EditProductPageProps) 
 
   // Get product data
   const product = await db.product.findUnique({
-    where: { id: params.id },
-    include: {
-      category: true,
-      country: true,
-      supplier: true
+  where: { id: params.id },
+  include: {
+    category: true,
+    country: true,
+    supplier: true,
+    // ✅ ADD THIS: Include product sizes
+    productSizes: {
+      orderBy: {
+        sortOrder: 'asc'
+      }
     }
-  })
+  }
+})
 
   if (!product) {
     notFound()

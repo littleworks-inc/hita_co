@@ -333,7 +333,7 @@ export async function POST(request: NextRequest) {
       publishedAt: status === 'PUBLISHED' && !publishedAt ? new Date() : (publishedAt ? new Date(publishedAt) : null),
       // ✅ NEW: Size system fields
       requiresSizes: Boolean(requiresSizes),
-      sizeType: sizeType || null
+      // sizeType: sizeType || null
     }
 
     // ✅ NEW: Create product with sizes in a transaction
