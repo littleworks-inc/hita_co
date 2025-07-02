@@ -526,8 +526,8 @@ model ShippingRate {
 
 model ConfigurationSetting {
   id              String   @id @default(cuid())
-  category        String   // 'PRODUCT_DEFAULTS', 'COUNTRY_DEFAULTS', 'CATEGORY_DEFAULTS', 'BUSINESS_RULES'
-  key             String   // 'gst_percentage', 'shipping_cost', 'profit_margin', etc.
+  category        String   // 'PRICING', 'BUSINESS_RULES', 'UI_SETTINGS', etc.
+  key             String   // 'profit_margin', 'low_stock_alert', etc.
   value           String   // JSON string for complex values, simple string for basic values
   dataType        String   // 'number', 'string', 'boolean', 'json'
   description     String?  // Human-readable description
@@ -538,10 +538,11 @@ model ConfigurationSetting {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
   
-  // Relations
+  // ✅ FIXED: Relations use proper field names
   country         Country?  @relation(fields: [countryId], references: [id])
-  category        Category? @relation(fields: [categoryId], references: [id])
+  categoryRef     Category? @relation(fields: [categoryId], references: [id])
   
+  // ✅ FIXED: Unique constraint uses scalar fields only
   @@unique([category, key, countryId, categoryId])
   @@map("configuration_settings")
 }
