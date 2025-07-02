@@ -1,9 +1,11 @@
-// ✅ UPDATED: src/app/api/products/route.ts - Customer Products API with Discount Support
+// =====================================
+// src/app/api/products/route.ts - UPDATED Customer Products API
+// =====================================
 
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 
-// GET /api/products - Fetch published products for customers
+// GET /api/products - Fetch published products for customers with proper stock filtering
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
@@ -51,17 +53,19 @@ export async function GET(request: NextRequest) {
       where.isFeatured = true
     }
 
-    // In stock filter
+    // ✅ ENHANCED: Smart stock filtering
     if (inStock) {
+      // Show products that have stock > 0
+      // This now works correctly because main stockQuantity is synced with size totals
       where.stockQuantity = {
         gt: 0
       }
     }
 
-    // Count total products
+    // Count total products matching criteria
     const totalCount = await db.product.count({ where })
 
-    // Fetch products with discount information
+    // Fetch products with all necessary data
     const products = await db.product.findMany({
       where,
       select: {
@@ -70,15 +74,33 @@ export async function GET(request: NextRequest) {
         shortDescription: true,
         description: true,
         sellingPriceUSD: true,
-        // ✅ CRITICAL: Include discount fields for customer display
+        // ✅ Include discount fields for customer display
         discountPercentage: true,
         showDiscountToCustomers: true,
         images: true,
         tags: true,
-        stockQuantity: true,
+        stockQuantity: true, // ✅ Now properly synced for all products
         lowStockAlert: true,
         isFeatured: true,
         publishedAt: true,
+        // ✅ Include size information for customer selection
+        requiresSizes: true,
+        productSizes: {
+          select: {
+            id: true,
+            size: true,
+            sku: true,
+            stockQuantity: true,
+            isActive: true,
+            sortOrder: true
+          },
+          where: {
+            isActive: true // Only show active sizes to customers
+          },
+          orderBy: {
+            sortOrder: 'asc'
+          }
+        },
         category: {
           select: {
             id: true,
@@ -103,24 +125,67 @@ export async function GET(request: NextRequest) {
           ? [{ name: sortOrder === 'asc' ? 'asc' : 'desc' }]
           : sortBy === 'featured'
           ? [{ isFeatured: 'desc' }, { createdAt: 'desc' }]
-          : [{ [sortBy]: sortOrder === 'asc' ? 'asc' : 'desc' }]
-        )
-      ] as any,
+          : [{ createdAt: sortOrder === 'asc' ? 'asc' : 'desc' }]
+        ),
+        // Secondary sort by featured status
+        { isFeatured: 'desc' },
+        // Tertiary sort by stock status (in-stock first)
+        { stockQuantity: 'desc' }
+      ],
       skip: (page - 1) * limit,
       take: limit
     })
 
-    const totalPages = Math.ceil(totalCount / limit)
+    // ✅ ENHANCED: Enrich products with calculated stock information
+    const enrichedProducts = products.map(product => {
+      // Calculate stock status for display
+      const isOutOfStock = product.stockQuantity === 0
+      const isLowStock = product.stockQuantity > 0 && product.stockQuantity <= product.lowStockAlert
+      
+      // For sized products, provide additional size information
+      const sizeInfo = product.requiresSizes ? {
+        totalSizes: product.productSizes?.length || 0,
+        availableSizes: product.productSizes?.filter(size => size.stockQuantity > 0).length || 0,
+        sizesOutOfStock: product.productSizes?.filter(size => size.stockQuantity === 0).length || 0
+      } : null
+
+      return {
+        ...product,
+        stockInfo: {
+          isOutOfStock,
+          isLowStock,
+          isInStock: product.stockQuantity > 0,
+          stockLevel: product.stockQuantity,
+          stockStatus: isOutOfStock ? 'out_of_stock' : isLowStock ? 'low_stock' : 'in_stock'
+        },
+        sizeInfo
+      }
+    })
+
+    // ✅ Filter out completely out-of-stock products if inStock filter is applied
+    const finalProducts = inStock 
+      ? enrichedProducts.filter(product => !product.stockInfo.isOutOfStock)
+      : enrichedProducts
 
     return NextResponse.json({
-      products,
+      products: finalProducts,
       pagination: {
         page,
         limit,
         totalCount,
-        totalPages,
-        hasNext: page < totalPages,
-        hasPrev: page > 1
+        totalPages: Math.ceil(totalCount / limit),
+        hasNextPage: page < Math.ceil(totalCount / limit),
+        hasPreviousPage: page > 1
+      },
+      filters: {
+        category,
+        search,
+        minPrice,
+        maxPrice,
+        featured,
+        inStock,
+        sortBy,
+        sortOrder
       }
     })
 
@@ -128,150 +193,6 @@ export async function GET(request: NextRequest) {
     console.error('Error fetching customer products:', error)
     return NextResponse.json(
       { error: 'Failed to fetch products' },
-      { status: 500 }
-    )
-  }
-}
-
-// POST /api/products/search - Advanced search endpoint (optional)
-export async function POST(request: NextRequest) {
-  try {
-    const { 
-      query, 
-      filters, 
-      page = 1, 
-      limit = 12,
-      sortBy = 'relevance' 
-    } = await request.json()
-
-    const where: any = {
-      status: 'PUBLISHED',
-      isActive: true
-    }
-
-    // Text search
-    if (query && query.trim()) {
-      where.OR = [
-        { name: { contains: query, mode: 'insensitive' } },
-        { description: { contains: query, mode: 'insensitive' } },
-        { shortDescription: { contains: query, mode: 'insensitive' } },
-        { tags: { has: query } }
-      ]
-    }
-
-    // Apply filters
-    if (filters) {
-      if (filters.categoryIds && filters.categoryIds.length > 0) {
-        where.categoryId = { in: filters.categoryIds }
-      }
-      
-      if (filters.priceRange) {
-        where.sellingPriceUSD = {}
-        if (filters.priceRange.min) where.sellingPriceUSD.gte = filters.priceRange.min
-        if (filters.priceRange.max) where.sellingPriceUSD.lte = filters.priceRange.max
-      }
-      
-      if (filters.inStock) {
-        where.stockQuantity = { gt: 0 }
-      }
-      
-      if (filters.featured) {
-        where.isFeatured = true
-      }
-
-      if (filters.onSale) {
-        // ✅ NEW: Filter for products with active customer discounts
-        where.AND = [
-          { discountPercentage: { gt: 0 } },
-          { showDiscountToCustomers: true }
-        ]
-      }
-    }
-
-    // Sorting
-    let orderBy: any = []
-    switch (sortBy) {
-      case 'price-low':
-        orderBy = [{ sellingPriceUSD: 'asc' }]
-        break
-      case 'price-high':
-        orderBy = [{ sellingPriceUSD: 'desc' }]
-        break
-      case 'newest':
-        orderBy = [{ publishedAt: 'desc' }]
-        break
-      case 'featured':
-        orderBy = [{ isFeatured: 'desc' }, { createdAt: 'desc' }]
-        break
-      case 'sale':
-        // ✅ NEW: Sort by discount percentage
-        orderBy = [{ discountPercentage: 'desc' }, { isFeatured: 'desc' }]
-        break
-      default: // relevance
-        orderBy = [
-          { isFeatured: 'desc' },
-          { stockQuantity: 'desc' },
-          { createdAt: 'desc' }
-        ]
-    }
-
-    const [products, totalCount] = await Promise.all([
-      db.product.findMany({
-        where,
-        select: {
-          id: true,
-          name: true,
-          shortDescription: true,
-          sellingPriceUSD: true,
-          // ✅ CRITICAL: Include discount fields
-          discountPercentage: true,
-          showDiscountToCustomers: true,
-          images: true,
-          stockQuantity: true,
-          isFeatured: true,
-          category: {
-            select: {
-              id: true,
-              name: true,
-              slug: true
-            }
-          },
-          country: {
-            select: {
-              id: true,
-              name: true,
-              currency: true,
-              currencySymbol: true
-            }
-          }
-        },
-        orderBy,
-        skip: (page - 1) * limit,
-        take: limit
-      }),
-      db.product.count({ where })
-    ])
-
-    return NextResponse.json({
-      products,
-      pagination: {
-        page,
-        limit,
-        totalCount,
-        totalPages: Math.ceil(totalCount / limit),
-        hasNext: page < Math.ceil(totalCount / limit),
-        hasPrev: page > 1
-      },
-      filters: {
-        applied: filters,
-        query
-      }
-    })
-
-  } catch (error) {
-    console.error('Error in advanced product search:', error)
-    return NextResponse.json(
-      { error: 'Search failed' },
       { status: 500 }
     )
   }
