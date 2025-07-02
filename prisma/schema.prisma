@@ -462,7 +462,7 @@ model StoreSetting {
   timezone                  String        @default("America/New_York")
   defaultShippingZoneId     String?
   
-  // Return Policy Fields with No Returns Option
+  // Return Policy Fields (existing)
   returnsEnabled            Boolean?      @default(true)
   returnPeriodDays          Int?          @default(30)
   returnPolicyUrl           String?
@@ -470,6 +470,10 @@ model StoreSetting {
   restockingFeePercentage   Float?        @default(0)
   returnPolicyDescription   String?
   noReturnsReason           String?
+  
+  // ✅ NEW: Catalog/eCommerce Toggle Fields (just added to database)
+  disableShoppingCart       Boolean?      @default(false)  // false = eCommerce, true = Catalog
+  catalogModeSettings       String?       // JSON string for contact settings
   
   createdAt                 DateTime      @default(now())
   updatedAt                 DateTime      @updatedAt
