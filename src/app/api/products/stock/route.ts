@@ -1,32 +1,15 @@
+// ✅ FIXED: src/app/api/products/stock/route.ts
+// Enhanced to handle size variants properly
+
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 
-// Stock validation for multiple products
-interface StockCheckRequest {
-  items: {
-    productId: string
-    requestedQuantity: number
-  }[]
-}
-
-interface StockCheckResponse {
-  isValid: boolean
-  items: {
-    productId: string
-    available: boolean
-    stockQuantity: number
-    requestedQuantity: number
-    maxAllowed: number
-    message: string
-  }[]
-  errors: string[]
-}
-
-// GET: Check individual product stock
+// GET: Check individual product stock (enhanced for size variants)
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const productId = searchParams.get('productId')
+    const sizeId = searchParams.get('sizeId')
     const quantity = parseInt(searchParams.get('quantity') || '1')
 
     if (!productId) {
@@ -43,17 +26,20 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Get current product stock with atomic read
+    // Handle compound productId (for legacy support)
+    const actualProductId = productId.includes('-') ? productId.split('-')[0] : productId
+    const actualSizeId = sizeId || (productId.includes('-') ? productId.split('-')[1] : null)
+
+    // Get product with size information
     const product = await db.product.findUnique({
       where: { 
-        id: productId,
-        status: 'PUBLISHED' // Only check stock for published products
+        id: actualProductId,
+        status: 'PUBLISHED'
       },
-      select: {
-        id: true,
-        name: true,
-        stockQuantity: true,
-        status: true
+      include: {
+        productSizes: {
+          where: { isActive: true }
+        }
       }
     })
 
@@ -64,15 +50,55 @@ export async function GET(request: NextRequest) {
       )
     }
 
+    // For products that require sizes
+    if (product.requiresSizes && product.productSizes.length > 0) {
+      if (!actualSizeId) {
+        return NextResponse.json(
+          { error: 'Size selection required for this product' },
+          { status: 400 }
+        )
+      }
+
+      // Find the specific size
+      const selectedSize = product.productSizes.find(size => size.id === actualSizeId)
+      
+      if (!selectedSize) {
+        return NextResponse.json(
+          { error: 'Selected size not found or not available' },
+          { status: 404 }
+        )
+      }
+
+      const isAvailable = selectedSize.stockQuantity >= quantity
+      const maxAllowed = Math.max(0, selectedSize.stockQuantity)
+
+      return NextResponse.json({
+        productId: actualProductId,
+        sizeId: actualSizeId,
+        available: isAvailable,
+        stockQuantity: selectedSize.stockQuantity,
+        requestedQuantity: quantity,
+        maxAllowed,
+        requiresSize: true,
+        message: isAvailable 
+          ? `${quantity} item(s) available in size ${selectedSize.size}`
+          : selectedSize.stockQuantity === 0 
+            ? `Size ${selectedSize.size} is out of stock` 
+            : `Only ${selectedSize.stockQuantity} item(s) available in size ${selectedSize.size}`
+      })
+    }
+
+    // For products without sizes
     const isAvailable = product.stockQuantity >= quantity
     const maxAllowed = Math.max(0, product.stockQuantity)
 
     return NextResponse.json({
-      productId: product.id,
+      productId: actualProductId,
       available: isAvailable,
       stockQuantity: product.stockQuantity,
       requestedQuantity: quantity,
       maxAllowed,
+      requiresSize: false,
       message: isAvailable 
         ? `${quantity} item(s) available`
         : product.stockQuantity === 0 
@@ -89,10 +115,10 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST: Check stock for multiple items (cart validation)
+// POST: Check stock for multiple items (enhanced for cart validation)
 export async function POST(request: NextRequest) {
   try {
-    const { items }: StockCheckRequest = await request.json()
+    const { items } = await request.json()
 
     if (!items || !Array.isArray(items) || items.length === 0) {
       return NextResponse.json(
@@ -105,33 +131,33 @@ export async function POST(request: NextRequest) {
     for (const item of items) {
       if (!item.productId || typeof item.requestedQuantity !== 'number' || item.requestedQuantity <= 0) {
         return NextResponse.json(
-          { error: 'Invalid item format. Each item must have productId and positive requestedQuantity' },
+          { error: 'Each item must have productId and positive requestedQuantity' },
           { status: 400 }
         )
       }
     }
 
-    // Get all product IDs
-    const productIds = items.map(item => item.productId)
+    // Group items by actual product ID and collect size IDs
+    const productIds = [...new Set(items.map(item => {
+      return item.productId.includes('-') ? item.productId.split('-')[0] : item.productId
+    }))]
 
-    // Fetch current stock for all products in a single query
+    // Fetch all products with sizes
     const products = await db.product.findMany({
       where: {
         id: { in: productIds },
-        status: 'PUBLISHED' // Only check published products
+        status: 'PUBLISHED'
       },
-      select: {
-        id: true,
-        name: true,
-        stockQuantity: true,
-        status: true
+      include: {
+        productSizes: {
+          where: { isActive: true }
+        }
       }
     })
 
-    // Create a map for quick lookup
     const productMap = new Map(products.map(p => [p.id, p]))
 
-    const response: StockCheckResponse = {
+    const response = {
       isValid: true,
       items: [],
       errors: []
@@ -139,46 +165,92 @@ export async function POST(request: NextRequest) {
 
     // Check each requested item
     for (const item of items) {
-      const product = productMap.get(item.productId)
+      const actualProductId = item.productId.includes('-') ? item.productId.split('-')[0] : item.productId
+      const sizeId = item.sizeId || (item.productId.includes('-') ? item.productId.split('-')[1] : null)
+      
+      const product = productMap.get(actualProductId)
       
       if (!product) {
         response.isValid = false
-        response.errors.push(`Product ${item.productId} not found or not available`)
+        response.errors.push(`Product ${actualProductId} not found`)
         response.items.push({
           productId: item.productId,
           available: false,
           stockQuantity: 0,
           requestedQuantity: item.requestedQuantity,
           maxAllowed: 0,
-          message: 'Product not found or not available'
+          message: 'Product not found'
         })
         continue
       }
 
-      const isAvailable = product.stockQuantity >= item.requestedQuantity
-      const maxAllowed = Math.max(0, product.stockQuantity)
-
-      if (!isAvailable) {
-        response.isValid = false
-        if (product.stockQuantity === 0) {
-          response.errors.push(`${product.name} is out of stock`)
-        } else {
-          response.errors.push(`${product.name}: Only ${product.stockQuantity} available, but ${item.requestedQuantity} requested`)
+      // Handle sized products
+      if (product.requiresSizes && product.productSizes.length > 0) {
+        if (!sizeId) {
+          response.isValid = false
+          response.errors.push(`Size required for ${product.name}`)
+          response.items.push({
+            productId: item.productId,
+            available: false,
+            stockQuantity: 0,
+            requestedQuantity: item.requestedQuantity,
+            maxAllowed: 0,
+            message: 'Size selection required'
+          })
+          continue
         }
-      }
 
-      response.items.push({
-        productId: item.productId,
-        available: isAvailable,
-        stockQuantity: product.stockQuantity,
-        requestedQuantity: item.requestedQuantity,
-        maxAllowed,
-        message: isAvailable 
-          ? `${item.requestedQuantity} item(s) available`
-          : product.stockQuantity === 0 
-            ? 'Out of stock' 
-            : `Only ${product.stockQuantity} item(s) available (requested ${item.requestedQuantity})`
-      })
+        const selectedSize = product.productSizes.find(size => size.id === sizeId)
+        
+        if (!selectedSize) {
+          response.isValid = false
+          response.errors.push(`Size not found for ${product.name}`)
+          response.items.push({
+            productId: item.productId,
+            available: false,
+            stockQuantity: 0,
+            requestedQuantity: item.requestedQuantity,
+            maxAllowed: 0,
+            message: 'Size not available'
+          })
+          continue
+        }
+
+        const isAvailable = selectedSize.stockQuantity >= item.requestedQuantity
+        if (!isAvailable) {
+          response.isValid = false
+          response.errors.push(`Insufficient stock for ${product.name} size ${selectedSize.size}`)
+        }
+
+        response.items.push({
+          productId: item.productId,
+          available: isAvailable,
+          stockQuantity: selectedSize.stockQuantity,
+          requestedQuantity: item.requestedQuantity,
+          maxAllowed: selectedSize.stockQuantity,
+          message: isAvailable 
+            ? `Available in size ${selectedSize.size}`
+            : `Only ${selectedSize.stockQuantity} available in size ${selectedSize.size}`
+        })
+      } else {
+        // Handle non-sized products
+        const isAvailable = product.stockQuantity >= item.requestedQuantity
+        if (!isAvailable) {
+          response.isValid = false
+          response.errors.push(`Insufficient stock for ${product.name}`)
+        }
+
+        response.items.push({
+          productId: item.productId,
+          available: isAvailable,
+          stockQuantity: product.stockQuantity,
+          requestedQuantity: item.requestedQuantity,
+          maxAllowed: product.stockQuantity,
+          message: isAvailable 
+            ? 'Available'
+            : `Only ${product.stockQuantity} available`
+        })
+      }
     }
 
     return NextResponse.json(response)
@@ -187,95 +259,6 @@ export async function POST(request: NextRequest) {
     console.error('Bulk stock check error:', error)
     return NextResponse.json(
       { error: 'Failed to check stock availability' },
-      { status: 500 }
-    )
-  }
-}
-
-// PUT: Reserve stock temporarily (for checkout process)
-export async function PUT(request: NextRequest) {
-  try {
-    const { items, reservationId }: { items: StockCheckRequest['items'], reservationId: string } = await request.json()
-
-    if (!items || !Array.isArray(items) || !reservationId) {
-      return NextResponse.json(
-        { error: 'Items array and reservationId are required' },
-        { status: 400 }
-      )
-    }
-
-    // Validate request format
-    for (const item of items) {
-      if (!item.productId || typeof item.requestedQuantity !== 'number' || item.requestedQuantity <= 0) {
-        return NextResponse.json(
-          { error: 'Invalid item format' },
-          { status: 400 }
-        )
-      }
-    }
-
-    // Do a comprehensive stock check first
-    const stockCheckResponse = await POST(new NextRequest(request.url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ items })
-    }))
-
-    const stockResult = await stockCheckResponse.json()
-
-    if (!stockResult.isValid) {
-      return NextResponse.json({
-        reserved: false,
-        errors: stockResult.errors,
-        items: stockResult.items
-      }, { status: 409 }) // Conflict - stock not available
-    }
-
-    // TODO: Implement actual stock reservation logic
-    // This would typically involve creating reservation records with expiry times
-    // For now, we'll return a successful reservation response
-    
-    return NextResponse.json({
-      reserved: true,
-      reservationId,
-      expiresAt: new Date(Date.now() + 10 * 60 * 1000), // 10 minutes
-      items: stockResult.items
-    })
-
-  } catch (error) {
-    console.error('Stock reservation error:', error)
-    return NextResponse.json(
-      { error: 'Failed to reserve stock' },
-      { status: 500 }
-    )
-  }
-}
-
-// DELETE: Cancel stock reservation
-export async function DELETE(request: NextRequest) {
-  try {
-    const { searchParams } = new URL(request.url)
-    const reservationId = searchParams.get('reservationId')
-
-    if (!reservationId) {
-      return NextResponse.json(
-        { error: 'Reservation ID is required' },
-        { status: 400 }
-      )
-    }
-
-    // TODO: Implement actual reservation cancellation
-    // This would remove the reservation record from the database
-    
-    return NextResponse.json({
-      cancelled: true,
-      reservationId
-    })
-
-  } catch (error) {
-    console.error('Stock reservation cancellation error:', error)
-    return NextResponse.json(
-      { error: 'Failed to cancel reservation' },
       { status: 500 }
     )
   }

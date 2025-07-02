@@ -1,5 +1,5 @@
 // ✅ FIXED: src/components/cart/AddToCartButton.tsx
-// AddToCartButton WITHOUT duplicate ProductSizeSelector
+// Simplified and working version
 
 'use client'
 
@@ -14,7 +14,7 @@ import {
   Loader2
 } from 'lucide-react'
 
-// ✅ Product interfaces
+// Product interfaces
 interface ProductSize {
   id: string
   size: string
@@ -52,8 +52,7 @@ interface AddToCartButtonProps {
   showQuantitySelector?: boolean
   className?: string
   disabled?: boolean
-  selectedSize?: ProductSize | null  // ✅ NEW: Receive selected size from parent
-  onSizeRequired?: () => void        // ✅ NEW: Callback when size is required
+  selectedSize?: ProductSize | null
 }
 
 export default function AddToCartButton({ 
@@ -62,113 +61,81 @@ export default function AddToCartButton({
   showQuantitySelector = false,
   className = '',
   disabled = false,
-  selectedSize = null,           // ✅ NEW: Get selected size from parent
-  onSizeRequired                 // ✅ NEW: Callback for size requirement
+  selectedSize = null
 }: AddToCartButtonProps) {
   const { addItem, updateQuantity, getItemQuantity, isInCart, isLoading } = useCart()
   const [quantity, setQuantity] = useState(1)
   const [justAdded, setJustAdded] = useState(false)
-  const [stockValidation, setStockValidation] = useState<{
-    isValidating: boolean
-    available: boolean
-    maxAllowed: number
-    message: string
-  }>({
-    isValidating: false,
-    available: true,
-    maxAllowed: product.stockQuantity,
-    message: ''
-  })
+  const [isValidating, setIsValidating] = useState(false)
 
-  // ✅ Calculate cart quantity considering size variants
-  const getCartQuantityForSize = (sizeId?: string): number => {
-    if (product.requiresSizes && sizeId) {
-      // For sized products, get quantity for specific size
-      return getItemQuantity(`${product.id}-${sizeId}`)
-    } else {
-      // For non-sized products, get total quantity
-      return getItemQuantity(product.id)
-    }
-  }
-
-  const currentQuantity = getCartQuantityForSize(selectedSize?.id)
-  
-  // ✅ Calculate stock based on size selection
+  // Calculate available stock based on size selection
   const getAvailableStock = () => {
     if (product.requiresSizes && selectedSize) {
       return selectedSize.stockQuantity
-    } else if (product.requiresSizes && product.productSizes?.length) {
-      // Total stock across all sizes
-      return product.productSizes.reduce((total, size) => total + size.stockQuantity, 0)
-    } else {
-      return product.stockQuantity
     }
+    return product.stockQuantity
   }
 
   const availableStock = getAvailableStock()
   const isOutOfStock = availableStock === 0
-  const isLowStock = availableStock <= 5
 
-  // Calculate available quantity considering cart contents
-  const availableToAdd = Math.max(0, stockValidation.maxAllowed - currentQuantity)
-  const effectiveMaxQuantity = Math.min(quantity, availableToAdd)
+  // Generate cart item ID (unique for size variants)
+  const getCartItemId = () => {
+    if (product.requiresSizes && selectedSize) {
+      return `${product.id}-${selectedSize.id}`
+    }
+    return product.id
+  }
 
-  // ✅ Check if product requires size selection
+  const cartItemId = getCartItemId()
+  const currentQuantity = getItemQuantity(cartItemId)
+  const availableToAdd = Math.max(0, availableStock - currentQuantity)
+
+  // Check if product requires size selection
   const requiresSizeSelection = product.requiresSizes && product.productSizes?.length > 0
   const canAddToCart = !requiresSizeSelection || (requiresSizeSelection && selectedSize)
 
-  // Real-time stock validation
+  // Validate stock with API
   const validateStock = useCallback(async (requestedQuantity: number) => {
-    setStockValidation(prev => ({ ...prev, isValidating: true }))
+    if (!canAddToCart) return false
+
+    setIsValidating(true)
 
     try {
-      const totalQuantity = currentQuantity + requestedQuantity
-      const productIdForValidation = selectedSize ? `${product.id}-${selectedSize.id}` : product.id
-      
-      const response = await fetch(`/api/products/stock?productId=${productIdForValidation}&quantity=${totalQuantity}`)
+      const params = new URLSearchParams({
+        productId: product.id,
+        quantity: requestedQuantity.toString()
+      })
+
+      // Add size information if applicable
+      if (selectedSize) {
+        params.append('sizeId', selectedSize.id)
+      }
+
+      const response = await fetch(`/api/products/stock?${params}`)
       
       if (!response.ok) {
         throw new Error('Stock validation failed')
       }
 
       const result = await response.json()
-      
-      setStockValidation({
-        isValidating: false,
-        available: result.available,
-        maxAllowed: result.maxAllowed,
-        message: result.message
-      })
-
       return result.available
+
     } catch (error) {
       console.error('Stock validation error:', error)
-      
-      // ✅ Fallback validation using selected size stock
-      const maxAllowed = selectedSize?.stockQuantity || product.stockQuantity
-      setStockValidation({
-        isValidating: false,
-        available: maxAllowed > currentQuantity,
-        maxAllowed: maxAllowed,
-        message: 'Using local stock validation'
-      })
-      return maxAllowed > currentQuantity
+      // Fallback to local validation
+      return availableToAdd >= requestedQuantity
+    } finally {
+      setIsValidating(false)
     }
-  }, [product.id, currentQuantity, selectedSize])
-
-  // Validate stock when component mounts or cart changes
-  useEffect(() => {
-    if (canAddToCart) {
-      validateStock(quantity)
-    }
-  }, [quantity, currentQuantity, selectedSize, canAddToCart])
+  }, [product.id, selectedSize, availableToAdd, canAddToCart])
 
   const handleAddToCart = async () => {
-    if (isOutOfStock || isLoading || stockValidation.isValidating) return
+    if (isOutOfStock || isLoading || isValidating || disabled) return
 
-    // ✅ Check size selection requirement
+    // Check size selection requirement
     if (requiresSizeSelection && !selectedSize) {
-      onSizeRequired?.()
+      console.warn('Size selection required')
       return
     }
 
@@ -176,37 +143,33 @@ export default function AddToCartButton({
     const stockIsValid = await validateStock(quantity)
     
     if (!stockIsValid) {
-      console.warn('Cannot add to cart: Stock validation failed')
+      console.warn('Insufficient stock available')
       return
     }
 
     let success = false
 
-    // ✅ Create cart item with size information
+    // Create cart product with size information
     const cartProduct = {
       ...product,
-      // For sized products, use size-specific data
+      // For sized products, store size-specific information
       ...(selectedSize && {
-        id: `${product.id}-${selectedSize.id}`, // Unique ID for size variant
-        sku: selectedSize.sku, // Size-specific SKU
-        stockQuantity: selectedSize.stockQuantity,
         sizeInfo: {
           sizeId: selectedSize.id,
           size: selectedSize.size,
-          originalProductId: product.id
+          sku: selectedSize.sku,
+          stockQuantity: selectedSize.stockQuantity
         }
       })
     }
 
-    const cartItemId = selectedSize ? `${product.id}-${selectedSize.id}` : product.id
-
     if (isInCart(cartItemId)) {
       // Update quantity if already in cart
-      const newQuantity = Math.min(currentQuantity + quantity, stockValidation.maxAllowed)
+      const newQuantity = Math.min(currentQuantity + quantity, availableStock)
       success = await updateQuantity(cartItemId, newQuantity)
     } else {
       // Add new item to cart
-      success = await addItem(cartProduct, quantity)
+      success = await addItem(cartProduct, quantity, selectedSize?.id)
     }
 
     if (success) {
@@ -221,14 +184,9 @@ export default function AddToCartButton({
     }
   }
 
-  const increaseQuantity = async () => {
-    const newQuantity = quantity + 1
-    const totalWithCart = currentQuantity + newQuantity
-    
-    // Check against available stock
-    if (totalWithCart <= availableStock && newQuantity <= availableToAdd) {
-      setQuantity(newQuantity)
-    }
+  const increaseQuantity = () => {
+    const newQuantity = Math.min(quantity + 1, availableToAdd)
+    setQuantity(newQuantity)
   }
 
   const decreaseQuantity = () => {
@@ -242,7 +200,7 @@ export default function AddToCartButton({
     
     const sizeClasses = {
       default: 'px-6 py-3 text-base rounded-lg',
-      large: 'px-8 py-4 text-lg rounded-lg',
+      large: 'px-8 py-4 text-lg rounded-lg w-full',
       icon: 'p-3 rounded-full',
       minimal: 'px-4 py-2 text-sm rounded-md'
     }
@@ -254,7 +212,7 @@ export default function AddToCartButton({
       if (justAdded) {
         return 'bg-green-600 text-white'
       }
-      if (stockValidation.isValidating) {
+      if (isValidating) {
         return 'bg-gray-400 text-white cursor-wait'
       }
       return 'bg-purple-600 text-white hover:bg-purple-700 active:bg-purple-800'
@@ -266,25 +224,23 @@ export default function AddToCartButton({
   const getButtonText = () => {
     if (!canAddToCart && requiresSizeSelection) return 'Select Size First'
     if (isOutOfStock) return 'Out of Stock'
-    if (stockValidation.isValidating) return 'Checking Stock...'
+    if (isValidating) return 'Checking Stock...'
     if (justAdded) return 'Added to Cart!'
-    if (isInCart(selectedSize ? `${product.id}-${selectedSize.id}` : product.id)) return 'Update Cart'
+    if (isInCart(cartItemId)) return 'Update Cart'
     return 'Add to Cart'
   }
 
   const getButtonIcon = () => {
-    if (stockValidation.isValidating) return <Loader2 className="h-5 w-5 animate-spin" />
+    if (isValidating) return <Loader2 className="h-5 w-5 animate-spin" />
     if (justAdded) return <Check className="h-5 w-5" />
     if (variant === 'icon') return <ShoppingCart className="h-5 w-5" />
     return <ShoppingCart className="h-5 w-5" />
   }
 
-  const finalCanAddToCart = canAddToCart && availableToAdd > 0 && stockValidation.available && !stockValidation.isValidating
+  const finalCanAddToCart = canAddToCart && availableToAdd > 0 && !isValidating
 
   return (
     <div className="space-y-4">
-      {/* ✅ REMOVED: ProductSizeSelector - handled by parent component */}
-
       {/* Quantity Selector */}
       {showQuantitySelector && !isOutOfStock && canAddToCart && (
         <div className="flex items-center gap-3">
@@ -302,7 +258,7 @@ export default function AddToCartButton({
             </span>
             <button
               onClick={increaseQuantity}
-              disabled={quantity >= availableToAdd || stockValidation.isValidating}
+              disabled={quantity >= availableToAdd || isValidating}
               className="p-2 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               <Plus className="h-4 w-4" />
@@ -312,13 +268,13 @@ export default function AddToCartButton({
           {/* Available quantity info */}
           <div className="flex items-center gap-1 text-sm">
             {availableToAdd > 0 ? (
-              <span className="text-gray-600">
+              <span className="text-green-600">
                 {availableToAdd} available
               </span>
             ) : (
-              <span className="text-red-600 flex items-center gap-1">
-                <AlertCircle className="h-4 w-4" />
-                Max quantity reached
+              <span className="text-red-600">
+                <AlertCircle className="h-4 w-4 inline mr-1" />
+                No more available
               </span>
             )}
           </div>
@@ -330,35 +286,18 @@ export default function AddToCartButton({
         onClick={handleAddToCart}
         disabled={disabled || isOutOfStock || !finalCanAddToCart || isLoading}
         className={getButtonClasses()}
-        type="button"
       >
-        {variant !== 'icon' && (
-          <>
-            {getButtonIcon()}
-            <span className="ml-2">{getButtonText()}</span>
-          </>
-        )}
-        {variant === 'icon' && getButtonIcon()}
+        <div className="flex items-center gap-2">
+          {getButtonIcon()}
+          <span>{getButtonText()}</span>
+        </div>
       </button>
 
-      {/* Stock Status Messages */}
-      {!stockValidation.available && stockValidation.message && (
-        <div className="text-sm text-red-600 flex items-center gap-1">
+      {/* Stock Information */}
+      {availableStock <= 5 && availableStock > 0 && (
+        <div className="flex items-center gap-2 text-sm text-orange-600">
           <AlertCircle className="h-4 w-4" />
-          {stockValidation.message}
-        </div>
-      )}
-
-      {isLowStock && !isOutOfStock && (
-        <div className="text-sm text-orange-600">
-          Only {availableStock} left in stock
-        </div>
-      )}
-
-      {/* Size Selection Required Notice */}
-      {requiresSizeSelection && !selectedSize && (
-        <div className="text-sm text-blue-600 bg-blue-50 border border-blue-200 rounded-lg p-3">
-          Please select a size above to add this item to your cart.
+          <span>Only {availableStock} left in stock</span>
         </div>
       )}
     </div>
