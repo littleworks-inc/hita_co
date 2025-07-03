@@ -66,6 +66,10 @@ interface StoreSettings {
   aiModel?: string | null
   currency: string
   timezone: string
+  returnsEnabled: boolean | null
+  returnPeriodDays: number | null
+  disableShoppingCart: boolean | null
+  catalogModeSettings: string | null
 }
 
 interface StoreSettingsFormProps {
@@ -87,7 +91,8 @@ const TABS = [
   { id: 'contact', name: 'Contact Info', icon: Contact },
   { id: 'social', name: 'Social Media', icon: Share2 },
   { id: 'ai', name: 'AI Settings', icon: Brain },
-  { name: 'Policies', id: 'policies', icon: Shield },
+  { id: 'business', name: 'Business Mode', icon: Settings }, // ✅ ADD THIS LINE
+  { id: 'policies', name: 'Policies', icon: Shield },
   { id: 'general', name: 'General', icon: Globe }
 ]
 
@@ -362,6 +367,15 @@ export default function StoreSettingsForm({ storeSettings }: StoreSettingsFormPr
     restockingFeePercentage: storeSettings.restockingFeePercentage || 0,
     returnPolicyDescription: storeSettings.returnPolicyDescription || '',
     noReturnsReason: storeSettings.noReturnsReason || '',
+    disableShoppingCart: storeSettings.disableShoppingCart ?? false,
+    catalogModeSettings: storeSettings.catalogModeSettings || JSON.stringify({
+      whatsappNumber: '',
+      instagramHandle: '',
+      contactMessage: 'Hi! I\'m interested in this product. Can you provide more details?',
+      showWhatsApp: true,
+      showInstagram: true,
+      customContactText: 'Contact us for pricing and availability'
+    }),
   })
 
   // Dynamic model fetching
@@ -1569,6 +1583,333 @@ export default function StoreSettingsForm({ storeSettings }: StoreSettingsFormPr
                   )}
                 </div>
               </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+      {activeTab === 'business' && (
+        <div className="space-y-6">
+          {/* Business Mode Toggle */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Settings className="h-5 w-5" />
+                Business Mode Configuration
+              </CardTitle>
+              <p className="text-sm text-gray-600">
+                Choose how customers interact with your products - full eCommerce with cart or catalog mode with contact buttons.
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Mode Toggle */}
+              <div className="border border-gray-200 rounded-lg p-6 bg-gray-50">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center space-x-3 mb-4">
+                      <input
+                        type="checkbox"
+                        id="disableShoppingCart"
+                        checked={formData.disableShoppingCart}
+                        onChange={(e) => handleInputChange('disableShoppingCart', e.target.checked)}
+                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      />
+                      <Label htmlFor="disableShoppingCart" className="flex items-center gap-2 font-medium text-lg">
+                        <ShoppingBag className="h-5 w-5 text-blue-500" />
+                        Enable Catalog Mode
+                      </Label>
+                    </div>
+
+                    <div className="space-y-3">
+                      {/* Current Mode Display */}
+                      <div className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium ${formData.disableShoppingCart
+                          ? 'bg-orange-100 text-orange-800'
+                          : 'bg-green-100 text-green-800'
+                        }`}>
+                        {formData.disableShoppingCart ? (
+                          <>
+                            <MessageCircle className="h-4 w-4" />
+                            Catalog Mode Active
+                          </>
+                        ) : (
+                          <>
+                            <ShoppingBag className="h-4 w-4" />
+                            eCommerce Mode Active
+                          </>
+                        )}
+                      </div>
+
+                      {/* Mode Description */}
+                      <p className="text-sm text-gray-600">
+                        {formData.disableShoppingCart
+                          ? "Products display with prices, but customers contact you directly via WhatsApp or Instagram instead of using a shopping cart."
+                          : "Full eCommerce experience with shopping cart, checkout, and payment processing."
+                        }
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Visual Preview */}
+                  <div className="ml-6 flex-shrink-0">
+                    <div className="w-32 h-20 border rounded-lg bg-white p-3 text-xs">
+                      <div className="text-gray-800 font-medium mb-2">Product Card</div>
+                      {formData.disableShoppingCart ? (
+                        <div className="space-y-1">
+                          <div className="bg-green-500 text-white px-2 py-1 rounded text-center">
+                            📱 WhatsApp
+                          </div>
+                          <div className="bg-pink-500 text-white px-2 py-1 rounded text-center">
+                            📷 Instagram
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="bg-blue-500 text-white px-2 py-1 rounded text-center">
+                          🛒 Add to Cart
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Catalog Mode Settings - Only show when catalog mode is enabled */}
+              {formData.disableShoppingCart && (
+                <Card className="border-orange-200 bg-orange-50">
+                  <CardHeader className="pb-4">
+                    <CardTitle className="flex items-center gap-2 text-orange-800">
+                      <MessageCircle className="h-5 w-5" />
+                      Catalog Mode Contact Settings
+                    </CardTitle>
+                    <p className="text-sm text-orange-700">
+                      Configure how customers can contact you when browsing your catalog.
+                    </p>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {(() => {
+                      // Parse current catalog settings
+                      let catalogSettings;
+                      try {
+                        catalogSettings = JSON.parse(formData.catalogModeSettings);
+                      } catch {
+                        catalogSettings = {
+                          whatsappNumber: '',
+                          instagramHandle: '',
+                          contactMessage: 'Hi! I\'m interested in this product. Can you provide more details?',
+                          showWhatsApp: true,
+                          showInstagram: true,
+                          customContactText: 'Contact us for pricing and availability'
+                        };
+                      }
+
+                      const updateCatalogSettings = (field: string, value: any) => {
+                        const updated = { ...catalogSettings, [field]: value };
+                        handleInputChange('catalogModeSettings', JSON.stringify(updated));
+                      };
+
+                      return (
+                        <>
+                          {/* Contact Options */}
+                          <div className="grid gap-4 md:grid-cols-2">
+                            <div className="space-y-2">
+                              <Label htmlFor="whatsappNumber" className="flex items-center gap-2">
+                                <MessageCircle className="h-4 w-4 text-green-600" />
+                                WhatsApp Number
+                              </Label>
+                              <Input
+                                id="whatsappNumber"
+                                value={catalogSettings.whatsappNumber}
+                                onChange={(e) => updateCatalogSettings('whatsappNumber', e.target.value)}
+                                placeholder="+1234567890"
+                                className="bg-white border-orange-300 focus:border-orange-500 focus:ring-orange-500"
+                              />
+                              <p className="text-xs text-orange-600">
+                                Include country code (e.g., +1 for US, +91 for India)
+                              </p>
+                            </div>
+
+                            <div className="space-y-2">
+                              <Label htmlFor="instagramHandle" className="flex items-center gap-2">
+                                <Instagram className="h-4 w-4 text-pink-600" />
+                                Instagram Handle
+                              </Label>
+                              <Input
+                                id="instagramHandle"
+                                value={catalogSettings.instagramHandle}
+                                onChange={(e) => updateCatalogSettings('instagramHandle', e.target.value)}
+                                placeholder="hitaco_store"
+                                className="bg-white border-orange-300 focus:border-orange-500 focus:ring-orange-500"
+                              />
+                              <p className="text-xs text-orange-600">
+                                Without @ symbol (e.g., hitaco_store)
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Default Contact Message */}
+                          <div className="space-y-2">
+                            <Label htmlFor="contactMessage">Default Contact Message</Label>
+                            <textarea
+                              id="contactMessage"
+                              rows={3}
+                              value={catalogSettings.contactMessage}
+                              onChange={(e) => updateCatalogSettings('contactMessage', e.target.value)}
+                              placeholder="Hi! I'm interested in this product. Can you provide more details?"
+                              className="w-full px-3 py-2 border border-orange-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 bg-white"
+                            />
+                            <p className="text-xs text-orange-600">
+                              This message will be pre-filled when customers contact you about products
+                            </p>
+                          </div>
+
+                          {/* Custom Contact Text */}
+                          <div className="space-y-2">
+                            <Label htmlFor="customContactText">Contact Button Text</Label>
+                            <Input
+                              id="customContactText"
+                              value={catalogSettings.customContactText}
+                              onChange={(e) => updateCatalogSettings('customContactText', e.target.value)}
+                              placeholder="Contact us for pricing and availability"
+                              className="bg-white border-orange-300 focus:border-orange-500 focus:ring-orange-500"
+                            />
+                            <p className="text-xs text-orange-600">
+                              Text displayed above contact buttons on product pages
+                            </p>
+                          </div>
+
+                          {/* Contact Options Toggle */}
+                          <div className="border border-orange-200 rounded-lg p-4 bg-white">
+                            <Label className="text-sm font-medium text-orange-800 mb-3 block">
+                              Contact Methods to Display
+                            </Label>
+                            <div className="space-y-2">
+                              <div className="flex items-center space-x-3">
+                                <input
+                                  type="checkbox"
+                                  id="showWhatsApp"
+                                  checked={catalogSettings.showWhatsApp}
+                                  onChange={(e) => updateCatalogSettings('showWhatsApp', e.target.checked)}
+                                  className="rounded border-orange-300 text-green-600 focus:ring-green-500"
+                                />
+                                <Label htmlFor="showWhatsApp" className="flex items-center gap-2">
+                                  <MessageCircle className="h-4 w-4 text-green-600" />
+                                  Show WhatsApp Button
+                                </Label>
+                              </div>
+                              <div className="flex items-center space-x-3">
+                                <input
+                                  type="checkbox"
+                                  id="showInstagram"
+                                  checked={catalogSettings.showInstagram}
+                                  onChange={(e) => updateCatalogSettings('showInstagram', e.target.checked)}
+                                  className="rounded border-orange-300 text-pink-600 focus:ring-pink-500"
+                                />
+                                <Label htmlFor="showInstagram" className="flex items-center gap-2">
+                                  <Instagram className="h-4 w-4 text-pink-600" />
+                                  Show Instagram Button
+                                </Label>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Preview */}
+                          <div className="border border-orange-200 rounded-lg p-4 bg-white">
+                            <h4 className="text-sm font-medium text-orange-800 mb-3">Contact Buttons Preview</h4>
+                            <div className="space-y-2">
+                              <p className="text-xs text-gray-600 italic">{catalogSettings.customContactText}</p>
+                              <div className="flex gap-2">
+                                {catalogSettings.showWhatsApp && catalogSettings.whatsappNumber && (
+                                  <div className="inline-flex items-center gap-1 bg-green-500 text-white px-3 py-1 rounded text-xs">
+                                    <MessageCircle className="h-3 w-3" />
+                                    WhatsApp
+                                  </div>
+                                )}
+                                {catalogSettings.showInstagram && catalogSettings.instagramHandle && (
+                                  <div className="inline-flex items-center gap-1 bg-pink-500 text-white px-3 py-1 rounded text-xs">
+                                    <Instagram className="h-3 w-3" />
+                                    Instagram
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </>
+                      );
+                    })()}
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Mode Comparison */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Mode Comparison</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    {/* eCommerce Mode */}
+                    <div className="border border-green-200 rounded-lg p-4 bg-green-50">
+                      <h4 className="font-medium text-green-800 mb-2 flex items-center gap-2">
+                        <ShoppingBag className="h-4 w-4" />
+                        eCommerce Mode
+                      </h4>
+                      <ul className="text-sm text-green-700 space-y-1">
+                        <li>• Full shopping cart functionality</li>
+                        <li>• "Add to Cart" buttons on products</li>
+                        <li>• Complete checkout process</li>
+                        <li>• Payment processing</li>
+                        <li>• Order management</li>
+                        <li>• Cart icon in navigation</li>
+                      </ul>
+                    </div>
+
+                    {/* Catalog Mode */}
+                    <div className="border border-orange-200 rounded-lg p-4 bg-orange-50">
+                      <h4 className="font-medium text-orange-800 mb-2 flex items-center gap-2">
+                        <MessageCircle className="h-4 w-4" />
+                        Catalog Mode
+                      </h4>
+                      <ul className="text-sm text-orange-700 space-y-1">
+                        <li>• Product showcase with prices</li>
+                        <li>• WhatsApp contact buttons</li>
+                        <li>• Instagram contact buttons</li>
+                        <li>• Direct customer communication</li>
+                        <li>• No cart or checkout needed</li>
+                        <li>• Perfect for custom orders</li>
+                      </ul>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Business Use Cases */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">When to Use Each Mode</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div>
+                      <h4 className="font-medium text-green-800 mb-2">Use eCommerce Mode For:</h4>
+                      <ul className="text-sm text-gray-600 space-y-1">
+                        <li>• Standard retail products</li>
+                        <li>• Fixed pricing</li>
+                        <li>• Immediate purchase needs</li>
+                        <li>• Automated order processing</li>
+                        <li>• High-volume sales</li>
+                      </ul>
+                    </div>
+                    <div>
+                      <h4 className="font-medium text-orange-800 mb-2">Use Catalog Mode For:</h4>
+                      <ul className="text-sm text-gray-600 space-y-1">
+                        <li>• Custom or made-to-order items</li>
+                        <li>• Price varies by specification</li>
+                        <li>• Consultation needed before purchase</li>
+                        <li>• Relationship-based sales</li>
+                        <li>• Limited or exclusive items</li>
+                      </ul>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
             </CardContent>
           </Card>
         </div>
