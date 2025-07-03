@@ -546,7 +546,7 @@ export default function StoreSettingsForm({ storeSettings }: StoreSettingsFormPr
     setConnectionStatus(null)
 
     try {
-      const response = await fetch('/api/admin/ai/test-connection', {
+      const response = await fetch('/api/admin/ai/test', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
