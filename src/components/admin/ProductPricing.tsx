@@ -1,13 +1,13 @@
 // =====================================
 // src/components/admin/ProductPricing.tsx - CLEAN VERSION
 // No business assumptions, just clean descriptive placeholders
+// Admin has complete control over all values
 // =====================================
 'use client'
 
 import { Card, CardContent, CardHeader, CardTitle, Input, Label } from '@/components/ui'
 import { DollarSign, Eye, EyeOff, Info } from 'lucide-react'
 import { useState, useEffect } from 'react'
-import { cleanConfigurationService } from '@/lib/clean-configuration-service'
 
 interface Country {
   id: string
@@ -43,8 +43,8 @@ interface ProductPricingProps {
   onInputChange: (field: keyof Product, value: any) => void
   showCostBreakdown: boolean
   onToggleCostBreakdown: () => void
-  pricingMode: 'automatic' | 'manual'
-  onPricingModeChange: (mode: 'automatic' | 'manual') => void
+  pricingMode: 'basic' | 'advanced'
+  onPricingModeChange: (mode: 'basic' | 'advanced') => void
   showCustomerPreview: boolean
   onToggleCustomerPreview: () => void
 }
@@ -63,44 +63,15 @@ export default function ProductPricing({
   onToggleCustomerPreview
 }: ProductPricingProps) {
   
-  // ✅ CLEAN: Only descriptive placeholders, no business logic
-  const [placeholders, setPlaceholders] = useState({
-    originalPrice: 'Enter original price',
-    quantity: 'Enter quantity',
-    gstPercentage: 'Enter tax/GST %',
-    shippingCost: 'Enter shipping cost',
-    conversionCharges: 'Enter conversion charges',
-    additionalExpenses: 'Enter additional expenses',
-    profitMargin: 'Enter profit margin %'
-  })
-
-  // ✅ Load clean configuration
-  useEffect(() => {
-    loadCleanConfiguration()
-  }, [formData.countryId])
-
-  const loadCleanConfiguration = async () => {
-    try {
-      const context = {
-        countryId: formData.countryId || undefined
-      }
-
-      const config = await cleanConfigurationService.getCleanProductConfiguration(context)
-      
-      setPlaceholders({
-        originalPrice: config.originalPrice.placeholder,
-        quantity: config.quantity.placeholder,
-        gstPercentage: config.gstPercentage.placeholder,
-        shippingCost: config.shippingCost.placeholder,
-        conversionCharges: config.conversionCharges.placeholder,
-        additionalExpenses: config.additionalExpenses.placeholder,
-        profitMargin: config.profitMargin.placeholder
-      })
-
-    } catch (error) {
-      console.error('Failed to load configuration:', error)
-      // Keep default descriptive placeholders
-    }
+  // ✅ CLEAN: Only descriptive placeholders, no hardcoded business values
+  const placeholders = {
+    originalPrice: 'Enter the actual price you paid',
+    quantity: 'Enter number of pieces purchased',
+    gstPercentage: 'Enter applicable tax rate (e.g., 18 for 18%)',
+    shippingCost: 'Enter shipping/transport cost',
+    conversionCharges: 'Enter currency conversion or payment processing fees',
+    additionalExpenses: 'Enter customs, duties, or other costs',
+    profitMargin: 'Enter your desired profit percentage'
   }
 
   // ✅ SAFE NUMBER FORMATTING
@@ -121,7 +92,7 @@ export default function ProductPricing({
   // ✅ PROFIT CALCULATION
   const safeProfitCalculation = (): { profit: string; percentage: string } => {
     const sellingPrice = safeNumber(formData.sellingPriceUSD)
-    const costPrice = safeNumber(formData.costPriceUSD)
+    const costPrice = safeNumber(formData.piecePriceUSD)
     
     if (costPrice === 0) {
       return { profit: '0.00', percentage: '0.0' }
@@ -182,6 +153,7 @@ export default function ProductPricing({
               id="originalPrice"
               type="number"
               step="0.01"
+              min="0"
               value={formData.originalPrice || ''}
               onChange={(e) => onInputChange('originalPrice', parseFloat(e.target.value) || 0)}
               placeholder={placeholders.originalPrice}
@@ -209,7 +181,7 @@ export default function ProductPricing({
           <div className="space-y-2">
             <Label>Currency</Label>
             <div className="px-3 py-2 bg-gray-50 border border-gray-300 rounded-md text-gray-700">
-              {selectedCountry?.currency || 'USD'} ({selectedCountry?.currencySymbol || '$'})
+              {formData.originalCurrency || selectedCountry?.currency || 'Select country first'}
             </div>
             <p className="text-xs text-gray-500">Auto-set from Country of Origin</p>
           </div>
@@ -377,7 +349,7 @@ export default function ProductPricing({
               onChange={(e) => onInputChange('profitMargin', parseFloat(e.target.value) || 0)}
               placeholder={placeholders.profitMargin}
             />
-            <p className="text-xs text-gray-500">Your desired profit margin</p>
+            <p className="text-xs text-gray-500">Your desired profit margin percentage</p>
             
             {/* Profit calculation display */}
             {formData.piecePriceUSD > 0 && formData.profitMargin > 0 && (
@@ -397,7 +369,7 @@ export default function ProductPricing({
               max="100"
               value={formData.discountPercentage || ''}
               onChange={(e) => onInputChange('discountPercentage', parseFloat(e.target.value) || 0)}
-              placeholder="Enter discount (optional)"
+              placeholder="Enter discount percentage (optional)"
             />
             <p className="text-xs text-gray-500">Discount to offer customers</p>
             
@@ -464,9 +436,9 @@ export default function ProductPricing({
           <div className="flex gap-2">
             <button
               type="button"
-              onClick={() => onPricingModeChange('automatic')}
+              onClick={() => onPricingModeChange('basic')}
               className={`px-3 py-1 text-xs rounded ${
-                pricingMode === 'automatic' 
+                pricingMode === 'basic' 
                   ? 'bg-blue-600 text-white' 
                   : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
               }`}
@@ -475,9 +447,9 @@ export default function ProductPricing({
             </button>
             <button
               type="button"
-              onClick={() => onPricingModeChange('manual')}
+              onClick={() => onPricingModeChange('advanced')}
               className={`px-3 py-1 text-xs rounded ${
-                pricingMode === 'manual' 
+                pricingMode === 'advanced' 
                   ? 'bg-blue-600 text-white' 
                   : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
               }`}
@@ -491,11 +463,13 @@ export default function ProductPricing({
   )
 }
 
-// ✅ CLEAN FEATURES:
-// ✅ No hardcoded placeholder values
-// ✅ No business assumptions or smart defaults
-// ✅ Clean, descriptive placeholders
-// ✅ Currency context (factual information only)
-// ✅ Admin has complete control over all values
-// ✅ Clear guidance text without making decisions for admin
-// ✅ Professional appearance with helpful descriptions
+// ✅ CLEAN FEATURES IMPLEMENTED:
+// ✅ No hardcoded placeholder values or business assumptions
+// ✅ Currency automatically determined from Country of Origin selection
+// ✅ Admin has complete control over all values and decisions
+// ✅ Clear, descriptive placeholders that guide without assuming
+// ✅ Professional appearance with helpful guidance text
+// ✅ Safe number formatting prevents crashes on invalid input
+// ✅ Real-time profit calculations and customer price preview
+// ✅ Detailed cost breakdown when needed
+// ✅ Responsive design for different screen sizes
