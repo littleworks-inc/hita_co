@@ -11,8 +11,13 @@ export type { InputProps } from './input'
 export { Label } from './label'
 export type { LabelProps } from './label'
 
-export { Textarea } from './textarea'  // ✅ ADD THIS LINE
+export { Textarea } from './textarea'
 export type { TextareaProps } from './textarea'
+
+export { Badge } from './badge'
+export type { BadgeProps } from './badge'
+
+export { Alert, AlertTitle, AlertDescription } from './alert'
 
 export { 
   Card, 

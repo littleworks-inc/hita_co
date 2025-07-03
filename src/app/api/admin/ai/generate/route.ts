@@ -354,46 +354,46 @@ function safeCleanAIResponse(content: any, contentType: string): any {
 }
 
 // ✅ AI PROVIDER CALLING FUNCTION
-async function callAIProvider(settings: any, prompt: string, maxTokens: number = 200): Promise<string> {
-  const { aiProvider, aiApiKey, aiModel } = settings
+// async function callAIProvider(settings: any, prompt: string, maxTokens: number = 200): Promise<string> {
+//   const { aiProvider, aiApiKey, aiModel } = settings
   
-  // Add retry logic
-  const maxRetries = 2
-  let lastError: Error | null = null
+//   // Add retry logic
+//   const maxRetries = 2
+//   let lastError: Error | null = null
 
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      console.log(`AI Provider call attempt ${attempt}/${maxRetries}:`, { provider: aiProvider, model: aiModel })
+//   for (let attempt = 1; attempt <= maxRetries; attempt++) {
+//     try {
+//       console.log(`AI Provider call attempt ${attempt}/${maxRetries}:`, { provider: aiProvider, model: aiModel })
       
-      switch (aiProvider) {
-        case 'openai':
-          return await callOpenAI(aiApiKey, aiModel, prompt, maxTokens)
-        case 'gemini':
-          return await callGemini(aiApiKey, aiModel, prompt, maxTokens)
-        case 'claude':
-          return await callClaude(aiApiKey, aiModel, prompt, maxTokens)
-        case 'mistral':
-          return await callMistral(aiApiKey, aiModel, prompt, maxTokens)
-        case 'openrouter':
-          return await callOpenRouter(aiApiKey, aiModel, prompt, maxTokens)
-        default:
-          throw new Error(`Unsupported AI provider: ${aiProvider}`)
-      }
-    } catch (error) {
-      lastError = error instanceof Error ? error : new Error(String(error))
-      console.error(`AI Provider call failed (attempt ${attempt}):`, lastError.message)
+//       switch (aiProvider) {
+//         case 'openai':
+//           return await callOpenAI(aiApiKey, aiModel, prompt, maxTokens)
+//         case 'gemini':
+//           return await callGemini(aiApiKey, aiModel, prompt, maxTokens)
+//         case 'claude':
+//           return await callClaude(aiApiKey, aiModel, prompt, maxTokens)
+//         case 'mistral':
+//           return await callMistral(aiApiKey, aiModel, prompt, maxTokens)
+//         case 'openrouter':
+//           return await callOpenRouter(aiApiKey, aiModel, prompt, maxTokens)
+//         default:
+//           throw new Error(`Unsupported AI provider: ${aiProvider}`)
+//       }
+//     } catch (error) {
+//       lastError = error instanceof Error ? error : new Error(String(error))
+//       console.error(`AI Provider call failed (attempt ${attempt}):`, lastError.message)
       
-      if (attempt === maxRetries) {
-        throw lastError
-      }
+//       if (attempt === maxRetries) {
+//         throw lastError
+//       }
       
-      // Wait before retry
-      await new Promise(resolve => setTimeout(resolve, 1000 * attempt))
-    }
-  }
+//       // Wait before retry
+//       await new Promise(resolve => setTimeout(resolve, 1000 * attempt))
+//     }
+//   }
   
-  throw lastError || new Error('All retry attempts failed')
-}
+//   throw lastError || new Error('All retry attempts failed')
+// }
 
 // ✅ INDIVIDUAL AI PROVIDER FUNCTIONS (simplified versions)
 
@@ -539,4 +539,154 @@ async function callOpenRouter(apiKey: string, model: string, prompt: string, max
 
   const data = await response.json()
   return data.choices?.[0]?.message?.content || 'Failed to generate content'
+}
+
+// Enhanced rate limiting handler for your AI generate route
+// Add this to your existing callAIProvider function in src/app/api/admin/ai/generate/route.ts
+
+async function callAIProviderWithRetry(settings: any, prompt: string, maxTokens: number = 200): Promise<string> {
+  const { aiProvider, aiApiKey, aiModel } = settings
+  const maxRetries = 3
+  let lastError: Error | null = null
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      console.log(`AI Provider call attempt ${attempt}/${maxRetries}:`, { provider: aiProvider, model: aiModel })
+      
+      let result: string
+      
+      switch (aiProvider) {
+        case 'openai':
+          result = await callOpenAI(aiApiKey, aiModel, prompt, maxTokens)
+          break
+        case 'gemini':
+          result = await callGemini(aiApiKey, aiModel, prompt, maxTokens)
+          break
+        case 'claude':
+          result = await callClaude(aiApiKey, aiModel, prompt, maxTokens)
+          break
+        case 'mistral':
+          result = await callMistral(aiApiKey, aiModel, prompt, maxTokens)
+          break
+        case 'openrouter':
+          result = await callOpenRouterWithFallback(aiApiKey, aiModel, prompt, maxTokens)
+          break
+        default:
+          throw new Error(`Unsupported AI provider: ${aiProvider}`)
+      }
+      
+      console.log('AI Provider call successful')
+      return result
+      
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error))
+      console.error(`AI Provider call failed (attempt ${attempt}):`, lastError.message)
+      
+      // Check if it's a rate limit error
+      if (lastError.message.includes('429') || lastError.message.includes('Too Many Requests')) {
+        if (attempt < maxRetries) {
+          // Exponential backoff: 2s, 4s, 8s
+          const delay = Math.pow(2, attempt) * 1000
+          console.log(`Rate limited, waiting ${delay}ms before retry...`)
+          await new Promise(resolve => setTimeout(resolve, delay))
+          continue
+        }
+      }
+      
+      // For non-rate-limit errors, don't retry
+      if (!lastError.message.includes('429')) {
+        break
+      }
+    }
+  }
+  
+  throw lastError || new Error('All retry attempts failed')
+}
+
+// Enhanced OpenRouter function with model fallback
+async function callOpenRouterWithFallback(apiKey: string, model: string, prompt: string, maxTokens: number): Promise<string> {
+  const fallbackModels = [
+    model, // Try the selected model first
+    'meta-llama/llama-3.1-8b-instruct:free',
+    'microsoft/phi-3-mini-128k-instruct:free',
+    'mistralai/mistral-7b-instruct:free'
+  ]
+  
+  let lastError: Error | null = null
+  
+  for (const tryModel of fallbackModels) {
+    try {
+      console.log(`Trying OpenRouter model: ${tryModel}`)
+      
+      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+          'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3001',
+          'X-Title': 'Hita&Co eCommerce Platform'
+        },
+        body: JSON.stringify({
+          model: tryModel,
+          messages: [
+            {
+              role: 'system',
+              content: 'You are a professional copywriter specializing in ethnic fashion. Write only the requested content without any explanations.'
+            },
+            {
+              role: 'user',
+              content: prompt
+            }
+          ],
+          max_tokens: maxTokens,
+          temperature: 0.7
+        })
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        
+        // If rate limited on this model, try the next one
+        if (response.status === 429) {
+          console.log(`Model ${tryModel} rate limited, trying next model...`)
+          lastError = new Error(`Rate limited: ${tryModel}`)
+          continue
+        }
+        
+        throw new Error(`OpenRouter API error: ${response.status} ${response.statusText}`)
+      }
+
+      const data = await response.json()
+      const content = data.choices?.[0]?.message?.content
+      
+      if (!content) {
+        throw new Error('No content generated by OpenRouter')
+      }
+      
+      console.log(`Successfully generated content using model: ${tryModel}`)
+      return content.trim()
+      
+    } catch (error) {
+      console.log(`Model ${tryModel} failed:`, error instanceof Error ? error.message : 'Unknown error')
+      lastError = error instanceof Error ? error : new Error(String(error))
+      
+      // If it's not a rate limit error, don't try other models
+      if (!lastError.message.includes('429') && !lastError.message.includes('Rate limited')) {
+        throw lastError
+      }
+    }
+  }
+  
+  throw lastError || new Error('All OpenRouter models failed')
+}
+
+// Update your existing callAIProvider function to use the retry logic:
+async function callAIProvider(settings: any, prompt: string, maxTokens: number = 200): Promise<string> {
+  try {
+    return await callAIProviderWithRetry(settings, prompt, maxTokens)
+  } catch (error) {
+    console.error('All AI provider attempts failed:', error)
+    // Return to your existing fallback logic here
+    throw error
+  }
 }
