@@ -1,4 +1,4 @@
-// ✅ FIXED: src/app/products/page.tsx
+// ✅ UPDATED: src/app/products/page.tsx - CATALOG/ECOMMERCE TOGGLE SUPPORT
 
 import { Suspense } from 'react'
 import Link from 'next/link'
@@ -28,6 +28,13 @@ interface ProductsPageProps {
     country?: string
     page?: string
   }
+}
+
+// ✅ GET STORE SETTINGS - Required for catalog mode
+async function getStoreSettings() {
+  return await db.storeSetting.findFirst({
+    where: { id: 'default' }
+  })
 }
 
 // ✅ FIXED: Simplified and corrected getProducts function
@@ -84,272 +91,244 @@ async function getProducts(searchParams: ProductsPageProps['searchParams']) {
       orderBy = [{ name: 'asc' }]
       break
     case 'newest':
-      orderBy = [{ publishedAt: 'desc' }, { createdAt: 'desc' }]
+      orderBy = [{ createdAt: 'desc' }]
       break
     case 'featured':
-      orderBy = [{ isFeatured: 'desc' }, { updatedAt: 'desc' }]
-      break
-    default:
-      // Default: Featured first, then by update date
       orderBy = [
         { isFeatured: 'desc' },
-        { stockQuantity: 'desc' }, // In-stock products first
-        { updatedAt: 'desc' }
+        { createdAt: 'desc' }
+      ]
+      break
+    default:
+      orderBy = [
+        { isFeatured: 'desc' },
+        { stockQuantity: 'desc' },
+        { createdAt: 'desc' }
       ]
   }
 
-  try {
-    // ✅ FIXED: Separate queries to avoid complex count issues
-    const [products, totalCount] = await Promise.all([
-      db.product.findMany({
-        where,
-        include: {
-          category: {
-            select: {
-              id: true,
-              name: true,
-              slug: true
-            }
-          },
-          country: {
-            select: {
-              id: true,
-              name: true,
-              currency: true,
-              currencySymbol: true
-            }
-          }
-        },
-        orderBy,
-        skip,
-        take: pageSize
-      }),
-      // ✅ FIXED: Simple count query
-      db.product.count({ where })
-    ])
+  // Fetch products and total count
+  const [products, totalCount] = await Promise.all([
+    db.product.findMany({
+      where,
+      include: {
+        category: true,
+        country: true
+      },
+      orderBy,
+      take: pageSize,
+      skip
+    }),
+    db.product.count({ where })
+  ])
 
-    return {
-      products,
-      totalCount,
-      totalPages: Math.ceil(totalCount / pageSize),
-      currentPage: page,
-      hasNextPage: page < Math.ceil(totalCount / pageSize),
-      hasPrevPage: page > 1
-    }
-  } catch (error) {
-    console.error('Error fetching products:', error)
-    // Return empty results instead of throwing
-    return {
-      products: [],
-      totalCount: 0,
-      totalPages: 0,
-      currentPage: 1,
-      hasNextPage: false,
-      hasPrevPage: false
-    }
+  return {
+    products,
+    totalCount,
+    totalPages: Math.ceil(totalCount / pageSize),
+    currentPage: page
   }
 }
 
 // Get categories for filters
 async function getCategories() {
-  try {
-    return await db.category.findMany({
-      select: {
-        id: true,
-        name: true,
-        slug: true,
-        _count: {
-          select: {
-            products: {
-              where: {
-                status: 'PUBLISHED',
-                stockQuantity: { gt: 0 }
-              }
+  return await db.category.findMany({
+    include: {
+      _count: {
+        select: {
+          products: {
+            where: {
+              status: 'PUBLISHED',
+              stockQuantity: { gt: 0 }
             }
           }
         }
-      },
-      orderBy: { name: 'asc' }
-    })
-  } catch (error) {
-    console.error('Error fetching categories:', error)
-    return []
-  }
+      }
+    },
+    orderBy: { name: 'asc' }
+  })
 }
 
 // Get countries for filters
 async function getCountries() {
-  try {
-    return await db.country.findMany({
-      select: {
-        id: true,
-        name: true,
-        code: true,
-        _count: {
-          select: {
-            products: {
-              where: {
-                status: 'PUBLISHED',
-                stockQuantity: { gt: 0 }
-              }
+  return await db.country.findMany({
+    include: {
+      _count: {
+        select: {
+          products: {
+            where: {
+              status: 'PUBLISHED',
+              stockQuantity: { gt: 0 }
             }
           }
         }
-      },
-      orderBy: { name: 'asc' }
-    })
-  } catch (error) {
-    console.error('Error fetching countries:', error)
-    return []
-  }
+      }
+    },
+    orderBy: { name: 'asc' }
+  })
 }
 
-// ---------- Components ----------
-
-interface ProductsGridProps {
-  searchParams: ProductsPageProps['searchParams']
-}
-
-async function ProductsGrid({ searchParams }: ProductsGridProps) {
-  const { products, totalCount, currentPage, totalPages, hasNextPage, hasPrevPage } = await getProducts(searchParams)
-
-  if (totalCount === 0) {
-    return (
-      <div className="text-center py-12">
-        <Package className="mx-auto h-16 w-16 text-gray-300 mb-4" />
-        <h3 className="text-lg font-medium text-gray-900 mb-2">No products found</h3>
-        <p className="text-gray-500 mb-6">
-          {searchParams.search 
-            ? `No matches for "${searchParams.search}"`
-            : 'No products match your current filters'}
-        </p>
-        <Link href="/products" className="text-purple-600 hover:underline flex items-center gap-1 justify-center">
-          <ArrowLeft className="h-4 w-4" /> Clear Filters
-        </Link>
-      </div>
-    )
-  }
-
-  return (
-    <>
-      <div className="mb-6">
-        <h2 className="text-2xl font-bold">
-          {searchParams.search 
-            ? `Search results for "${searchParams.search}"` 
-            : 'All Products'}
-        </h2>
-        <p className="text-gray-600 mt-1">
-          Showing {products.length} of {totalCount} products
-        </p>
-      </div>
-
-      {/* Products Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-8">
-        {products.map((product) => (
-          <ProductCard key={product.id} product={product} />
-        ))}
-      </div>
-
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-center gap-2">
-          <Link
-            href={{
-              pathname: '/products',
-              query: { ...searchParams, page: (currentPage - 1).toString() }
-            }}
-            className={`flex items-center gap-1 px-4 py-2 rounded-lg ${
-              hasPrevPage 
-                ? 'bg-gray-100 hover:bg-gray-200 text-gray-700' 
-                : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-            }`}
-          >
-            <ChevronLeft className="h-4 w-4" />
-            Previous
-          </Link>
-
-          <span className="px-4 py-2 text-gray-600">
-            Page {currentPage} of {totalPages}
-          </span>
-
-          <Link
-            href={{
-              pathname: '/products',
-              query: { ...searchParams, page: (currentPage + 1).toString() }
-            }}
-            className={`flex items-center gap-1 px-4 py-2 rounded-lg ${
-              hasNextPage 
-                ? 'bg-gray-100 hover:bg-gray-200 text-gray-700' 
-                : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-            }`}
-          >
-            Next
-            <ChevronRight className="h-4 w-4" />
-          </Link>
-        </div>
-      )}
-    </>
-  )
-}
-
-// Page metadata
-export async function generateMetadata({ searchParams }: ProductsPageProps) {
-  const title = searchParams.search 
-    ? `Search: ${searchParams.search} - Products` 
-    : 'All Products - Shop Indian Ethnic Wear'
-  
-  return {
-    title,
-    description: 'Browse our complete collection of authentic Indian ethnic wear, jewelry, and lifestyle products.',
-  }
-}
-
-// Main page component
 export default async function ProductsPage({ searchParams }: ProductsPageProps) {
-  // Fetch data in parallel
-  const [categories, countries] = await Promise.all([
-    getCategories(),
-    getCountries()
-  ])
+  const storeSettings = await getStoreSettings()
+  const { products, totalCount, totalPages, currentPage } = await getProducts(searchParams)
+  const categories = await getCategories()
+  const countries = await getCountries()
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <CustomerNavigation />
+      <CustomerNavigation storeSettings={storeSettings} />
       
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Page Header */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Header */}
         <div className="mb-8">
-          <div className="flex items-center gap-2 mb-4">
-            <Grid3X3 className="h-6 w-6 text-purple-600" />
-            <h1 className="text-3xl font-bold text-gray-900">
-              Products
-            </h1>
-          </div>
-          <p className="text-gray-600">
-            Discover our authentic collection of Indian ethnic wear and lifestyle products
-          </p>
-        </div>
-
-        <div className="lg:grid lg:grid-cols-4 lg:gap-8">
-          {/* Filters Sidebar */}
-          <div className="lg:col-span-1">
-            <Suspense fallback={<div className="h-96 bg-gray-200 rounded-lg animate-pulse" />}>
-              <ProductFilters
-                categories={categories}
-                countries={countries}
-                searchParams={searchParams}
-              />
-            </Suspense>
-          </div>
-
-          {/* Products Grid */}
-          <div className="lg:col-span-3 mt-8 lg:mt-0">
-            <Suspense fallback={<LoadingSpinner />}>
-              <ProductsGrid searchParams={searchParams} />
-            </Suspense>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
+                <Package className="h-8 w-8 text-purple-600" />
+                All Products
+              </h1>
+              <p className="text-gray-600 mt-2">
+                {totalCount} product{totalCount !== 1 ? 's' : ''} found
+                {searchParams.search && ` for "${searchParams.search}"`}
+              </p>
+            </div>
+            
+            <Link
+              href="/"
+              className="inline-flex items-center gap-2 text-purple-600 hover:text-purple-700 font-medium transition-colors"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back to Home
+            </Link>
           </div>
         </div>
-      </div>
+
+        {/* Filters */}
+        <div className="mb-8">
+          <ProductFilters
+            categories={categories}
+            countries={countries}
+            searchParams={searchParams}
+          />
+        </div>
+
+        {/* Products Grid */}
+        {products.length === 0 ? (
+          <div className="text-center py-16">
+            <div className="w-32 h-32 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-8">
+              <Package className="h-16 w-16 text-gray-400" />
+            </div>
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">
+              No products found
+            </h2>
+            <p className="text-gray-600 mb-8 max-w-md mx-auto">
+              {searchParams.search 
+                ? `No products match your search for "${searchParams.search}". Try adjusting your search terms or filters.`
+                : "No products are currently available. Please check back later!"
+              }
+            </p>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <Link
+                href="/products"
+                className="inline-flex items-center gap-2 bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 transition-colors font-medium"
+              >
+                <Package className="h-4 w-4" />
+                View All Products
+              </Link>
+              <Link
+                href="/categories"
+                className="inline-flex items-center gap-2 bg-gray-600 text-white px-6 py-3 rounded-lg hover:bg-gray-700 transition-colors font-medium"
+              >
+                <Grid3X3 className="h-4 w-4" />
+                Browse Categories
+              </Link>
+            </div>
+          </div>
+        ) : (
+          <>
+            {/* Products Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-12">
+              {products.map((product) => (
+                <ProductCard 
+                  key={product.id} 
+                  product={product} 
+                  storeSettings={storeSettings}
+                />
+              ))}
+            </div>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="flex justify-center">
+                <div className="flex items-center space-x-2">
+                  {/* Previous Page */}
+                  {currentPage > 1 && (
+                    <Link
+                      href={`/products?${new URLSearchParams({ 
+                        ...searchParams, 
+                        page: (currentPage - 1).toString() 
+                      }).toString()}`}
+                      className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium bg-white text-gray-700 hover:bg-purple-50 border border-gray-300 transition-colors"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                      Previous
+                    </Link>
+                  )}
+
+                  {/* Page Numbers */}
+                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                    let pageNum
+                    if (totalPages <= 5) {
+                      pageNum = i + 1
+                    } else if (currentPage <= 3) {
+                      pageNum = i + 1
+                    } else if (currentPage >= totalPages - 2) {
+                      pageNum = totalPages - 4 + i
+                    } else {
+                      pageNum = currentPage - 2 + i
+                    }
+                    
+                    if (pageNum < 1 || pageNum > totalPages) return null
+                    
+                    const isActive = pageNum === currentPage
+                    
+                    return (
+                      <Link
+                        key={pageNum}
+                        href={`/products?${new URLSearchParams({ 
+                          ...searchParams, 
+                          page: pageNum.toString() 
+                        }).toString()}`}
+                        className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                          isActive
+                            ? 'bg-purple-600 text-white'
+                            : 'bg-white text-gray-700 hover:bg-purple-50 border border-gray-300'
+                        }`}
+                      >
+                        {pageNum}
+                      </Link>
+                    )
+                  })}
+
+                  {/* Next Page */}
+                  {currentPage < totalPages && (
+                    <Link
+                      href={`/products?${new URLSearchParams({ 
+                        ...searchParams, 
+                        page: (currentPage + 1).toString() 
+                      }).toString()}`}
+                      className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium bg-white text-gray-700 hover:bg-purple-50 border border-gray-300 transition-colors"
+                    >
+                      Next
+                      <ChevronRight className="h-4 w-4" />
+                    </Link>
+                  )}
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </main>
     </div>
   )
 }

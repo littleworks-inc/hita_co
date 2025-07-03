@@ -1,6 +1,8 @@
+// ✅ FIXED: src/components/admin/CategoriesTable.tsx - Fixed React key prop warnings
+
 'use client'
 
-import { useState } from 'react'
+import React, { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle, Button } from '@/components/ui'
@@ -96,54 +98,70 @@ export default function CategoriesTable({ categories }: CategoriesTableProps) {
           <div className="flex items-center">
             <div className={`flex-shrink-0 w-8 h-8 ${isSubcategory ? 'bg-blue-100' : 'bg-purple-100'} rounded-lg flex items-center justify-center`}>
               {isSubcategory ? (
-                <Package className={`h-4 w-4 ${isSubcategory ? 'text-blue-600' : 'text-purple-600'}`} />
+                <Package className="h-4 w-4 text-blue-600" />
               ) : (
-                <Layers className={`h-4 w-4 ${isSubcategory ? 'text-blue-600' : 'text-purple-600'}`} />
+                <Layers className="h-4 w-4 text-purple-600" />
               )}
             </div>
-            <div className="ml-3">
-              <div className={`text-sm font-medium ${isSubcategory ? 'text-gray-700' : 'text-gray-900'}`}>
-                {category.name}
-              </div>
-              <div className="text-sm text-gray-500">
-                {category.slug}
-              </div>
+            <div className="ml-4">
+              <div className="text-sm font-medium text-gray-900">{category.name}</div>
+              <div className="text-sm text-gray-500">/{category.slug}</div>
             </div>
           </div>
         </div>
       </td>
       <td className="px-6 py-4">
         <div className="text-sm text-gray-900 max-w-xs truncate">
-          {category.description || '-'}
+          {category.description || (
+            <span className="italic text-gray-400">No description</span>
+          )}
         </div>
       </td>
-      <td className="px-6 py-4 whitespace-nowrap text-center">
-        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-          {category._count.products} products
-        </span>
-      </td>
-      <td className="px-6 py-4 whitespace-nowrap text-center">
-        {!isSubcategory && (
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-            {category._count.children} subcategories
+      <td className="px-6 py-4 text-center">
+        <div className="flex flex-col items-center">
+          <span className="text-sm font-medium text-gray-900">
+            {category._count.products}
           </span>
-        )}
+          <span className="text-xs text-gray-500">
+            {category._count.products === 1 ? 'product' : 'products'}
+          </span>
+        </div>
       </td>
-      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-        <div className="flex items-center justify-end gap-2">
+      <td className="px-6 py-4 text-center">
+        <div className="flex flex-col items-center">
+          <span className="text-sm font-medium text-gray-900">
+            {category._count.children}
+          </span>
+          <span className="text-xs text-gray-500">
+            {category._count.children === 1 ? 'subcategory' : 'subcategories'}
+          </span>
+        </div>
+      </td>
+      <td className="px-6 py-4 text-right text-sm font-medium">
+        <div className="flex items-center justify-end space-x-2">
+          {/* View Button */}
+          <Link href={`/admin/categories/${category.id}`}>
+            <Button variant="ghost" size="sm">
+              <Eye className="h-4 w-4" />
+            </Button>
+          </Link>
+
+          {/* Edit Button */}
           <Link href={`/admin/categories/${category.id}/edit`}>
-            <Button variant="ghost" size="sm" title="Edit Category">
+            <Button variant="ghost" size="sm">
               <Edit className="h-4 w-4" />
             </Button>
           </Link>
-          <Button 
-            variant="ghost" 
+
+          {/* Delete Button */}
+          <Button
+            variant="ghost"
             size="sm"
-            className="text-red-600 hover:text-red-700"
             onClick={() => handleDelete(category.id, category.name)}
             disabled={deletingId === category.id || category._count.products > 0 || category._count.children > 0}
+            className="text-red-600 hover:text-red-700 hover:bg-red-50"
             title={
-              category._count.products > 0 
+              category._count.products > 0
                 ? "Cannot delete category with products"
                 : category._count.children > 0
                 ? "Cannot delete category with subcategories"  
@@ -219,12 +237,12 @@ export default function CategoriesTable({ categories }: CategoriesTableProps) {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {parentCategories.map((parentCategory) => (
-                  <>
+                  <React.Fragment key={`parent-${parentCategory.id}`}>
                     {renderCategoryRow(parentCategory)}
                     {subcategoriesMap[parentCategory.id]?.map((subcategory) =>
                       renderCategoryRow(subcategory, true)
                     )}
-                  </>
+                  </React.Fragment>
                 ))}
               </tbody>
             </table>

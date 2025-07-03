@@ -1,3 +1,5 @@
+// ✅ UPDATED: src/app/categories/[slug]/page.tsx - CATALOG/ECOMMERCE TOGGLE SUPPORT
+
 import { Suspense } from 'react'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
@@ -11,7 +13,9 @@ import {
   Tag,
   Grid3X3,
   ArrowLeft,
-  Package
+  Package,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react'
 
 interface CategoryPageProps {
@@ -24,7 +28,7 @@ interface CategoryPageProps {
   }
 }
 
-// Get store settings
+// ✅ GET STORE SETTINGS - Required for catalog mode
 async function getStoreSettings() {
   return await db.storeSetting.findFirst({
     where: { id: 'default' }
@@ -34,90 +38,76 @@ async function getStoreSettings() {
 // Get category by slug
 async function getCategory(slug: string) {
   return await db.category.findFirst({
-    where: { slug },
+    where: { 
+      slug: slug
+    },
     include: {
       parent: true,
       children: {
-        where: {
-          products: {
-            some: {
-              isActive: true,
-              stockQuantity: { gt: 0 }
-            }
-          }
-        },
-        include: {
-          _count: {
-            select: {
-              products: {
-                where: {
-                  isActive: true,
-                  stockQuantity: { gt: 0 }
-                }
-              }
-            }
-          }
-        }
-      },
-      _count: {
-        select: {
-          products: {
-            where: {
-              isActive: true,
-              stockQuantity: { gt: 0 }
-            }
-          }
-        }
+        orderBy: { name: 'asc' }
       }
     }
   })
 }
 
-// Get products in category
-async function getCategoryProducts(categoryId: string, searchParams: CategoryPageProps['searchParams']) {
+// Get products for category
+async function getCategoryProducts(
+  categoryId: string, 
+  searchParams: CategoryPageProps['searchParams']
+) {
   const page = parseInt(searchParams.page || '1')
   const pageSize = 12
   const skip = (page - 1) * pageSize
 
-  // Build order by
-  let orderBy: any = { createdAt: 'desc' }
-  switch (searchParams.sort) {
-    case 'price-low':
-      orderBy = { sellingPriceUSD: 'asc' }
-      break
-    case 'price-high':
-      orderBy = { sellingPriceUSD: 'desc' }
-      break
-    case 'name':
-      orderBy = { name: 'asc' }
-      break
-    case 'featured':
-      orderBy = [{ isFeatured: 'desc' }, { createdAt: 'desc' }]
-      break
+  // Build where clause
+  const where: any = {
+    categoryId: categoryId,
+    status: 'PUBLISHED',
+    stockQuantity: { gt: 0 }
   }
 
+  // Sort options
+  let orderBy: any = []
+  switch (searchParams.sort) {
+    case 'price-low':
+      orderBy = [{ sellingPriceUSD: 'asc' }]
+      break
+    case 'price-high':
+      orderBy = [{ sellingPriceUSD: 'desc' }]
+      break
+    case 'name':
+      orderBy = [{ name: 'asc' }]
+      break
+    case 'newest':
+      orderBy = [{ createdAt: 'desc' }]
+      break
+    case 'featured':
+      orderBy = [
+        { isFeatured: 'desc' },
+        { createdAt: 'desc' }
+      ]
+      break
+    default:
+      orderBy = [
+        { isFeatured: 'desc' },
+        { stockQuantity: 'desc' },
+        { createdAt: 'desc' }
+      ]
+  }
+
+  // Fetch products and total count
   const [products, totalCount] = await Promise.all([
     db.product.findMany({
-      where: {
-        categoryId,
-        isActive: true,
-        stockQuantity: { gt: 0 }
-      },
+      where,
       include: {
         category: true,
         country: true
       },
       orderBy,
-      skip,
-      take: pageSize
+      take: pageSize,
+      skip
     }),
-    db.product.count({
-      where: {
-        categoryId,
-        isActive: true,
-        stockQuantity: { gt: 0 }
-      }
-    })
+    db.product.count({ where })
   ])
 
   return {
@@ -128,252 +118,248 @@ async function getCategoryProducts(categoryId: string, searchParams: CategoryPag
   }
 }
 
-// Category Products Component
-async function CategoryProducts({ category, searchParams }: { 
-  category: any, 
-  searchParams: CategoryPageProps['searchParams'] 
-}) {
-  const { products, totalCount, totalPages, currentPage } = await getCategoryProducts(category.id, searchParams)
-
-  if (products.length === 0) {
-    return (
-      <div className="text-center py-16">
-        <Package className="h-24 w-24 text-gray-300 mx-auto mb-4" />
-        <h3 className="text-xl font-semibold text-gray-900 mb-2">No products available</h3>
-        <p className="text-gray-500">
-          We're currently updating our {category.name.toLowerCase()} collection. Check back soon!
-        </p>
-        <Link
-          href="/products"
-          className="inline-flex items-center gap-2 mt-6 text-purple-600 hover:text-purple-700 font-medium"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Browse All Products
-        </Link>
-      </div>
-    )
+// Generate metadata for the category page
+export async function generateMetadata({ params }: CategoryPageProps) {
+  const category = await getCategory(params.slug)
+  
+  if (!category) {
+    return {
+      title: 'Category Not Found',
+      description: 'The requested category could not be found.'
+    }
   }
 
-  return (
-    <>
-      {/* Category Header */}
-      <div className="mb-8">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
-          <h2 className="text-2xl font-bold text-gray-900">
-            {category.name} Collection
-          </h2>
-          <div className="flex items-center gap-4">
-            <span className="text-sm text-gray-500">
-              {totalCount} {totalCount === 1 ? 'product' : 'products'}
-            </span>
-            
-            {/* Sort Filter Component */}
-            <CategorySortFilter 
-              currentSort={searchParams.sort || 'newest'}
-              categorySlug={category.slug}
-              searchParams={searchParams}
-            />
-          </div>
-        </div>
-
-        {category.description && (
-          <p className="text-gray-600 max-w-3xl">{category.description}</p>
-        )}
-      </div>
-
-      {/* Subcategories */}
-      {category.children && category.children.length > 0 && (
-        <div className="mb-8">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Shop by Subcategory</h3>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {category.children.map((subcategory: any) => (
-              <Link
-                key={subcategory.id}
-                href={`/categories/${subcategory.slug}`}
-                className="bg-white border border-gray-200 rounded-lg p-4 hover:border-purple-300 hover:shadow-md transition-all group"
-              >
-                <h4 className="font-medium text-gray-900 mb-1 group-hover:text-purple-600 transition-colors">
-                  {subcategory.name}
-                </h4>
-                <p className="text-sm text-gray-500">
-                  {subcategory._count.products} {subcategory._count.products === 1 ? 'item' : 'items'}
-                </p>
-              </Link>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Products Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-12">
-        {products.map((product) => (
-          <ProductCard key={product.id} product={product} />
-        ))}
-      </div>
-
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex justify-center">
-          <div className="flex items-center space-x-2">
-            {/* Previous Page */}
-            {currentPage > 1 && (
-              <Link
-                href={`/categories/${category.slug}?${new URLSearchParams({ 
-                  ...searchParams, 
-                  page: (currentPage - 1).toString() 
-                }).toString()}`}
-                className="px-3 py-2 rounded-lg font-medium bg-white text-gray-700 hover:bg-purple-50 border border-gray-300 transition-colors"
-              >
-                Previous
-              </Link>
-            )}
-
-            {/* Page Numbers */}
-            {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-              let pageNum
-              if (totalPages <= 5) {
-                pageNum = i + 1
-              } else if (currentPage <= 3) {
-                pageNum = i + 1
-              } else if (currentPage >= totalPages - 2) {
-                pageNum = totalPages - 4 + i
-              } else {
-                pageNum = currentPage - 2 + i
-              }
-              
-              if (pageNum < 1 || pageNum > totalPages) return null
-              
-              const isActive = pageNum === currentPage
-              
-              return (
-                <Link
-                  key={pageNum}
-                  href={`/categories/${category.slug}?${new URLSearchParams({ 
-                    ...searchParams, 
-                    page: pageNum.toString() 
-                  }).toString()}`}
-                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                    isActive
-                      ? 'bg-purple-600 text-white'
-                      : 'bg-white text-gray-700 hover:bg-purple-50 border border-gray-300'
-                  }`}
-                >
-                  {pageNum}
-                </Link>
-              )
-            })}
-
-            {/* Next Page */}
-            {currentPage < totalPages && (
-              <Link
-                href={`/categories/${category.slug}?${new URLSearchParams({ 
-                  ...searchParams, 
-                  page: (currentPage + 1).toString() 
-                }).toString()}`}
-                className="px-3 py-2 rounded-lg font-medium bg-white text-gray-700 hover:bg-purple-50 border border-gray-300 transition-colors"
-              >
-                Next
-              </Link>
-            )}
-          </div>
-        </div>
-      )}
-    </>
-  )
+  return generateCategoryMetadata(category)
 }
 
 export default async function CategoryPage({ params, searchParams }: CategoryPageProps) {
-  const [storeSettings, category] = await Promise.all([
-    getStoreSettings(),
-    getCategory(params.slug)
-  ])
+  const storeSettings = await getStoreSettings() // ✅ GET STORE SETTINGS
+  const category = await getCategory(params.slug)
 
   if (!category) {
     notFound()
   }
 
-  // Generate breadcrumb schema
-  const breadcrumbs = [
-    { name: 'Home', url: '/' },
-    { name: 'Categories', url: '/categories' }
-  ]
-  
-  if (category.parent) {
-    breadcrumbs.push({ name: category.parent.name, url: `/categories/${category.parent.slug}` })
-  }
-  
-  breadcrumbs.push({ name: category.name, url: `/categories/${category.slug}` })
-  
-  const breadcrumbSchema = generateBreadcrumbJsonLd(breadcrumbs)
+  const { products, totalCount, totalPages, currentPage } = await getCategoryProducts(
+    category.id, 
+    searchParams
+  )
 
   return (
-    <>
-      {/* JSON-LD Structured Data */}
+    <div className="min-h-screen bg-gray-50">
+      <CustomerNavigation storeSettings={storeSettings} />
+      
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Breadcrumb */}
+        <nav className="flex items-center space-x-2 text-sm text-gray-500 mb-8">
+          <Link href="/" className="hover:text-purple-600 transition-colors">
+            Home
+          </Link>
+          <span>/</span>
+          <Link href="/categories" className="hover:text-purple-600 transition-colors">
+            Categories
+          </Link>
+          {category.parent && (
+            <>
+              <span>/</span>
+              <Link 
+                href={`/categories/${category.parent.slug}`} 
+                className="hover:text-purple-600 transition-colors"
+              >
+                {category.parent.name}
+              </Link>
+            </>
+          )}
+          <span>/</span>
+          <span className="text-gray-900 font-medium">{category.name}</span>
+        </nav>
+
+        {/* Category Header */}
+        <div className="mb-8">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
+                <Tag className="h-8 w-8 text-purple-600" />
+                {category.name}
+              </h1>
+              {category.description && (
+                <p className="text-gray-600 mt-2 max-w-2xl">
+                  {category.description}
+                </p>
+              )}
+              <p className="text-gray-600 mt-2">
+                {totalCount} product{totalCount !== 1 ? 's' : ''} in this category
+              </p>
+            </div>
+            
+            <Link
+              href="/categories"
+              className="inline-flex items-center gap-2 text-purple-600 hover:text-purple-700 font-medium transition-colors"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              All Categories
+            </Link>
+          </div>
+        </div>
+
+        {/* Subcategories */}
+        {category.children && category.children.length > 0 && (
+          <div className="mb-8">
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">Subcategories</h2>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              {category.children.map((subcategory) => (
+                <Link
+                  key={subcategory.id}
+                  href={`/categories/${subcategory.slug}`}
+                  className="group p-4 bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow"
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="font-medium text-gray-900 group-hover:text-purple-600 transition-colors">
+                        {subcategory.name}
+                      </h3>
+                      <p className="text-sm text-gray-500 mt-1">
+                        {/* You can add product count here if needed */}
+                      </p>
+                    </div>
+                    <ChevronRight className="h-5 w-5 text-gray-400 group-hover:text-purple-600 transition-colors" />
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Sort & Filter */}
+        <div className="mb-8">
+          <CategorySortFilter
+            currentSort={searchParams.sort}
+            categorySlug={category.slug}
+          />
+        </div>
+
+        {/* Products Grid */}
+        {products.length === 0 ? (
+          <div className="text-center py-16">
+            <div className="w-32 h-32 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-8">
+              <Package className="h-16 w-16 text-gray-400" />
+            </div>
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">
+              No products in this category
+            </h2>
+            <p className="text-gray-600 mb-8 max-w-md mx-auto">
+              This category doesn't have any products yet. Check back later or explore other categories.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <Link
+                href="/products"
+                className="inline-flex items-center gap-2 bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 transition-colors font-medium"
+              >
+                <Package className="h-4 w-4" />
+                View All Products
+              </Link>
+              <Link
+                href="/categories"
+                className="inline-flex items-center gap-2 bg-gray-600 text-white px-6 py-3 rounded-lg hover:bg-gray-700 transition-colors font-medium"
+              >
+                <Grid3X3 className="h-4 w-4" />
+                Browse Categories
+              </Link>
+            </div>
+          </div>
+        ) : (
+          <>
+            {/* Products Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-12">
+              {products.map((product) => (
+                <ProductCard 
+                  key={product.id} 
+                  product={product} 
+                  storeSettings={storeSettings} {/* ✅ PASS STORE SETTINGS */}
+                />
+              ))}
+            </div>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="flex justify-center">
+                <div className="flex items-center space-x-2">
+                  {/* Previous Page */}
+                  {currentPage > 1 && (
+                    <Link
+                      href={`/categories/${category.slug}?${new URLSearchParams({ 
+                        ...searchParams, 
+                        page: (currentPage - 1).toString() 
+                      }).toString()}`}
+                      className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium bg-white text-gray-700 hover:bg-purple-50 border border-gray-300 transition-colors"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                      Previous
+                    </Link>
+                  )}
+
+                  {/* Page Numbers */}
+                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                    let pageNum
+                    if (totalPages <= 5) {
+                      pageNum = i + 1
+                    } else if (currentPage <= 3) {
+                      pageNum = i + 1
+                    } else if (currentPage >= totalPages - 2) {
+                      pageNum = totalPages - 4 + i
+                    } else {
+                      pageNum = currentPage - 2 + i
+                    }
+                    
+                    if (pageNum < 1 || pageNum > totalPages) return null
+                    
+                    const isActive = pageNum === currentPage
+                    
+                    return (
+                      <Link
+                        key={pageNum}
+                        href={`/categories/${category.slug}?${new URLSearchParams({ 
+                          ...searchParams, 
+                          page: pageNum.toString() 
+                        }).toString()}`}
+                        className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                          isActive
+                            ? 'bg-purple-600 text-white'
+                            : 'bg-white text-gray-700 hover:bg-purple-50 border border-gray-300'
+                        }`}
+                      >
+                        {pageNum}
+                      </Link>
+                    )
+                  })}
+
+                  {/* Next Page */}
+                  {currentPage < totalPages && (
+                    <Link
+                      href={`/categories/${category.slug}?${new URLSearchParams({ 
+                        ...searchParams, 
+                        page: (currentPage + 1).toString() 
+                      }).toString()}`}
+                      className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium bg-white text-gray-700 hover:bg-purple-50 border border-gray-300 transition-colors"
+                    >
+                      Next
+                      <ChevronRight className="h-4 w-4" />
+                    </Link>
+                  )}
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </main>
+      
+      {/* Enhanced Structured Data for SEO */}
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
-          __html: JSON.stringify(breadcrumbSchema)
+          __html: JSON.stringify(generateBreadcrumbJsonLd(category))
         }}
       />
-      
-      <div className="min-h-screen bg-gray-50">
-        <CustomerNavigation storeSettings={storeSettings} />
-        
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          {/* Breadcrumb */}
-          <nav className="flex items-center text-sm text-gray-500 mb-6" aria-label="Breadcrumb">
-            <Link href="/" className="hover:text-purple-600 transition-colors">Home</Link>
-            <span className="mx-2">/</span>
-            <Link href="/categories" className="hover:text-purple-600 transition-colors">Categories</Link>
-            {category.parent && (
-              <>
-                <span className="mx-2">/</span>
-                <Link 
-                  href={`/categories/${category.parent.slug}`} 
-                  className="hover:text-purple-600 transition-colors"
-                >
-                  {category.parent.name}
-                </Link>
-              </>
-            )}
-            <span className="mx-2">/</span>
-            <span className="text-gray-900 font-medium">{category.name}</span>
-          </nav>
-
-          {/* Page Header */}
-          <header className="mb-8">
-            <div className="flex items-center gap-2 mb-4">
-              <Tag className="h-6 w-6 text-purple-600" />
-              <h1 className="text-3xl md:text-4xl font-bold text-gray-900">{category.name}</h1>
-            </div>
-            {category.description && (
-              <p className="text-lg text-gray-600 max-w-3xl leading-relaxed">{category.description}</p>
-            )}
-          </header>
-
-          {/* Category Products */}
-          <Suspense fallback={<LoadingSpinner size="lg" text="Loading products..." />}>
-            <CategoryProducts category={category} searchParams={searchParams} />
-          </Suspense>
-        </main>
-      </div>
-    </>
+    </div>
   )
-}
-
-// Generate metadata for SEO
-export async function generateMetadata({ params }: CategoryPageProps) {
-  const [category, storeSettings] = await Promise.all([
-    getCategory(params.slug),
-    getStoreSettings()
-  ])
-
-  if (!category) {
-    return {
-      title: 'Category Not Found',
-      description: 'The requested category could not be found.',
-    }
-  }
-
-  return generateCategoryMetadata(category, storeSettings)
 }

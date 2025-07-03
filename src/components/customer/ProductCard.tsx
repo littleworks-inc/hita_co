@@ -1,4 +1,4 @@
-// ✅ FIXED: src/components/customer/ProductCard.tsx - MATCHING ADMIN PREVIEW LOGIC
+// ✅ UPDATED: src/components/customer/ProductCard.tsx - CATALOG/ECOMMERCE TOGGLE SUPPORT
 
 'use client'
 
@@ -8,6 +8,7 @@ import Image from 'next/image'
 import { useCurrency } from '@/contexts/CurrencyContext'
 import { formatPrice } from '@/lib/utils'
 import AddToCartButton from '@/components/cart/AddToCartButton'
+import ContactButtons from '@/components/customer/ContactButtons'
 import {
   Heart,
   Package,
@@ -20,7 +21,7 @@ import {
 
 interface Product {
   id: string
-  sku: string  // ADD this line if missing
+  sku: string
   name: string
   shortDescription?: string
   images: string[]
@@ -42,16 +43,45 @@ interface Product {
   }
 }
 
+interface StoreSettings {
+  disableShoppingCart?: boolean
+  catalogModeSettings?: string
+}
+
 interface ProductCardProps {
   product: Product
+  storeSettings?: StoreSettings
   className?: string
 }
 
-export default function ProductCard({ product, className = '' }: ProductCardProps) {
+export default function ProductCard({ 
+  product, 
+  storeSettings,
+  className = '' 
+}: ProductCardProps) {
   const [imageLoading, setImageLoading] = useState(true)
   const [imageError, setImageError] = useState(false)
   const [isWishlisted, setIsWishlisted] = useState(false)
   const { currentCurrency, convertPrice } = useCurrency()
+
+  // Parse catalog mode settings
+  const isECommerceMode = !storeSettings?.disableShoppingCart
+  const catalogSettings = storeSettings?.catalogModeSettings 
+    ? (() => {
+        try {
+          return JSON.parse(storeSettings.catalogModeSettings)
+        } catch {
+          return {
+            whatsappNumber: '',
+            instagramHandle: '',
+            contactMessage: 'Hi! I\'m interested in this product. Can you provide more details?',
+            showWhatsApp: true,
+            showInstagram: true,
+            customContactText: 'Contact us for pricing and availability'
+          }
+        }
+      })()
+    : null
 
   // Get primary and secondary images
   const primaryImage = product.images && product.images.length > 0 ? product.images[0] : null
@@ -111,52 +141,70 @@ export default function ProductCard({ product, className = '' }: ProductCardProp
                 } ${secondaryImage ? 'group-hover:opacity-0' : ''}`}
                 onLoad={() => setImageLoading(false)}
                 onError={() => setImageError(true)}
-                sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+                priority={product.isFeatured}
               />
 
-              {/* Secondary Image (Hover Effect) */}
+              {/* Secondary Image (hover effect) */}
               {secondaryImage && (
                 <Image
                   src={secondaryImage}
                   alt={`${product.name} - View 2`}
                   fill
-                  className="object-cover opacity-0 group-hover:opacity-100 transition-opacity duration-500"
-                  sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+                  className="object-cover transition-opacity duration-500 opacity-0 group-hover:opacity-100"
+                  onError={() => {}}
                 />
               )}
             </>
           ) : (
-            // Fallback placeholder
-            <div className="w-full h-full flex items-center justify-center bg-gray-200">
-              <Package className="h-12 w-12 text-gray-400" />
+            /* Fallback when no image */
+            <div className="w-full h-full bg-gray-200 flex items-center justify-center">
+              <Package className="h-16 w-16 text-gray-400" />
             </div>
           )}
 
           {/* Quick Actions Overlay */}
-          <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
-            <div className="flex gap-2">
-              <div className="p-3 bg-white/90 backdrop-blur-sm rounded-full hover:bg-white transition-colors">
-                <Eye className="h-5 w-5 text-gray-700" />
+          <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-10 transition-all duration-300 flex items-center justify-center">
+            <div className="opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-y-4 group-hover:translate-y-0">
+              <div className="flex items-center gap-2">
+                {/* Quick View */}
+                <button className="p-2 bg-white rounded-full shadow-lg hover:shadow-xl transition-all">
+                  <Eye className="h-4 w-4 text-gray-700" />
+                </button>
+                
+                {/* Wishlist */}
+                <button 
+                  onClick={(e) => {
+                    e.preventDefault()
+                    setIsWishlisted(!isWishlisted)
+                  }}
+                  className="p-2 bg-white rounded-full shadow-lg hover:shadow-xl transition-all"
+                >
+                  <Heart className={`h-4 w-4 ${isWishlisted ? 'text-red-500 fill-current' : 'text-gray-700'}`} />
+                </button>
               </div>
             </div>
           </div>
         </div>
       </Link>
 
-      {/* Product Info */}
+      {/* Product Information */}
       <div className="p-4 space-y-3">
-        {/* Category & Country */}
-        <div className="flex items-center justify-between text-xs text-gray-500">
-          <span className="flex items-center gap-1">
-            <Tag className="h-3 w-3" />
+        {/* Category & Stock Status */}
+        <div className="flex items-center justify-between">
+          <span className="text-xs text-gray-500 uppercase tracking-wide">
             {product.category.name}
           </span>
-          <span>{product.country.name}</span>
+          {product.isFeatured && (
+            <div className="flex items-center gap-1 text-amber-500">
+              <Star className="h-3 w-3 fill-current" />
+              <span className="text-xs font-medium">Featured</span>
+            </div>
+          )}
         </div>
 
         {/* Product Name */}
-        <Link href={`/products/${productSlug}`} className="block">
-          <h3 className="font-semibold text-gray-900 line-clamp-2 hover:text-purple-600 transition-colors">
+        <Link href={`/products/${productSlug}`}>
+          <h3 className="font-semibold text-gray-900 hover:text-purple-600 transition-colors line-clamp-2">
             {product.name}
           </h3>
         </Link>
@@ -168,10 +216,9 @@ export default function ProductCard({ product, className = '' }: ProductCardProp
           </p>
         )}
 
-        {/* ✅ FIXED: Price Display Section - MATCHING ADMIN PREVIEW EXACTLY */}
-        <div className="space-y-2">
-          {/* Price Row */}
-          <div className="flex items-center gap-3 flex-wrap">
+        {/* Pricing */}
+        <div className="space-y-1">
+          <div className="flex items-center gap-2 flex-wrap">
             {shouldShowDiscount ? (
               <>
                 {/* Original price (crossed out) - This is the sellingPriceUSD */}
@@ -205,22 +252,34 @@ export default function ProductCard({ product, className = '' }: ProductCardProp
           )}
         </div>
 
-        {/* ✅ FIXED: Functional Add to Cart Button */}
-        <AddToCartButton 
-          product={{
-            id: product.id,
-            sku: product.id, // Using ID as SKU fallback
-            name: product.name,
-            sellingPriceUSD: discountedPrice, // Use the actual price customer pays
-            stockQuantity: product.stockQuantity,
-            images: product.images,
-            category: product.category,
-            country: product.country
-          }}
-          variant="default"
-          className="w-full"
-          disabled={isOutOfStock}
-        />
+        {/* ✅ NEW: CONDITIONAL RENDERING - eCommerce vs Catalog Mode */}
+        {isECommerceMode ? (
+          /* eCommerce Mode: Show Add to Cart Button */
+          <AddToCartButton 
+            product={{
+              id: product.id,
+              sku: product.sku || product.id, // Use actual SKU or fallback to ID
+              name: product.name,
+              sellingPriceUSD: discountedPrice, // Use the actual price customer pays
+              stockQuantity: product.stockQuantity,
+              images: product.images,
+              category: product.category,
+              country: product.country
+            }}
+            variant="default"
+            className="w-full"
+            disabled={isOutOfStock}
+          />
+        ) : (
+          /* Catalog Mode: Show Contact Buttons */
+          catalogSettings && (
+            <ContactButtons 
+              product={product}
+              catalogSettings={catalogSettings}
+              className="w-full"
+            />
+          )
+        )}
       </div>
     </div>
   )

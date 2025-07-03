@@ -1,4 +1,4 @@
-// ✅ FIXED: src/app/page.tsx - Use Dynamic Trust Indicators
+// ✅ UPDATED: src/app/page.tsx - CATALOG/ECOMMERCE TOGGLE SUPPORT
 
 import { Suspense } from 'react'
 import Link from 'next/link'
@@ -12,7 +12,7 @@ import HeroSection from '@/components/customer/HeroSection'
 import CategoryShowcase from '@/components/customer/CategoryShowcase'
 import LoadingSpinner from '@/components/customer/LoadingSpinner'
 import CurrencyNotification from '@/components/customer/CurrencyNotification'
-import TrustIndicators from '@/components/customer/TrustIndicators' // ✅ FIXED: Use dynamic component
+import TrustIndicators from '@/components/customer/TrustIndicators'
 import {
   Star,
   Truck,
@@ -51,47 +51,46 @@ async function getFeaturedProducts() {
     },
     take: 8,
     orderBy: [
-      { stockQuantity: 'desc' }, // Prioritize in-stock items
-      { createdAt: 'desc' }
+      { stockQuantity: 'desc' }, // Prioritize in-stock products
+      { createdAt: 'desc' } // Then by newest
     ]
   })
 }
 
-// FIXED: Simplified categories query
+// Simple category fetch for homepage
 async function getCategories() {
   return await db.category.findMany({
-    where: {
-      parentId: null, // Only top-level categories
-      products: {
-        some: {
-          isActive: true,
-          stockQuantity: { gt: 0 }
-        }
-      }
-    },
     include: {
       _count: {
         select: {
           products: {
             where: {
-              isActive: true,
+              status: 'PUBLISHED',
               stockQuantity: { gt: 0 }
             }
           }
         }
       }
     },
-    take: 6,
-    orderBy: { name: 'asc' }
+    orderBy: { name: 'asc' },
+    take: 6
   })
 }
 
-// Featured Products Component
+// ✅ UPDATED: Featured Products Component with storeSettings
 async function FeaturedProducts() {
   const products = await getFeaturedProducts()
+  const storeSettings = await getStoreSettings() // ✅ GET STORE SETTINGS
 
   if (products.length === 0) {
-    return null
+    return (
+      <section className="py-16 bg-gray-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <h2 className="text-3xl font-bold text-gray-900 mb-4">Featured Products</h2>
+          <p className="text-lg text-gray-600">No featured products available at the moment.</p>
+        </div>
+      </section>
+    )
   }
 
   return (
@@ -101,16 +100,20 @@ async function FeaturedProducts() {
           <div className="flex items-center justify-center gap-2 mb-4">
             <Star className="h-5 w-5 text-purple-600" />
             <h2 className="text-3xl font-bold text-gray-900">Featured Products</h2>
-            <Star className="h-5 w-5 text-purple-600" />
+            <Heart className="h-5 w-5 text-purple-600" />
           </div>
           <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-            Handpicked selections showcasing the finest craftsmanship and authentic designs
+            Discover our handpicked selection of premium products
           </p>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
           {products.map((product) => (
-            <ProductCard key={product.id} product={product} />
+            <ProductCard 
+              key={product.id} 
+              product={product} 
+              storeSettings={storeSettings}
+            />
           ))}
         </div>
 
@@ -128,9 +131,10 @@ async function FeaturedProducts() {
   )
 }
 
-// New Arrivals Component
+// ✅ UPDATED: New Arrivals Component with storeSettings
 async function NewArrivals() {
   const products = await getFeaturedProducts() // Reuse for demo
+  const storeSettings = await getStoreSettings() // ✅ GET STORE SETTINGS
 
   if (products.length === 0) {
     return null
@@ -152,7 +156,11 @@ async function NewArrivals() {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
           {products.slice(0, 8).map((product) => (
-            <ProductCard key={product.id} product={product} />
+            <ProductCard 
+              key={product.id} 
+              product={product} 
+              storeSettings={storeSettings}
+            />
           ))}
         </div>
 
@@ -198,7 +206,7 @@ export default async function HomePage() {
           <FeaturedProducts />
         </Suspense>
         
-        {/* ✅ FIXED: Dynamic Trust Indicators */}
+        {/* Dynamic Trust Indicators */}
         <Suspense fallback={<LoadingSpinner size="md" text="Loading shipping info..." />}>
           <TrustIndicators />
         </Suspense>
