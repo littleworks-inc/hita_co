@@ -17,7 +17,9 @@ import {
   CheckCircle,
   AlertTriangle,
   Sparkles,
-  Brain
+  Brain,
+  FileText,
+  Settings
 } from 'lucide-react'
 
 // Import all the modular components
@@ -258,7 +260,7 @@ export default function ProductForm({
   const getAIContext = () => {
     const category = categories.find(c => c.id === formData.categoryId)
     const country = countries.find(c => c.id === formData.countryId)
-    
+
     return {
       productName: formData.name,
       category: category?.name || '',
@@ -277,7 +279,7 @@ export default function ProductForm({
   const getEnhancedAIContext = () => {
     const category = categories.find(c => c.id === formData.categoryId)
     const country = countries.find(c => c.id === formData.countryId)
-    
+
     // Basic context (existing)
     const basicContext = {
       productName: formData.name,
@@ -301,30 +303,30 @@ export default function ProductForm({
         secondaryMaterials: enhancedAIData.secondaryMaterials,
         fabricWeight: enhancedAIData.fabricWeight,
         fabricTexture: enhancedAIData.fabricTexture,
-        
+
         // Design & Colors
         designStyle: enhancedAIData.designStyle,
         patterns: enhancedAIData.patterns,
         embellishments: enhancedAIData.embellishments,
         dominantColors: enhancedAIData.dominantColors,
         colorScheme: enhancedAIData.colorScheme,
-        
+
         // Cultural Context
         culturalOrigin: enhancedAIData.culturalOrigin,
         traditionalName: enhancedAIData.traditionalName,
         occasions: enhancedAIData.occasions,
         significance: enhancedAIData.significance,
-        
+
         // Target Audience
         targetAge: enhancedAIData.targetAge,
         targetGender: enhancedAIData.targetGender,
         targetOccasion: enhancedAIData.targetOccasion,
-        
+
         // Unique Features
         uniqueFeatures: enhancedAIData.uniqueFeatures,
         craftmanship: enhancedAIData.craftmanship,
         careInstructions: enhancedAIData.careInstructions,
-        
+
         // AI Preferences
         tone: enhancedAIData.tone,
         length: enhancedAIData.length,
@@ -340,9 +342,15 @@ export default function ProductForm({
   // ✅ Handle AI-generated content
   const handleAIGenerated = (type: string, content: any) => {
     setAiGenerating(false)
-    
+
     try {
-      if (type === 'product_description') {
+      if (type === 'short_description') {
+        // Handle short description generation
+        if (typeof content === 'string') {
+          handleInputChange('shortDescription', content)
+        }
+      } else if (type === 'product_description') {
+        // Handle full description generation
         if (typeof content === 'string') {
           handleInputChange('description', content)
         } else if (content.description) {
@@ -353,6 +361,17 @@ export default function ProductForm({
           if (content.tags && Array.isArray(content.tags)) {
             handleInputChange('tags', content.tags)
           }
+        }
+      } else if (type === 'both_descriptions') {
+        // ✅ NEW: Handle generating both descriptions at once
+        if (content.shortDescription) {
+          handleInputChange('shortDescription', content.shortDescription)
+        }
+        if (content.description) {
+          handleInputChange('description', content.description)
+        }
+        if (content.tags && Array.isArray(content.tags)) {
+          handleInputChange('tags', content.tags)
         }
       } else if (type === 'seo_content') {
         if (content.title) {
@@ -367,14 +386,73 @@ export default function ProductForm({
     }
   }
 
+  const handleBothDescriptionsAI = async () => {
+    setAiGenerating(true)
+
+    try {
+      // Generate short description first
+      const shortDescResponse = await fetch('/api/admin/ai/generate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          type: 'short_description',
+          context: getAIContext()
+        })
+      })
+
+      const shortDescData = await shortDescResponse.json()
+
+      // Generate full description
+      const fullDescResponse = await fetch('/api/admin/ai/generate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          type: 'product_description',
+          context: getAIContext()
+        })
+      })
+
+      const fullDescData = await fullDescResponse.json()
+
+      // Apply both results
+      if (shortDescData.success && shortDescData.content) {
+        handleInputChange('shortDescription', shortDescData.content)
+      }
+
+      if (fullDescData.success && fullDescData.content) {
+        if (typeof fullDescData.content === 'string') {
+          handleInputChange('description', fullDescData.content)
+        } else if (fullDescData.content.description) {
+          handleInputChange('description', fullDescData.content.description)
+        }
+      }
+
+      setSuccessMessage('Both descriptions generated successfully!')
+      setTimeout(() => setSuccessMessage(''), 3000)
+
+    } catch (error) {
+      console.error('Enhanced AI generation error:', error)
+      setErrors(prev => ({
+        ...prev,
+        submit: error instanceof Error ? error.message : 'AI generation failed'
+      }))
+    } finally {
+      setAiGenerating(false)
+    }
+  }
+
   // ✅ Enhanced AI generation handler
   const handleEnhancedAIGeneration = async (type: string, enhancedData: any) => {
     setAiGenerating(true)
     setEnhancedAIData(enhancedData)
-    
+
     try {
       const context = getEnhancedAIContext()
-      
+
       const response = await fetch('/api/admin/ai/generate', {
         method: 'POST',
         headers: {
@@ -404,9 +482,9 @@ export default function ProductForm({
       }
     } catch (error) {
       console.error('Enhanced AI generation error:', error)
-      setErrors(prev => ({ 
-        ...prev, 
-        submit: error instanceof Error ? error.message : 'AI generation failed' 
+      setErrors(prev => ({
+        ...prev,
+        submit: error instanceof Error ? error.message : 'AI generation failed'
       }))
     } finally {
       setAiGenerating(false)
@@ -423,47 +501,47 @@ export default function ProductForm({
   // =====================================
 
   const handleInputChange = (field: keyof Product, value: any) => {
-  setFormData(prev => ({ ...prev, [field]: value }))
+    setFormData(prev => ({ ...prev, [field]: value }))
 
-  // Clear specific error when user starts typing
-  if (errors[field]) {
-    setErrors(prev => ({ ...prev, [field]: '' }))
-  }
+    // Clear specific error when user starts typing
+    if (errors[field]) {
+      setErrors(prev => ({ ...prev, [field]: '' }))
+    }
 
-  // ✅ FIXED: Auto-calculate cost breakdown when relevant fields change
-  if (['originalPrice', 'quantity', 'gstPercentage', 'shippingCost', 'conversionCharges', 'additionalExpenses', 'countryId'].includes(field)) {
-    const country = countries.find(c => c.id === (field === 'countryId' ? value : formData.countryId))
-    if (country?.exchangeRate) {
-      // Get current values (use new value if field is being changed)
-      const currentOriginalPrice = field === 'originalPrice' ? parseFloat(value) || 0 : formData.originalPrice
-      const currentQuantity = field === 'quantity' ? parseInt(value) || 1 : formData.quantity
-      const currentGstPercentage = field === 'gstPercentage' ? parseFloat(value) || 0 : formData.gstPercentage
-      const currentShippingCost = field === 'shippingCost' ? parseFloat(value) || 0 : formData.shippingCost
-      const currentConversionCharges = field === 'conversionCharges' ? parseFloat(value) || 0 : formData.conversionCharges
-      const currentAdditionalExpenses = field === 'additionalExpenses' ? parseFloat(value) || 0 : formData.additionalExpenses
-      const exchangeRate = country.exchangeRate
+    // ✅ FIXED: Auto-calculate cost breakdown when relevant fields change
+    if (['originalPrice', 'quantity', 'gstPercentage', 'shippingCost', 'conversionCharges', 'additionalExpenses', 'countryId'].includes(field)) {
+      const country = countries.find(c => c.id === (field === 'countryId' ? value : formData.countryId))
+      if (country?.exchangeRate) {
+        // Get current values (use new value if field is being changed)
+        const currentOriginalPrice = field === 'originalPrice' ? parseFloat(value) || 0 : formData.originalPrice
+        const currentQuantity = field === 'quantity' ? parseInt(value) || 1 : formData.quantity
+        const currentGstPercentage = field === 'gstPercentage' ? parseFloat(value) || 0 : formData.gstPercentage
+        const currentShippingCost = field === 'shippingCost' ? parseFloat(value) || 0 : formData.shippingCost
+        const currentConversionCharges = field === 'conversionCharges' ? parseFloat(value) || 0 : formData.conversionCharges
+        const currentAdditionalExpenses = field === 'additionalExpenses' ? parseFloat(value) || 0 : formData.additionalExpenses
+        const exchangeRate = country.exchangeRate
 
-      // Simple cost calculation
-      const gstAmount = (currentOriginalPrice * currentGstPercentage) / 100
-      const totalCostInOriginalCurrency = currentOriginalPrice + gstAmount + currentShippingCost + currentConversionCharges + currentAdditionalExpenses
-      const costPriceUSD = totalCostInOriginalCurrency / exchangeRate
-      const piecePriceUSD = costPriceUSD / currentQuantity
+        // Simple cost calculation
+        const gstAmount = (currentOriginalPrice * currentGstPercentage) / 100
+        const totalCostInOriginalCurrency = currentOriginalPrice + gstAmount + currentShippingCost + currentConversionCharges + currentAdditionalExpenses
+        const costPriceUSD = totalCostInOriginalCurrency / exchangeRate
+        const piecePriceUSD = costPriceUSD / currentQuantity
 
-      // Update calculated fields
-      setFormData(prev => ({
-        ...prev,
-        costPriceUSD: Math.round(costPriceUSD * 100) / 100,
-        piecePriceUSD: Math.round(piecePriceUSD * 100) / 100
-      }))
+        // Update calculated fields
+        setFormData(prev => ({
+          ...prev,
+          costPriceUSD: Math.round(costPriceUSD * 100) / 100,
+          piecePriceUSD: Math.round(piecePriceUSD * 100) / 100
+        }))
+      }
+    }
+
+    // Auto-calculate selling price when profit margin changes
+    if (field === 'profitMargin' && formData.piecePriceUSD > 0) {
+      const newSellingPrice = formData.piecePriceUSD * (1 + parseFloat(value) / 100)
+      setFormData(prev => ({ ...prev, sellingPriceUSD: Math.round(newSellingPrice * 100) / 100 }))
     }
   }
-
-  // Auto-calculate selling price when profit margin changes
-  if (field === 'profitMargin' && formData.piecePriceUSD > 0) {
-    const newSellingPrice = formData.piecePriceUSD * (1 + parseFloat(value) / 100)
-    setFormData(prev => ({ ...prev, sellingPriceUSD: Math.round(newSellingPrice * 100) / 100 }))
-  }
-}
 
   // Handle image changes
   const handleImagesChange = (images: string[]) => {
@@ -501,17 +579,17 @@ export default function ProductForm({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     if (loading) return
 
     setLoading(true)
     setErrors({})
 
     try {
-      const url = mode === 'edit' && product?.id 
-        ? `/api/admin/products/${product.id}` 
+      const url = mode === 'edit' && product?.id
+        ? `/api/admin/products/${product.id}`
         : '/api/admin/products'
-      
+
       const method = mode === 'edit' ? 'PUT' : 'POST'
 
       const response = await fetch(url, {
@@ -526,20 +604,20 @@ export default function ProductForm({
 
       if (response.ok) {
         setSuccessMessage(data.message || `Product ${mode === 'edit' ? 'updated' : 'created'} successfully!`)
-        
+
         if (mode === 'create') {
           setTimeout(() => {
             router.push('/admin/products')
           }, 1500)
         }
       } else {
-        setErrors({ 
-          submit: data.error || `Failed to ${mode} product` 
+        setErrors({
+          submit: data.error || `Failed to ${mode} product`
         })
       }
     } catch (error) {
-      setErrors({ 
-        submit: error instanceof Error ? error.message : 'Failed to save product' 
+      setErrors({
+        submit: error instanceof Error ? error.message : 'Failed to save product'
       })
     } finally {
       setLoading(false)
@@ -562,14 +640,14 @@ export default function ProductForm({
             {mode === 'edit' ? 'Update product information' : 'Create a new product with AI-powered content generation'}
           </p>
         </div>
-        
+
         {/* ✅ AI Panel Toggle */}
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2 text-sm text-gray-500">
             <CheckCircle className="h-4 w-4 text-green-500" />
             Clean configuration system
           </div>
-          
+
           <Button
             type="button"
             variant="outline"
@@ -590,7 +668,7 @@ export default function ProductForm({
               <Sparkles className="h-5 w-5 text-purple-600" />
               <h3 className="font-medium text-purple-900">AI Content Generation</h3>
             </div>
-            
+
             <div className="flex items-center gap-2">
               {!isAIReady() && (
                 <div className="text-sm text-amber-600 flex items-center gap-1">
@@ -598,35 +676,33 @@ export default function ProductForm({
                   Add product name and category first
                 </div>
               )}
-              
+
               {/* AI Mode Toggle */}
               <div className="flex items-center gap-2">
                 <button
                   type="button"
                   onClick={() => setShowEnhancedAI(false)}
-                  className={`px-3 py-1 text-sm rounded-lg transition-colors ${
-                    !showEnhancedAI 
-                      ? 'bg-purple-600 text-white' 
-                      : 'bg-white text-purple-600 hover:bg-purple-50'
-                  }`}
+                  className={`px-3 py-1 text-sm rounded-lg transition-colors ${!showEnhancedAI
+                    ? 'bg-purple-600 text-white'
+                    : 'bg-white text-purple-600 hover:bg-purple-50'
+                    }`}
                 >
                   Quick AI
                 </button>
                 <button
                   type="button"
                   onClick={() => setShowEnhancedAI(true)}
-                  className={`px-3 py-1 text-sm rounded-lg transition-colors ${
-                    showEnhancedAI 
-                      ? 'bg-purple-600 text-white' 
-                      : 'bg-white text-purple-600 hover:bg-purple-50'
-                  }`}
+                  className={`px-3 py-1 text-sm rounded-lg transition-colors ${showEnhancedAI
+                    ? 'bg-purple-600 text-white'
+                    : 'bg-white text-purple-600 hover:bg-purple-50'
+                    }`}
                 >
                   Enhanced AI
                 </button>
               </div>
             </div>
           </div>
-          
+
           {/* AI Generation Content */}
           {showEnhancedAI ? (
             // Enhanced AI Input Form
@@ -640,10 +716,22 @@ export default function ProductForm({
           ) : (
             // Quick AI Buttons (existing)
             isAIReady() && (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                {/* ✅ NEW: Short Description AI */}
+                <div className="space-y-2">
+                  <div className="text-sm font-medium text-gray-700">Short Description</div>
+                  <AIGenerateButton
+                    type="short_description"
+                    context={getAIContext()}
+                    onGenerated={(content) => handleAIGenerated('short_description', content)}
+                    disabled={!isAIReady() || aiGenerating}
+                    size="sm"
+                  />
+                </div>
+
                 {/* Product Description AI */}
                 <div className="space-y-2">
-                  <div className="text-sm font-medium text-gray-700">Product Description</div>
+                  <div className="text-sm font-medium text-gray-700">Full Description</div>
                   <AIGenerateButton
                     type="product_description"
                     context={getAIContext()}
@@ -706,7 +794,7 @@ export default function ProductForm({
 
       {/* Form */}
       <form onSubmit={handleSubmit} className="space-y-8">
-        
+
         {/* 1. PRODUCT IMAGES & VIDEOS - TOP PRIORITY */}
         <ImageUpload
           label="Product Images & Videos"
@@ -735,22 +823,62 @@ export default function ProductForm({
             <h3 className="text-lg font-medium text-gray-900">Product Descriptions</h3>
             {isAIReady() && !showAiPanel && (
               <div className="flex gap-2">
-                <AIGenerateButton
-                  type="product_description"
-                  context={getAIContext()}
-                  onGenerated={(content) => handleAIGenerated('product_description', content)}
-                  disabled={!isAIReady() || aiGenerating}
-                  size="sm"
+                {/* ✅ NEW: Generate Both Descriptions Button */}
+                <Button
+                  type="button"
                   variant="outline"
-                />
+                  size="sm"
+                  onClick={handleBothDescriptionsAI}
+                  disabled={!isAIReady() || aiGenerating}
+                  className="text-blue-600 border-blue-200 hover:bg-blue-50"
+                >
+                  <FileText className={`h-4 w-4 mr-2 ${aiGenerating ? 'animate-spin' : ''}`} />
+                  {aiGenerating ? 'Generating...' : 'Generate Descriptions'}
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowAiPanel(!showAiPanel)}
+                  className="text-purple-600"
+                >
+                  <Settings className="h-3 w-3" />
+                </Button>
               </div>
             )}
           </div>
-          
+
           <ProductDescriptions
             formData={formData}
             onInputChange={handleInputChange}
           />
+
+          {/* ✅ Individual AI Buttons for specific descriptions */}
+          {isAIReady() && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-gray-200">
+              <div className="space-y-2">
+                <div className="text-sm font-medium text-gray-700">Generate Individual Descriptions</div>
+                <div className="flex gap-2">
+                  <AIGenerateButton
+                    type="short_description"
+                    context={getAIContext()}
+                    onGenerated={(content) => handleAIGenerated('short_description', content)}
+                    disabled={!isAIReady() || aiGenerating}
+                    size="sm"
+                    variant="outline"
+                  />
+                  <AIGenerateButton
+                    type="product_description"
+                    context={getAIContext()}
+                    onGenerated={(content) => handleAIGenerated('product_description', content)}
+                    disabled={!isAIReady() || aiGenerating}
+                    size="sm"
+                    variant="outline"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* 4. Pricing with Clean Configuration */}
@@ -807,7 +935,7 @@ export default function ProductForm({
               />
             )}
           </div>
-          
+
           <ProductSEO
             formData={formData}
             onInputChange={handleInputChange}
@@ -817,15 +945,15 @@ export default function ProductForm({
         {/* 8. Form Actions */}
         <div className="flex items-center justify-between pt-6 border-t border-gray-200">
           <div className="flex items-center gap-4">
-            <Link 
+            <Link
               href="/admin/products"
               className="text-gray-600 hover:text-gray-800 transition-colors"
             >
               Cancel
             </Link>
-            
+
             {mode === 'edit' && (
-              <Link 
+              <Link
                 href={`/admin/products/${product?.id}`}
                 className="flex items-center gap-2 text-blue-600 hover:text-blue-800 transition-colors"
               >

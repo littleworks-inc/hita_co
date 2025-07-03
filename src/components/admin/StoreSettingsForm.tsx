@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle, Button, Input, Label } from '@/components/ui'
 import ColorPicker from '@/components/admin/ColorPicker'
@@ -378,6 +378,18 @@ export default function StoreSettingsForm({ storeSettings }: StoreSettingsFormPr
     }),
   })
 
+  useEffect(() => {
+    // ✅ FIX: Refetch models when component mounts if provider and API key exist
+    if (formData.aiProvider && formData.aiApiKey && availableModels.length === 0) {
+      console.log('Refetching models on component mount:', {
+        provider: formData.aiProvider,
+        hasApiKey: !!formData.aiApiKey,
+        currentModel: formData.aiModel
+      })
+      fetchAvailableModels(formData.aiProvider, formData.aiApiKey)
+    }
+  }, [formData.aiProvider, formData.aiApiKey, availableModels.length])
+
   // Dynamic model fetching
   const fetchAvailableModels = async (provider: string, apiKey: string) => {
     if (!provider || !apiKey) {
@@ -399,7 +411,7 @@ export default function StoreSettingsForm({ storeSettings }: StoreSettingsFormPr
         const data = await response.json()
         setAvailableModels(data.models || [])
 
-        // Auto-select recommended model if no model is currently selected
+        // ✅ FIX: Don't auto-select model if one is already saved
         if (!formData.aiModel && data.models.length > 0) {
           const recommendedModel = data.models.find((m: any) => m.recommended)
           const defaultModel = recommendedModel || data.models[0]
@@ -408,12 +420,16 @@ export default function StoreSettingsForm({ storeSettings }: StoreSettingsFormPr
           }
         }
       } else {
-        setAvailableModels([])
-        console.error('Failed to fetch models')
+        // ✅ FIX: Use static models as fallback
+        const staticModels = getStaticModels(provider)
+        setAvailableModels(staticModels)
+        console.log(`API failed, using static models for ${provider}:`, staticModels)
       }
     } catch (error) {
-      setAvailableModels([])
-      console.error('Error fetching models:', error)
+      // ✅ FIX: Use static models as fallback
+      const staticModels = getStaticModels(provider)
+      setAvailableModels(staticModels)
+      console.log(`Error fetching models, using static fallback for ${provider}:`, error)
     } finally {
       setLoadingModels(false)
     }
@@ -1622,8 +1638,8 @@ export default function StoreSettingsForm({ storeSettings }: StoreSettingsFormPr
                     <div className="space-y-3">
                       {/* Current Mode Display */}
                       <div className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium ${formData.disableShoppingCart
-                          ? 'bg-orange-100 text-orange-800'
-                          : 'bg-green-100 text-green-800'
+                        ? 'bg-orange-100 text-orange-800'
+                        : 'bg-green-100 text-green-800'
                         }`}>
                         {formData.disableShoppingCart ? (
                           <>

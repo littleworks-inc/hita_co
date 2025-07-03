@@ -12,11 +12,12 @@ import {
   Settings,
   ChevronDown,
   CheckCircle,
-  AlertCircle
+  AlertCircle,
+  Type // ✅ NEW: Icon for short description
 } from 'lucide-react'
 
 interface AIGenerateButtonProps {
-  type: 'product_description' | 'seo_content' | 'social_caption' | 'category_description'
+  type: 'product_description' | 'short_description' | 'seo_content' | 'social_caption' | 'category_description' // ✅ ADDED: short_description
   context: {
     productName?: string
     category?: string
@@ -63,6 +64,13 @@ export default function AIGenerateButton({
           icon: FileText,
           label: 'Generate Description',
           color: 'text-blue-600'
+        }
+      // ✅ NEW: Short description support
+      case 'short_description':
+        return {
+          icon: Type,
+          label: 'Generate Short Description',
+          color: 'text-indigo-600'
         }
       case 'seo_content':
         return {
@@ -186,19 +194,19 @@ function AIConfigModal({ isOpen, onClose, onGenerate, type }: AIConfigModalProps
       includeKeywords: keywords.split(',').map(k => k.trim()).filter(k => k),
       ...(useCustomPrompt && customPrompt ? { customPrompt } : {})
     }
+    
     onGenerate(config)
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg p-6 w-full max-w-md">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-medium">AI Generation Settings</h3>
-          <Button variant="ghost" size="sm" onClick={onClose}>×</Button>
-        </div>
+    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+        <h3 className="text-lg font-medium mb-4">
+          AI Generation Settings - {type.replace('_', ' ').toUpperCase()}
+        </h3>
 
         <div className="space-y-4">
-          {/* Tone Selection */}
+          {/* Tone */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Tone
@@ -208,11 +216,11 @@ function AIConfigModal({ isOpen, onClose, onGenerate, type }: AIConfigModalProps
               onChange={(e) => setTone(e.target.value as any)}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              <option value="elegant">Elegant & Sophisticated</option>
+              <option value="elegant">Elegant</option>
               <option value="professional">Professional</option>
-              <option value="casual">Casual & Friendly</option>
-              <option value="playful">Playful & Fun</option>
-              <option value="informative">Informative & Detailed</option>
+              <option value="casual">Casual</option>
+              <option value="playful">Playful</option>
+              <option value="informative">Informative</option>
             </select>
           </div>
 
