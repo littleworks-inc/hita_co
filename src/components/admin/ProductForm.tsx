@@ -167,7 +167,7 @@ export default function ProductForm({
     purchaseDate: product?.purchaseDate || '',
     invoiceNumber: product?.invoiceNumber || '',
     originalPrice: product?.originalPrice || 0,
-    originalCurrency: product?.originalCurrency || 'INR',
+    originalCurrency: product?.originalCurrency || '',
     quantity: product?.quantity || 1,
     gstPercentage: product?.gstPercentage || 0,
     shippingCost: product?.shippingCost || 0,
@@ -175,12 +175,12 @@ export default function ProductForm({
     additionalExpenses: product?.additionalExpenses || 0,
     costPriceUSD: product?.costPriceUSD || 0,
     piecePriceUSD: product?.piecePriceUSD || 0,
-    profitMargin: product?.profitMargin || 100,
+    profitMargin: product?.profitMargin || 0,
     discountPercentage: product?.discountPercentage || 0,
     showDiscountToCustomers: product?.showDiscountToCustomers ?? true,
     sellingPriceUSD: product?.sellingPriceUSD || 0,
     stockQuantity: product?.stockQuantity || 0,
-    lowStockAlert: product?.lowStockAlert || 5,
+    lowStockAlert: product?.lowStockAlert || 0,
     isActive: product?.isActive ?? true,
     isFeatured: product?.isFeatured ?? false,
     tags: product?.tags || [],
@@ -507,6 +507,18 @@ export default function ProductForm({
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: '' }))
     }
+
+    // ✅ NEW: Auto-update currency when country changes (ADD THIS)
+  if (field === 'countryId') {
+    const selectedCountry = countries.find(c => c.id === value)
+    if (selectedCountry && !product?.originalCurrency) {
+      // Only auto-set currency for new products, not when editing existing ones
+      setFormData(prev => ({ 
+        ...prev, 
+        originalCurrency: selectedCountry.currency 
+      }))
+    }
+  }
 
     // ✅ FIXED: Auto-calculate cost breakdown when relevant fields change
     if (['originalPrice', 'quantity', 'gstPercentage', 'shippingCost', 'conversionCharges', 'additionalExpenses', 'countryId'].includes(field)) {
