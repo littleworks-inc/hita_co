@@ -1,9 +1,10 @@
-// src/app/api/admin/settings/route.ts
+// ✅ COMPLETE: src/app/api/admin/settings/route.ts - Fixed catalog mode save issue
+
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth'
 import { db } from '@/lib/db'
 
-// GET: Fetch store settings (NEW METHOD)
+// GET: Fetch store settings
 export async function GET(request: NextRequest) {
   try {
     const session = await getSession()
@@ -17,18 +18,27 @@ export async function GET(request: NextRequest) {
     })
 
     if (!storeSettings) {
-      // Create default settings with LittleWorks Inc as default
+      // Create default settings
       storeSettings = await db.storeSetting.create({
         data: {
           id: 'default',
-          storeName: 'LittleWorks Inc', // Default company name as requested
-          tagline: 'Building Digital Solutions',
+          storeName: 'Hita&Co',
+          tagline: 'Authentic Handcrafted Products',
           primaryColor: '#1f2937',
           secondaryColor: '#ffffff',
           accentColor: '#f59e0b',
-          email: 'admin@littleworks.inc',
+          email: 'admin@hitaco.com',
           currency: 'USD',
           timezone: 'America/New_York',
+          disableShoppingCart: false,
+          catalogModeSettings: JSON.stringify({
+            whatsappNumber: '',
+            instagramHandle: '',
+            contactMessage: 'Hi! I\'m interested in this product. Can you provide more details?',
+            showWhatsApp: true,
+            showInstagram: true,
+            customContactText: 'Contact us for pricing and availability'
+          })
         }
       })
     }
@@ -45,7 +55,7 @@ export async function GET(request: NextRequest) {
         success: false,
         error: 'Failed to fetch store settings',
         storeSettings: {
-          storeName: 'LittleWorks Inc', // Fallback default
+          storeName: 'Hita&Co',
           primaryColor: '#1f2937'
         }
       },
@@ -54,7 +64,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// PUT: Update store settings (EXISTING METHOD)
+// PUT: Update store settings
 export async function PUT(request: NextRequest) {
   try {
     const session = await getSession()
@@ -63,6 +73,7 @@ export async function PUT(request: NextRequest) {
     }
 
     const data = await request.json()
+    console.log('📝 Received settings update:', data)
 
     // Validate required fields
     if (!data.storeName?.trim()) {
@@ -85,33 +96,49 @@ export async function PUT(request: NextRequest) {
     for (const field of colorFields) {
       if (data[field] && !/^#[0-9A-F]{6}$/i.test(data[field])) {
         return NextResponse.json(
-          { error: `Invalid color format for ${field}. Please use hex format (e.g., #ffffff)` },
+          { error: `Invalid color format for ${field}. Use format #RRGGBB` },
           { status: 400 }
         )
       }
     }
 
-    // Validate URL formats for social media links
-    const urlFields = ['instagram', 'facebook', 'pinterest', 'twitter']
-    for (const field of urlFields) {
-      if (data[field] && data[field].trim()) {
-        try {
-          new URL(data[field])
-        } catch {
-          return NextResponse.json(
-            { error: `Invalid URL format for ${field}` },
-            { status: 400 }
-          )
+    // Validate catalog mode settings if provided
+    if (data.catalogModeSettings) {
+      try {
+        const catalogSettings = JSON.parse(data.catalogModeSettings)
+        
+        // Validate WhatsApp number format if provided
+        if (catalogSettings.whatsappNumber && catalogSettings.whatsappNumber.trim()) {
+          const cleanNumber = catalogSettings.whatsappNumber.replace(/\D/g, '')
+          if (cleanNumber.length < 10) {
+            return NextResponse.json(
+              { error: 'WhatsApp number must be at least 10 digits' },
+              { status: 400 }
+            )
+          }
         }
+
+        // Validate Instagram handle if provided
+        if (catalogSettings.instagramHandle && catalogSettings.instagramHandle.trim()) {
+          const cleanHandle = catalogSettings.instagramHandle.replace('@', '')
+          if (!/^[a-zA-Z0-9_.]+$/.test(cleanHandle)) {
+            return NextResponse.json(
+              { error: 'Instagram handle can only contain letters, numbers, dots, and underscores' },
+              { status: 400 }
+            )
+          }
+        }
+
+      } catch (error) {
+        return NextResponse.json(
+          { error: 'Invalid catalog mode settings format' },
+          { status: 400 }
+        )
       }
     }
 
-    // Get existing settings or create default
-    let existingSettings = await db.storeSetting.findFirst({
-      where: { id: 'default' }
-    })
-
-    const updateData = {
+    // Prepare update data
+    const updateData: any = {
       storeName: data.storeName.trim(),
       tagline: data.tagline?.trim() || null,
       logo: data.logo?.trim() || null,
@@ -121,7 +148,7 @@ export async function PUT(request: NextRequest) {
       accentColor: data.accentColor || '#f59e0b',
       email: data.email?.trim() || null,
       phone: data.phone?.trim() || null,
-      address: data.address || null,
+      address: data.address?.trim() || null,
       instagram: data.instagram?.trim() || null,
       facebook: data.facebook?.trim() || null,
       pinterest: data.pinterest?.trim() || null,
@@ -130,36 +157,60 @@ export async function PUT(request: NextRequest) {
       aiApiKey: data.aiApiKey?.trim() || null,
       aiModel: data.aiModel?.trim() || null,
       currency: data.currency || 'USD',
-      timezone: data.timezone || 'America/New_York'
+      timezone: data.timezone || 'America/New_York',
+      returnsEnabled: data.returnsEnabled ?? true,
+      returnPeriodDays: data.returnPeriodDays || 30,
+      returnPolicyUrl: data.returnPolicyUrl?.trim() || null,
+      hasRestockingFee: data.hasRestockingFee || false,
+      restockingFeePercentage: data.restockingFeePercentage || 0,
+      returnPolicyDescription: data.returnPolicyDescription?.trim() || null,
+      noReturnsReason: data.noReturnsReason?.trim() || null,
+      // ✅ CATALOG MODE FIELDS
+      disableShoppingCart: data.disableShoppingCart ?? false,
+      catalogModeSettings: data.catalogModeSettings || null
     }
 
-    let storeSettings
-    if (existingSettings) {
-      // Update existing settings
-      storeSettings = await db.storeSetting.update({
-        where: { id: 'default' },
-        data: updateData
-      })
-    } else {
-      // Create new settings with LittleWorks Inc default
-      storeSettings = await db.storeSetting.create({
-        data: {
-          id: 'default',
-          storeName: 'LittleWorks Inc', // Ensure default even on create
-          ...updateData
-        }
-      })
-    }
+    console.log('📝 Prepared update data:', updateData)
+
+    // Update store settings using upsert to handle both create and update
+    const updatedSettings = await db.storeSetting.upsert({
+      where: { id: 'default' },
+      create: {
+        id: 'default',
+        ...updateData
+      },
+      update: updateData
+    })
+
+    console.log('✅ Store settings updated successfully')
 
     return NextResponse.json({
       success: true,
-      storeSettings
+      message: 'Settings updated successfully',
+      storeSettings: updatedSettings
     })
 
   } catch (error) {
-    console.error('Store settings UPDATE error:', error)
+    console.error('❌ Store settings update error:', error)
+    
+    // Handle specific database errors
+    if (error instanceof Error) {
+      if (error.message.includes('Unique constraint')) {
+        return NextResponse.json(
+          { error: 'A store setting with this configuration already exists' },
+          { status: 400 }
+        )
+      }
+      if (error.message.includes('Foreign key constraint')) {
+        return NextResponse.json(
+          { error: 'Invalid reference in store settings' },
+          { status: 400 }
+        )
+      }
+    }
+
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: 'Failed to update store settings. Please try again.' },
       { status: 500 }
     )
   }
