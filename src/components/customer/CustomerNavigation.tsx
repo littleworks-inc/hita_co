@@ -1,3 +1,5 @@
+// ✅ UPDATED: src/components/customer/CustomerNavigation.tsx - CATALOG/ECOMMERCE TOGGLE SUPPORT
+
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -16,7 +18,7 @@ import {
   Package
 } from 'lucide-react'
 import CurrencySelector from '@/components/customer/CurrencySelector'
-import ThemeToggle from '@/components/ThemeToggle' // ✅ NEW - Theme toggle import
+import ThemeToggle from '@/components/ThemeToggle'
 import { useCart } from '@/contexts/CartContext'
 import { useCurrency } from '@/contexts/CurrencyContext'
 
@@ -35,6 +37,8 @@ interface StoreSettings {
   primaryColor: string
   secondaryColor: string
   accentColor: string
+  disableShoppingCart?: boolean // ✅ NEW - Catalog mode toggle
+  catalogModeSettings?: string  // ✅ NEW - Contact settings
 }
 
 interface CustomerNavigationProps {
@@ -48,9 +52,13 @@ export default function CustomerNavigation({ storeSettings }: CustomerNavigation
   const [showSearch, setShowSearch] = useState(false)
   const [categories, setCategories] = useState<Category[]>([])
 
-  // Cart integration (✅ UNCHANGED - Existing functionality)
+  // Cart integration (✅ PRESERVED - Existing functionality)
   const { totalItems, totalPriceUSD, toggleCart, isClient } = useCart()
   const { formatPrice } = useCurrency()
+
+  // ✅ NEW - Determine business mode
+  const isECommerceMode = !storeSettings?.disableShoppingCart
+  const showCartFeatures = isECommerceMode // Hide cart when in catalog mode
 
   // Fetch categories for navigation (✅ UNCHANGED)
   useEffect(() => {
@@ -190,7 +198,7 @@ export default function CustomerNavigation({ storeSettings }: CustomerNavigation
               {/* Currency Selector (✅ UNCHANGED) */}
               <CurrencySelector className="hidden sm:block" />
 
-              {/* ✅ NEW - Theme Toggle (positioned between currency and wishlist) */}
+              {/* Theme Toggle (✅ UNCHANGED) */}
               <ThemeToggle className="hidden sm:block" />
 
               {/* Wishlist (✅ UNCHANGED) */}
@@ -201,26 +209,28 @@ export default function CustomerNavigation({ storeSettings }: CustomerNavigation
                 </span>
               </button>
 
-              {/* Enhanced Cart Button with live count and price (✅ UNCHANGED - Just added dark mode classes) */}
-              <button 
-                onClick={toggleCart}
-                className="text-gray-700 dark:text-gray-300 hover:text-purple-600 dark:hover:text-purple-400 transition-colors relative group"
-              >
-                <ShoppingBag className="h-6 w-6" />
-                {/* Cart count badge */}
-                {isClient && totalItems > 0 && (
-                  <span className="absolute -top-2 -right-2 bg-purple-600 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center animate-pulse">
-                    {totalItems > 99 ? '99+' : totalItems}
-                  </span>
-                )}
-                
-                {/* Cart preview tooltip */}
-                {isClient && totalItems > 0 && (
-                  <div className="absolute right-0 top-8 invisible group-hover:visible bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 text-xs rounded py-2 px-3 whitespace-nowrap z-50">
-                    {totalItems} item{totalItems !== 1 ? 's' : ''} • {formatPrice(totalPriceUSD)}
-                  </div>
-                )}
-              </button>
+              {/* ✅ CONDITIONAL: Cart Button - Only show in eCommerce mode */}
+              {showCartFeatures && (
+                <button 
+                  onClick={toggleCart}
+                  className="text-gray-700 dark:text-gray-300 hover:text-purple-600 dark:hover:text-purple-400 transition-colors relative group"
+                >
+                  <ShoppingBag className="h-6 w-6" />
+                  {/* Cart count badge */}
+                  {isClient && totalItems > 0 && (
+                    <span className="absolute -top-2 -right-2 bg-purple-600 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center animate-pulse">
+                      {totalItems > 99 ? '99+' : totalItems}
+                    </span>
+                  )}
+                  
+                  {/* Cart preview tooltip */}
+                  {isClient && totalItems > 0 && (
+                    <div className="absolute right-0 top-8 invisible group-hover:visible bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 text-xs rounded py-2 px-3 whitespace-nowrap z-50">
+                      {totalItems} item{totalItems !== 1 ? 's' : ''} • {formatPrice(totalPriceUSD)}
+                    </div>
+                  )}
+                </button>
+              )}
 
               {/* User Account (✅ UNCHANGED) */}
               <button className="text-gray-700 dark:text-gray-300 hover:text-purple-600 dark:hover:text-purple-400 transition-colors">
@@ -238,7 +248,7 @@ export default function CustomerNavigation({ storeSettings }: CustomerNavigation
           </div>
         </div>
 
-        {/* Mobile Menu (✅ ENHANCED with theme support) */}
+        {/* Mobile Menu (✅ ENHANCED with conditional cart features) */}
         {mobileMenuOpen && (
           <div className="md:hidden absolute top-16 left-0 right-0 bg-white dark:bg-gray-900 shadow-lg border-t border-gray-200 dark:border-gray-700 z-40">
             <div className="px-4 py-2 space-y-1">
@@ -277,8 +287,8 @@ export default function CustomerNavigation({ storeSettings }: CustomerNavigation
 
               {/* Mobile Action Items */}
               <div className="pt-4 border-t border-gray-200 dark:border-gray-700 space-y-4">
-                {/* Cart Summary for Mobile */}
-                {isClient && totalItems > 0 && (
+                {/* ✅ CONDITIONAL: Cart Summary for Mobile - Only show in eCommerce mode */}
+                {showCartFeatures && isClient && totalItems > 0 && (
                   <button
                     onClick={() => {
                       toggleCart()
@@ -296,6 +306,16 @@ export default function CustomerNavigation({ storeSettings }: CustomerNavigation
                   </button>
                 )}
 
+                {/* ✅ CONDITIONAL: Business Mode Indicator for Mobile */}
+                {!showCartFeatures && (
+                  <div className="flex items-center justify-center p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg text-orange-600 dark:text-orange-400">
+                    <div className="flex items-center gap-2">
+                      <Package className="h-5 w-5" />
+                      <span className="font-medium">Catalog Mode</span>
+                    </div>
+                  </div>
+                )}
+
                 {/* Mobile Currency & Theme Controls */}
                 <div className="grid grid-cols-2 gap-3">
                   {/* Mobile Currency Selector */}
@@ -306,7 +326,7 @@ export default function CustomerNavigation({ storeSettings }: CustomerNavigation
                     <CurrencySelector showName={true} />
                   </div>
 
-                  {/* ✅ NEW - Mobile Theme Toggle */}
+                  {/* Mobile Theme Toggle */}
                   <div>
                     <label className="block text-sm font-semibold text-gray-900 dark:text-white mb-2">
                       Theme
@@ -319,16 +339,16 @@ export default function CustomerNavigation({ storeSettings }: CustomerNavigation
               {/* Mobile Categories (✅ UNCHANGED with dark mode) */}
               {categories.length > 0 && (
                 <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
-                  <h3 className="px-4 text-sm font-semibold text-gray-900 dark:text-white uppercase tracking-wide">
+                  <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
                     Categories
                   </h3>
-                  <div className="mt-2 space-y-1">
-                    {categories.slice(0, 5).map((category) => (
+                  <div className="space-y-2">
+                    {categories.map((category) => (
                       <Link
                         key={category.id}
                         href={`/categories/${category.slug}`}
                         onClick={() => setMobileMenuOpen(false)}
-                        className="block px-4 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-purple-600 dark:hover:text-purple-400 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg transition-colors"
+                        className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:text-purple-600 dark:hover:text-purple-400 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg transition-colors"
                       >
                         {category.name}
                       </Link>
@@ -340,36 +360,6 @@ export default function CustomerNavigation({ storeSettings }: CustomerNavigation
           </div>
         )}
       </nav>
-
-      {/* Categories Navigation Bar (Desktop) - ✅ ENHANCED with dark mode */}
-      {categories.length > 0 && (
-        <div className="hidden md:block bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 transition-colors duration-300">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex items-center space-x-8 py-3 overflow-x-auto">
-              <span className="text-sm font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap">
-                Shop by Category:
-              </span>
-              {categories.slice(0, 6).map((category) => (
-                <Link
-                  key={category.id}
-                  href={`/categories/${category.slug}`}
-                  className="text-sm text-gray-600 dark:text-gray-400 hover:text-purple-600 dark:hover:text-purple-400 transition-colors whitespace-nowrap"
-                >
-                  {category.name}
-                </Link>
-              ))}
-              {categories.length > 6 && (
-                <Link
-                  href="/categories"
-                  className="text-sm text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 font-medium whitespace-nowrap"
-                >
-                  View All →
-                </Link>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
     </>
   )
 }
