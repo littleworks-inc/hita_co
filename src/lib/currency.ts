@@ -1,4 +1,10 @@
-import { db } from '@/lib/db'
+// src/lib/currency.ts
+// =====================================
+// 🔧 FIXED: Currency System with Proper Database Error Handling
+// Resolves "Cannot read properties of undefined" errors
+// =====================================
+
+import { PrismaClient } from '@prisma/client'
 
 // Supported currencies with their display information
 export const SUPPORTED_CURRENCIES = {
@@ -50,6 +56,18 @@ const FALLBACK_RATES = {
   DKK: 6.4
 }
 
+// 🔧 FIXED: Safe database client getter
+function getDbClient(): PrismaClient | null {
+  try {
+    // Try to get the database client
+    const { db } = require('@/lib/db')
+    return db || null
+  } catch (error) {
+    console.warn('Database client not available:', error)
+    return null
+  }
+}
+
 // Check if a string is a valid currency
 export function isValidCurrency(currency: string): currency is SupportedCurrency {
   return currency in SUPPORTED_CURRENCIES
@@ -82,7 +100,7 @@ export async function getCustomerLocation(request?: Request): Promise<{
 
     // Try to get location from IP geolocation service
     const response = await fetch(`http://ip-api.com/json/${ip}`, {
-      timeout: 3000,
+      signal: AbortSignal.timeout(3000), // 3 second timeout
       next: { revalidate: 3600 } // Cache for 1 hour
     })
 
@@ -144,10 +162,12 @@ export async function fetchExchangeRates(): Promise<Record<string, number>> {
   }
 }
 
-// Get stored exchange rates from database with proper error handling
+// 🔧 FIXED: Get stored exchange rates from database with proper error handling
 export async function getStoredExchangeRates(): Promise<Record<string, number>> {
   try {
-    // Check if db and the model are available
+    const db = getDbClient()
+    
+    // Check if db is available
     if (!db) {
       console.warn('Database client not available')
       return {}
@@ -178,9 +198,11 @@ export async function getStoredExchangeRates(): Promise<Record<string, number>> 
   }
 }
 
-// Update exchange rates in database with proper error handling
+// 🔧 FIXED: Update exchange rates in database with proper error handling
 export async function updateExchangeRates(): Promise<void> {
   try {
+    const db = getDbClient()
+    
     // Check if db is available
     if (!db) {
       console.warn('Database client not available, skipping rate update')
@@ -199,6 +221,12 @@ export async function updateExchangeRates(): Promise<void> {
       if (typeof rate !== 'number' || rate <= 0) continue // Skip invalid rates
 
       try {
+        // 🔧 FIXED: Additional safety check before upsert
+        if (!db.exchangeRate) {
+          console.warn('ExchangeRate model not available')
+          break
+        }
+
         await db.exchangeRate.upsert({
           where: {
             fromCurrency_toCurrency: {
@@ -267,49 +295,21 @@ export function formatPriceWithCurrency(
       style: 'currency',
       currency: currency,
       minimumFractionDigits: currency === 'JPY' ? 0 : 2,
-      maximumFractionDigits: currency === 'JPY' ? 0 : 2,
+      maximumFractionDigits: currency === 'JPY' ? 0 : 2
     })
-
+    
     return formatter.format(price)
   } catch (error) {
-    console.warn('Error formatting currency, using fallback:', error)
-    // Fallback to manual formatting
-    const symbol = currencyInfo.symbol
-    const formattedPrice = currency === 'JPY' 
-      ? Math.round(price).toLocaleString()
-      : price.toFixed(2)
-
-    return `${symbol}${formattedPrice}`
+    console.warn(`Error formatting currency ${currency}:`, error)
+    // Fallback to simple formatting
+    return `${currencyInfo.symbol}${price.toFixed(currency === 'JPY' ? 0 : 2)}`
   }
-}
-
-// Get user's preferred locale based on currency
-export function getLocaleFromCurrency(currency: SupportedCurrency): string {
-  const localeMap: Record<SupportedCurrency, string> = {
-    USD: 'en-US',
-    EUR: 'de-DE',
-    GBP: 'en-GB',
-    CAD: 'en-CA',
-    AUD: 'en-AU',
-    JPY: 'ja-JP',
-    CNY: 'zh-CN',
-    INR: 'en-IN',
-    SGD: 'en-SG',
-    HKD: 'zh-HK',
-    AED: 'ar-AE',
-    CHF: 'de-CH',
-    NOK: 'nb-NO',
-    SEK: 'sv-SE',
-    DKK: 'da-DK'
-  }
-
-  return localeMap[currency] || 'en-US'
 }
 
 // Convert and format price in one function
 export function convertAndFormatPrice(
-  priceUSD: number,
-  targetCurrency: SupportedCurrency,
+  priceUSD: number, 
+  targetCurrency: SupportedCurrency, 
   exchangeRates: Record<string, number>,
   locale?: string
 ): string {
@@ -325,7 +325,7 @@ export function getAvailableCurrencies() {
   }))
 }
 
-// Initialize exchange rates (call this when the app starts)
+// 🔧 FIXED: Initialize exchange rates (call this when the app starts)
 export async function initializeExchangeRates(): Promise<Record<string, number>> {
   try {
     // First try to get stored rates
