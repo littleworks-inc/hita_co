@@ -43,7 +43,7 @@ async function ExhibitionStats() {
     }),
     // 🔥 FIXED: Get total revenue from exhibition sales instead of participation fees
     db.exhibitionSale.aggregate({
-      _sum: { total: true },
+      _sum: { finalTotal: true },
       where: { 
         isCompleted: true,
         exhibition: { isActive: true }
@@ -72,7 +72,7 @@ async function ExhibitionStats() {
     },
     {
       title: 'Total Revenue',
-      value: formatPrice(totalRevenueData._sum.total || 0),
+      value: formatPrice(totalRevenueData._sum.finalTotal || 0),
       icon: DollarSign,
       color: 'orange'
     }
@@ -117,7 +117,7 @@ async function ExhibitionsData() {
       // 🔥 FIXED: Changed from 'orders' to 'sales' to get exhibition POS transactions
       sales: {
         select: {
-          total: true,
+          finalTotal: true,  // ✅ FIXED: Changed from total to finalTotal
           isCompleted: true // 🔥 FIXED: Use isCompleted instead of status
         }
       },

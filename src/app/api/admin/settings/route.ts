@@ -13,13 +13,13 @@ export async function GET(request: NextRequest) {
     }
 
     // Get store settings (create default if doesn't exist)
-    let storeSettings = await db.storeSetting.findFirst({
+    let storeSettings = await db.storeSettings.findFirst({
       where: { id: 'default' }
     })
 
     if (!storeSettings) {
       // Create default settings
-      storeSettings = await db.storeSetting.create({
+      storeSettings = await db.storeSettings.create({
         data: {
           id: 'default',
           storeName: 'Hita&Co',
@@ -173,7 +173,7 @@ export async function PUT(request: NextRequest) {
     console.log('📝 Prepared update data:', updateData)
 
     // Update store settings using upsert to handle both create and update
-    const updatedSettings = await db.storeSetting.upsert({
+    const updatedSettings = await db.storeSettings.upsert({
       where: { id: 'default' },
       create: {
         id: 'default',

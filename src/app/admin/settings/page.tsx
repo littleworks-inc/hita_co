@@ -13,12 +13,12 @@ export default async function StoreSettingsPage() {
   }
 
   // Get store settings (create default if doesn't exist)
-  let storeSettings = await db.storeSetting.findFirst({
+  let storeSettings = await db.storeSettings.findFirst({
     where: { id: 'default' }
   })
 
   if (!storeSettings) {
-    storeSettings = await db.storeSetting.create({
+    storeSettings = await db.storeSettings.create({
       data: {
         id: 'default',
         storeName: 'Hita&Co',
