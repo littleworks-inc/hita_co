@@ -1,3 +1,9 @@
+// src/app/admin/exhibitions/page.tsx
+// =====================================
+// 🔥 FIXED: Admin Exhibition Page - Correct Model Relationships
+// Changed from 'orders' to 'sales' to fix revenue calculations
+// =====================================
+
 import { Suspense } from 'react'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
@@ -22,7 +28,8 @@ async function ExhibitionStats() {
     totalExhibitions,
     upcomingExhibitions,
     activeExhibitions,
-    totalRevenue
+    // 🔥 FIXED: Calculate total revenue from exhibition sales, not participation fees
+    totalRevenueData
   ] = await Promise.all([
     db.exhibition.count(),
     db.exhibition.count({
@@ -34,9 +41,13 @@ async function ExhibitionStats() {
     db.exhibition.count({
       where: { isActive: true }
     }),
-    db.exhibition.aggregate({
-      _sum: { participationFee: true },
-      where: { isActive: true }
+    // 🔥 FIXED: Get total revenue from exhibition sales instead of participation fees
+    db.exhibitionSale.aggregate({
+      _sum: { total: true },
+      where: { 
+        isCompleted: true,
+        exhibition: { isActive: true }
+      }
     })
   ])
 
@@ -60,8 +71,8 @@ async function ExhibitionStats() {
       color: 'purple'
     },
     {
-      title: 'Total Investment',
-      value: formatPrice(totalRevenue._sum.participationFee || 0),
+      title: 'Total Revenue',
+      value: formatPrice(totalRevenueData._sum.total || 0),
       icon: DollarSign,
       color: 'orange'
     }
@@ -103,16 +114,17 @@ async function ExhibitionsData() {
           }
         }
       },
-      orders: {
+      // 🔥 FIXED: Changed from 'orders' to 'sales' to get exhibition POS transactions
+      sales: {
         select: {
           total: true,
-          status: true
+          isCompleted: true // 🔥 FIXED: Use isCompleted instead of status
         }
       },
       _count: {
         select: {
           products: true,
-          orders: true
+          sales: true // 🔥 FIXED: Count sales instead of orders
         }
       }
     },
