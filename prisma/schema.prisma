@@ -1,5 +1,8 @@
-// ✅ Complete prisma/schema.prisma with Exhibition POS System + Flexible Size System
-// Enhanced schema with Shipping System + Return Policy + Exhibition POS + Size Management
+// prisma/schema.prisma
+// =====================================
+// 🚀 COMPLETE: Hita&Co eCommerce Schema with Size System
+// Includes full size support for exhibition management and POS
+// =====================================
 
 generator client {
   provider = "prisma-client-js"
@@ -10,203 +13,186 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// User Management
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  password  String
-  name      String?
-  role      String   @default("admin")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id             String   @id @default(cuid())
+  email          String   @unique
+  hashedPassword String
+  name           String
+  role           UserRole @default(ADMIN)
+  isActive       Boolean  @default(true)
+  lastLoginAt    DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   @@map("users")
 }
 
-model Category {
-  id                    String     @id @default(cuid())
-  name                  String     @unique
-  description           String?
-  slug                  String     @unique
-  parentId              String?
-  
-  // ✅ NEW: Category-specific business defaults
-  defaultProfitMargin   Float?     // Recommended profit margin for this category
-  defaultDiscountMax    Float?     // Maximum discount allowed for this category
-  suggestedTags         String[]   // Common tags for this category
-  averagePrice          Float?     // Average price point for pricing guidance
-  seasonality           String?    // JSON for seasonal data
-  
-  // Size system defaults
-  defaultRequiresSizes  Boolean    @default(false)
-  
-  createdAt             DateTime   @default(now())
-  updatedAt             DateTime   @updatedAt
-  
-  // Relations
-  parent                Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id])
-  children              Category[] @relation("CategoryHierarchy")
-  products              Product[]
-  configurationSettings ConfigurationSetting[]
-  
-  @@map("categories")
+// Store Configuration
+model StoreSettings {
+  id                  String  @id @default(cuid())
+  storeName           String  @default("Hita&Co")
+  tagline             String?
+  description         String?
+  logo                String?
+  favicon             String?
+  primaryColor        String  @default("#1f2937")
+  secondaryColor      String  @default("#f3f4f6")
+  email               String?
+  phone               String?
+  address             String?
+  socialMedia         Json?
+  businessHours       Json?
+  currency            String  @default("USD")
+  timezone            String  @default("America/New_York")
+  taxRate             Float   @default(0)
+  shippingRates       Json?
+  paymentMethods      Json?
+  returnsPolicy       String?
+  privacyPolicy       String?
+  termsOfService      String?
+  metaTitle           String?
+  metaDescription     String?
+  googleAnalyticsId   String?
+  facebookPixelId     String?
+  isMaintenanceMode   Boolean @default(false)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@map("store_settings")
 }
 
+// Exchange Rates
+model ExchangeRate {
+  id           String   @id @default(cuid())
+  fromCurrency String
+  toCurrency   String
+  rate         Float
+  lastUpdated  DateTime @default(now())
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([fromCurrency, toCurrency])
+  @@map("exchange_rates")
+}
+
+// Product Management
 model Country {
-  id                    String    @id @default(cuid())
-  name                  String    @unique
-  code                  String    @unique
-  currency              String
-  currencySymbol        String
-  exchangeRate          Float?
-  isDefault             Boolean   @default(false)
-  
-  // ✅ NEW: Country-specific business defaults
-  defaultGstPercentage  Float?    // Default GST/Tax rate for this country
-  defaultShippingCost   Float?    // Typical shipping cost within country
-  defaultTaxName        String?   // "GST", "VAT", "Sales Tax", etc.
-  businessHours         String?   // JSON string for business hours
-  holidays              String[]  // Array of holiday dates
-  
-  createdAt             DateTime  @default(now())
-  updatedAt             DateTime  @updatedAt
-  
-  // Relations
-  products              Product[]
-  countryZones          CountryShippingZone[]
-  configurationSettings ConfigurationSetting[]
-  
+  id               String    @id @default(cuid())
+  name             String    @unique
+  code             String    @unique // ISO country code
+  currency         String    // Currency code like USD, INR
+  currencySymbol   String    // $ ₹ €
+  exchangeRate     Float?    // Rate to USD
+  isActive         Boolean   @default(true)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  products         Product[]
+
   @@map("countries")
 }
 
 model Supplier {
-  id            String    @id @default(cuid())
-  name          String    @unique
+  id          String    @id @default(cuid())
+  name        String
+  email       String?
+  phone       String?
+  address     String?
   contactPerson String?
-  email         String?
-  phone         String?
-  whatsapp      String?
-  address       String?
-  city          String?
-  state         String?
-  country       String?
-  pincode       String?
-  businessType  String?
-  gstNumber     String?
-  panNumber     String?
-  bankName      String?
-  accountNumber String?
-  ifscCode      String?
-  notes         String?
-  rating        Float?
-  isActive      Boolean   @default(true)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  products      Product[]
+  notes       String?
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  products    Product[]
 
   @@map("suppliers")
 }
 
-enum ProductStatus {
-  DRAFT
-  PUBLISHED
-  ARCHIVED
-}
+model Category {
+  id                   String   @id @default(cuid())
+  name                 String   @unique
+  description          String?
+  slug                 String   @unique
+  image                String?
+  isActive             Boolean  @default(true)
+  sortOrder            Int      @default(0)
+  
+  // ✅ NEW: Size system defaults
+  defaultRequiresSizes Boolean  @default(false)  // Should products in this category require sizes by default?
+  defaultSizeType      String?  // Default size type for this category (CLOTHING, SHOES, etc.)
+  
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  products             Product[]
 
-enum OrderSource {
-  ONLINE
-  EXHIBITION
-  MANUAL
-}
-
-enum PaymentMethod {
-  CASH
-  CARD
-  UPI
-  BANK_TRANSFER
-  OTHER
-}
-
-enum PaymentStatus {
-  PENDING
-  PAID
-  PARTIAL
-  FAILED
-  REFUNDED
-}
-
-enum OrderStatus {
-  PENDING
-  CONFIRMED
-  PROCESSING
-  SHIPPED
-  DELIVERED
-  CANCELLED
-  REFUNDED
-}
-
-// ✅ Exhibition Payment Methods
-enum ExhibitionPaymentMethod {
-  CASH
-  ZELLE
-  CARD
-  VENMO
-  PAYPAL
-  SPLIT_PAYMENT
+  @@map("categories")
 }
 
 model Product {
-  id                      String              @id @default(cuid())
-  sku                     String              @unique
+  id                      String        @id @default(cuid())
   name                    String
   description             String?
   shortDescription        String?
+  sku                     String        @unique
   images                  String[]
-  categoryId              String
-  countryId               String
+  
+  // Pricing & Inventory
   originalPrice           Float
-  originalCurrency        String
-  supplierId              String
-  purchaseDate            DateTime?
-  invoiceNumber           String?
-  quantity                Int                 @default(1)
-  gstPercentage           Float               @default(0)
-  shippingCost            Float               @default(0)
-  conversionCharges       Float               @default(0)
-  additionalExpenses      Float               @default(0)
+  originalCurrency        String        @default("USD")
+  quantity                Int           @default(0)
+  gstPercentage           Float         @default(0)
+  shippingCost            Float         @default(0)
+  conversionCharges       Float         @default(0)
+  additionalExpenses      Float         @default(0)
   costPriceUSD            Float
   piecePriceUSD           Float
-  profitMargin            Float               @default(0)
-  discountPercentage      Float               @default(0)
+  profitMargin            Float         @default(0)
+  discountPercentage      Float         @default(0)
   sellingPriceUSD         Float
-  stockQuantity           Int                 @default(0)
-  lowStockAlert           Int                 @default(5)
-  seoTitle                String?
-  seoDescription          String?
-  tags                    String[]
-  isActive                Boolean             @default(true)
-  isFeatured              Boolean             @default(false)
-  createdAt               DateTime            @default(now())
-  updatedAt               DateTime            @updatedAt
-  barcode                 String?             @unique
-  barcodeType             String?             @default("CODE128")
-  publishedAt             DateTime?
-  status                  ProductStatus       @default(DRAFT)
-  archivedAt              DateTime?
-  showDiscountToCustomers Boolean             @default(false)
-  
-  // ✅ SIMPLIFIED: Size system fields - remove sizeType
-  requiresSizes           Boolean             @default(false)  // Keep this
-  // sizeType             SizeType?                           // ✅ REMOVE THIS LINE
+  stockQuantity           Int           @default(0)
+  lowStockAlert           Int           @default(5)
   
   // Relations
-  exhibitionItems         ExhibitionProduct[]
-  orderItems              OrderItem[]
-  exhibitionSaleItems     ExhibitionSaleItem[]
-  productSizes            ProductSize[]       
-  cartItems               CartItem[]          
+  categoryId              String
+  countryId               String
+  supplierId              String
+  
+  // Product Attributes
+  weight                  Float?
+  dimensions              Json?         // {length, width, height}
+  material                String?
+  careInstructions        String?
+  tags                    String[]
+  isFeatured              Boolean       @default(false)
+  isActive                Boolean       @default(true)
+  
+  // SEO & Marketing
+  slug                    String?       @unique
+  metaTitle               String?
+  metaDescription         String?
+  barcode                 String?       @unique
+  barcodeType             String?       @default("CODE128")
+  publishedAt             DateTime?
+  status                  ProductStatus @default(DRAFT)
+  archivedAt              DateTime?
+  showDiscountToCustomers Boolean       @default(false)
+  
+  // ✅ NEW: Size system fields
+  requiresSizes           Boolean       @default(false)  // Does this product come in different sizes?
+  sizeType                String?       // Type of sizing: CLOTHING, SHOES, JEWELRY, etc.
+  
+  createdAt               DateTime      @default(now())
+  updatedAt               DateTime      @updatedAt
+  
+  // Relations
   category                Category            @relation(fields: [categoryId], references: [id])
   country                 Country             @relation(fields: [countryId], references: [id])
   supplier                Supplier            @relation(fields: [supplierId], references: [id])
+  exhibitionItems         ExhibitionProduct[]
+  orderItems              OrderItem[]
+  exhibitionSaleItems     ExhibitionSaleItem[]
+  productSizes            ProductSize[]       // ✅ NEW: Size variants
+  cartItems               CartItem[]          // ✅ NEW: Cart items
 
   @@map("products")
 }
@@ -252,6 +238,7 @@ model ExhibitionProductSize {
   @@map("exhibition_product_sizes")
 }
 
+// Order Management
 model Order {
   id              String        @id @default(cuid())
   orderNumber     String        @unique
@@ -272,8 +259,12 @@ model Order {
   paymentStatus   PaymentStatus @default(PENDING)
   paymentId       String?
   status          OrderStatus   @default(PENDING)
+  notes           String?
+  trackingNumber  String?
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
+  
+  // Relations
   items           OrderItem[]
   exhibition      Exhibition?   @relation(fields: [exhibitionId], references: [id])
 
@@ -287,8 +278,12 @@ model OrderItem {
   productSizeId  String?      // ✅ NEW: Optional size reference
   sizeLabel      String?      // ✅ NEW: Size display text ("Medium", "Large")
   quantity       Int
-  pricePerItem   Float
+  unitPrice      Float
   totalPrice     Float
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  
+  // Relations
   order          Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
   product        Product      @relation(fields: [productId], references: [id])
   productSize    ProductSize? @relation(fields: [productSizeId], references: [id])
@@ -315,6 +310,7 @@ model CartItem {
   @@map("cart_items")
 }
 
+// Exhibition Management
 model Exhibition {
   id               String              @id @default(cuid())
   title            String
@@ -337,11 +333,11 @@ model Exhibition {
 }
 
 model ExhibitionProduct {
-  id            String     @id @default(cuid())
-  exhibitionId  String
-  productId     String
-  quantityTaken Int
-  quantitySold  Int        @default(0)
+  id                  String     @id @default(cuid())
+  exhibitionId        String
+  productId           String
+  quantityTaken       Int
+  quantitySold        Int        @default(0)
   
   // Exhibition-specific pricing fields
   exhibitionPrice     Float?    // Override price for this exhibition
@@ -355,11 +351,14 @@ model ExhibitionProduct {
   lastSaleDate        DateTime? // When was last item sold
   priceChangedAt      DateTime? // When price was last updated
   
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  
   // Relations
-  exhibition    Exhibition @relation(fields: [exhibitionId], references: [id], onDelete: Cascade)
-  product       Product    @relation(fields: [productId], references: [id])
-  saleItems     ExhibitionSaleItem[]
-  exhibitionSizes ExhibitionProductSize[]  // ✅ NEW: Size tracking
+  exhibition          Exhibition                @relation(fields: [exhibitionId], references: [id], onDelete: Cascade)
+  product             Product                   @relation(fields: [productId], references: [id])
+  saleItems           ExhibitionSaleItem[]
+  exhibitionSizes     ExhibitionProductSize[]   // ✅ NEW: Size tracking
 
   @@unique([exhibitionId, productId])
   @@map("exhibition_products")
@@ -378,22 +377,27 @@ model ExhibitionSale {
   
   // Sale Details
   subtotal              Float
-  tax                   Float                     @default(0)
-  discount              Float                     @default(0)
-  total                 Float
+  customDiscount        Float                     @default(0)  // Staff discount
+  bundleDiscount        Float                     @default(0)  // Negotiation discount
+  finalTotal            Float                     // subtotal - customDiscount - bundleDiscount
   
   // Payment Info
   paymentMethod         ExhibitionPaymentMethod
-  paymentDetails        Json?                     // For split payments, references, etc.
-  cashReceived          Float?                    // For cash transactions
-  changeGiven           Float?                    // For cash transactions
+  cashAmount            Float?                    // For cash/split payments
+  zelleAmount           Float?                    // For zelle/split payments
+  cardAmount            Float?                    // For card/split payments
+  paymentNotes          String?                   // Additional payment info
+  
+  // Negotiation tracking
+  bargainApplied        Boolean                   @default(false)
+  bargainReason         String?                   // Why discount was given
+  salesPersonNotes      String?                   // Staff notes
   
   // Status & Tracking
   isCompleted           Boolean                   @default(false)
   completedAt           DateTime?
   receiptPrinted        Boolean                   @default(false)
   receiptEmailSent      Boolean                   @default(false)
-  staffNotes            String?
   
   createdAt             DateTime                  @default(now())
   updatedAt             DateTime                  @updatedAt
@@ -412,153 +416,82 @@ model ExhibitionSaleItem {
   exhibitionProductId   String
   productId             String
   productSizeId         String?           // ✅ NEW: Size reference
-  sizeLabel             String?           // ✅ NEW: Size display
-  
-  // Pricing (at time of sale)
-  originalPrice         Float             // Product's original price
-  exhibitionPrice       Float             // Exhibition price (if different)
-  discountApplied       Float             @default(0) // Individual item discount
-  finalPrice            Float             // What was actually charged
-  
-  quantity              Int               @default(1)
+  sizeLabel             String?           // ✅ NEW: Size display text
+  productName           String            // Snapshot at time of sale
+  productSku            String            // Snapshot at time of sale
+  categoryName          String            // Snapshot at time of sale
+  originalPrice         Float             // Original price before any discounts
+  exhibitionPrice       Float             // Exhibition price (after store discount)
+  finalPrice            Float             // Final price paid (after all discounts)
+  quantity              Int
   lineTotal             Float             // finalPrice * quantity
-  
-  // Metadata
-  wasScanned            Boolean           @default(false) // Was barcode scanned?
-  scanMethod            String?           // "BARCODE" or "SKU" or "MANUAL"
-  appliedDiscount       Float             @default(0)     // Individual item discount
-  
   createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
   
   // Relations
   sale                  ExhibitionSale    @relation(fields: [saleId], references: [id], onDelete: Cascade)
   exhibitionProduct     ExhibitionProduct @relation(fields: [exhibitionProductId], references: [id])
   product               Product           @relation(fields: [productId], references: [id])
   productSize           ProductSize?      @relation(fields: [productSizeId], references: [id])
-  
+
   @@map("exhibition_sale_items")
 }
 
-model StoreSetting {
-  id                        String        @id @default(cuid())
-  storeName                 String        @default("LittleWorks Inc")
-  tagline                   String?
-  logo                      String?
-  favicon                   String?
-  primaryColor              String        @default("#000000")
-  secondaryColor            String        @default("#ffffff")
-  accentColor               String        @default("#f59e0b")
-  email                     String?
-  phone                     String?
-  address                   Json?
-  instagram                 String?
-  facebook                  String?
-  pinterest                 String?
-  twitter                   String?
-  aiProvider                String?
-  aiApiKey                  String?
-  aiModel                   String?
-  currency                  String        @default("USD")
-  timezone                  String        @default("America/New_York")
-  defaultShippingZoneId     String?
-  
-  // Return Policy Fields (existing)
-  returnsEnabled            Boolean?      @default(true)
-  returnPeriodDays          Int?          @default(30)
-  returnPolicyUrl           String?
-  hasRestockingFee          Boolean?      @default(false)
-  restockingFeePercentage   Float?        @default(0)
-  returnPolicyDescription   String?
-  noReturnsReason           String?
-  
-  // ✅ NEW: Catalog/eCommerce Toggle Fields (just added to database)
-  disableShoppingCart       Boolean?      @default(false)  // false = eCommerce, true = Catalog
-  catalogModeSettings       String?       // JSON string for contact settings
-  
-  createdAt                 DateTime      @default(now())
-  updatedAt                 DateTime      @updatedAt
-  defaultShippingZone       ShippingZone? @relation(fields: [defaultShippingZoneId], references: [id])
-
-  @@map("store_settings")
+// Enums
+enum UserRole {
+  ADMIN
+  STAFF
+  MANAGER
 }
 
-// Shipping Zone Model (groups countries/regions)
-model ShippingZone {
-  id              String         @id @default(cuid())
-  name            String         @unique
-  description     String?
-  isDefault       Boolean        @default(false)
-  isActive        Boolean        @default(true)
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
-  zoneCountries   CountryShippingZone[]
-  shippingRates   ShippingRate[]
-  storeSettings   StoreSetting[]
-
-  @@map("shipping_zones")
+enum ProductStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
 }
 
-model CountryShippingZone {
-  id              String       @id @default(cuid())
-  countryId       String
-  shippingZoneId  String
-  createdAt       DateTime     @default(now())
-  country         Country      @relation(fields: [countryId], references: [id], onDelete: Cascade)
-  shippingZone    ShippingZone @relation(fields: [shippingZoneId], references: [id], onDelete: Cascade)
-
-  @@unique([countryId, shippingZoneId])
-  @@map("country_shipping_zones")
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+  REFUNDED
 }
 
-// Shipping Rate Model (pricing rules per zone)
-model ShippingRate {
-  id                    String       @id @default(cuid())
-  shippingZoneId        String
-  name                  String
-  description           String?
-  flatRate              Float
-  freeShippingThreshold Float?
-  estimatedDays         String?
-  maxWeightKg           Float?
-  isActive              Boolean      @default(true)
-  createdAt             DateTime     @default(now())
-  updatedAt             DateTime     @updatedAt
-  shippingZone          ShippingZone @relation(fields: [shippingZoneId], references: [id], onDelete: Cascade)
-
-  @@map("shipping_rates")
+enum OrderSource {
+  ONLINE
+  EXHIBITION
+  PHONE
+  EMAIL
 }
 
-model ConfigurationSetting {
-  id              String   @id @default(cuid())
-  category        String   // 'PRICING', 'BUSINESS_RULES', 'UI_SETTINGS', etc.
-  key             String   // 'profit_margin', 'low_stock_alert', etc.
-  value           String   // JSON string for complex values, simple string for basic values
-  dataType        String   // 'number', 'string', 'boolean', 'json'
-  description     String?  // Human-readable description
-  countryId       String?  // For country-specific settings
-  categoryId      String?  // For category-specific settings
-  isUserEditable  Boolean  @default(true)  // Can admin modify this?
-  isActive        Boolean  @default(true)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  
-  // ✅ FIXED: Relations use proper field names
-  country         Country?  @relation(fields: [countryId], references: [id])
-  categoryRef     Category? @relation(fields: [categoryId], references: [id])
-  
-  // ✅ FIXED: Unique constraint uses scalar fields only
-  @@unique([category, key, countryId, categoryId])
-  @@map("configuration_settings")
+enum PaymentMethod {
+  CREDIT_CARD
+  DEBIT_CARD
+  PAYPAL
+  STRIPE
+  BANK_TRANSFER
+  CASH_ON_DELIVERY
+  ZELLE
+  VENMO
 }
 
-model ConfigurationTemplate {
-  id          String   @id @default(cuid())
-  name        String   @unique  // 'ETHNIC_FASHION_DEFAULT', 'JEWELRY_TEMPLATE', etc.
-  description String?
-  isActive    Boolean  @default(true)
-  settings    String   // JSON string of configuration values
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
-  @@map("configuration_templates")
+enum PaymentStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  CANCELLED
+  REFUNDED
+}
+
+enum ExhibitionPaymentMethod {
+  CASH
+  ZELLE
+  CARD
+  VENMO
+  PAYPAL
+  SPLIT_PAYMENT
 }
