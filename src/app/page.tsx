@@ -25,7 +25,7 @@ import {
 
 // Get store settings for branding and SEO
 async function getStoreSettings() {
-  return await db.storeSettings.findFirst({
+  return await db.storeSetting.findFirst({
     where: { id: 'default' }
   })
 }

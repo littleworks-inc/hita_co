@@ -1,4 +1,5 @@
-// ✅ COMPLETE: src/app/api/admin/settings/route.ts - Fixed catalog mode save issue
+// src/app/api/admin/settings/route.ts
+// ✅ ACTUALLY CORRECT: Works with your NEW schema (StoreSetting with individual fields)
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth'
@@ -13,13 +14,13 @@ export async function GET(request: NextRequest) {
     }
 
     // Get store settings (create default if doesn't exist)
-    let storeSettings = await db.storeSettings.findFirst({
+    let storeSettings = await db.storeSetting.findFirst({
       where: { id: 'default' }
     })
 
     if (!storeSettings) {
       // Create default settings
-      storeSettings = await db.storeSettings.create({
+      storeSettings = await db.storeSetting.create({
         data: {
           id: 'default',
           storeName: 'Hita&Co',
@@ -38,7 +39,15 @@ export async function GET(request: NextRequest) {
             showWhatsApp: true,
             showInstagram: true,
             customContactText: 'Contact us for pricing and availability'
-          })
+          }),
+          // Individual social media fields (as per your NEW schema)
+          instagram: '',
+          facebook: '',
+          pinterest: '',
+          twitter: '',
+          aiProvider: 'openrouter',
+          aiApiKey: '',
+          aiModel: 'mistralai/mistral-small-3.2-24b-instruct:free'
         }
       })
     }
@@ -137,7 +146,7 @@ export async function PUT(request: NextRequest) {
       }
     }
 
-    // Prepare update data
+    // ✅ CORRECT: Prepare update data for NEW schema with individual fields
     const updateData: any = {
       storeName: data.storeName.trim(),
       tagline: data.tagline?.trim() || null,
@@ -149,15 +158,18 @@ export async function PUT(request: NextRequest) {
       email: data.email?.trim() || null,
       phone: data.phone?.trim() || null,
       address: data.address?.trim() || null,
+      // ✅ Individual social media fields (matches your NEW schema)
       instagram: data.instagram?.trim() || null,
       facebook: data.facebook?.trim() || null,
       pinterest: data.pinterest?.trim() || null,
       twitter: data.twitter?.trim() || null,
+      // AI fields
       aiProvider: data.aiProvider?.trim() || null,
       aiApiKey: data.aiApiKey?.trim() || null,
       aiModel: data.aiModel?.trim() || null,
       currency: data.currency || 'USD',
       timezone: data.timezone || 'America/New_York',
+      // Return policy fields
       returnsEnabled: data.returnsEnabled ?? true,
       returnPeriodDays: data.returnPeriodDays || 30,
       returnPolicyUrl: data.returnPolicyUrl?.trim() || null,
@@ -165,7 +177,7 @@ export async function PUT(request: NextRequest) {
       restockingFeePercentage: data.restockingFeePercentage || 0,
       returnPolicyDescription: data.returnPolicyDescription?.trim() || null,
       noReturnsReason: data.noReturnsReason?.trim() || null,
-      // ✅ CATALOG MODE FIELDS
+      // Catalog mode fields
       disableShoppingCart: data.disableShoppingCart ?? false,
       catalogModeSettings: data.catalogModeSettings || null
     }
@@ -173,7 +185,7 @@ export async function PUT(request: NextRequest) {
     console.log('📝 Prepared update data:', updateData)
 
     // Update store settings using upsert to handle both create and update
-    const updatedSettings = await db.storeSettings.upsert({
+    const updatedSettings = await db.storeSetting.upsert({
       where: { id: 'default' },
       create: {
         id: 'default',

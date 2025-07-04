@@ -104,7 +104,7 @@ async function getAllExhibitionsWithStats() {
       },
       sales: {
         select: {
-          finalTotal: true,  // ✅ FIXED: Use finalTotal instead of total
+          total: true,   // ✅ FIXED: Use finalTotal instead of total
           isCompleted: true
         }
       },

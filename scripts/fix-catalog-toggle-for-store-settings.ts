@@ -57,7 +57,7 @@ fixCatalogToggleForStoreSettings()
   .then(() => {
     console.log('\n🎉 Migration completed successfully!')
     console.log('\n📋 Next steps:')
-    console.log('1. ✅ Update all files to use db.storeSettings (plural)')
+    console.log('1. ✅ Update all files to use db.storeSetting (plural)')
     console.log('2. ✅ Run: npx prisma generate')
     console.log('3. ✅ Run: npx prisma db:push')
     console.log('4. ✅ Restart development server: npm run dev')

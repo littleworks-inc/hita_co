@@ -34,7 +34,7 @@ interface ProductPageProps {
 
 // Get store settings
 async function getStoreSettings() {
-  return await db.storeSettings.findFirst({
+  return await db.storeSetting.findFirst({
     where: { id: 'default' }
   })
 }

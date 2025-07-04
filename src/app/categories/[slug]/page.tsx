@@ -34,7 +34,7 @@ interface CategoryPageProps {
 // Get store settings - Required for catalog mode
 async function getStoreSettings() {
   try {
-    return await db.storeSettings.findFirst({
+    return await db.storeSetting.findFirst({
       where: { id: 'store_1' }
     })
   } catch (error) {

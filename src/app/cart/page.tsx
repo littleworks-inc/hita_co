@@ -5,7 +5,7 @@ import CartPageContent from '@/components/cart/CartPageContent'
 
 // Get store settings for branding
 async function getStoreSettings() {
-  return await db.storeSettings.findFirst({
+  return await db.storeSetting.findFirst({
     where: { id: 'default' }
   })
 }
