@@ -1,10 +1,16 @@
+// src/components/admin/ExhibitionsTable.tsx
+// =====================================
+// 🔥 FIXED: ExhibitionsTable Component - Correct Model Relationships
+// Changed from 'orders' to 'sales' to fix revenue calculations
+// =====================================
+
 'use client'
 
 import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { formatPrice, formatDate } from '@/lib/utils'
-import { Card, CardContent, CardHeader, CardTitle, Button } from '@/components/ui'
+import { Card, CardContent, CardHeader, CardTitle, Button, Badge } from '@/components/ui'
 import {
   Calendar,
   Plus,
@@ -20,6 +26,7 @@ import {
   AlertTriangle
 } from 'lucide-react'
 
+// 🔥 FIXED: Updated interface to use 'sales' instead of 'orders'
 interface Exhibition {
   id: string
   title: string
@@ -41,13 +48,14 @@ interface Exhibition {
       sellingPriceUSD: number
     }
   }>
-  orders: Array<{
+  // 🔥 FIXED: Changed from 'orders' to 'sales' with correct properties
+  sales: Array<{
     total: number
-    status: string
+    isCompleted: boolean // 🔥 FIXED: Use isCompleted instead of status
   }>
   _count: {
     products: number
-    orders: number
+    sales: number // 🔥 FIXED: Count sales instead of orders
   }
 }
 
@@ -95,16 +103,16 @@ export default function ExhibitionsTable({ exhibitions }: ExhibitionsTableProps)
     if (startDate > now) status = 'upcoming'
     else if (endDate >= now) status = 'ongoing'
 
-    // Revenue calculation
-    const revenue = exhibition.orders
-      .filter(order => order.status !== 'CANCELLED')
-      .reduce((sum, order) => sum + order.total, 0)
+    // 🔥 FIXED: Revenue calculation using sales with isCompleted filter
+    const revenue = exhibition.sales
+      .filter(sale => sale.isCompleted) // 🔥 FIXED: Filter by isCompleted instead of status
+      .reduce((sum, sale) => sum + sale.total, 0)
 
     // Products taken vs sold
     const totalProductsTaken = exhibition.products.reduce((sum, p) => sum + p.quantityTaken, 0)
     const totalProductsSold = exhibition.products.reduce((sum, p) => sum + p.quantitySold, 0)
 
-    // Net profit = Revenue - Participation Fee
+    // 🔥 FIXED: Net profit = Revenue - Participation Fee (proper ROI calculation)
     const netProfit = revenue - exhibition.participationFee
 
     return {
@@ -113,49 +121,65 @@ export default function ExhibitionsTable({ exhibitions }: ExhibitionsTableProps)
       netProfit,
       totalProductsTaken,
       totalProductsSold,
-      sellThroughRate: totalProductsTaken > 0 ? (totalProductsSold / totalProductsTaken) * 100 : 0
+      sellThroughRate: totalProductsTaken > 0 ? 
+        Math.round((totalProductsSold / totalProductsTaken) * 100) : 0
     }
   }
 
   const getStatusBadge = (status: 'upcoming' | 'ongoing' | 'completed') => {
-    const styles = {
-      upcoming: 'bg-blue-100 text-blue-800',
-      ongoing: 'bg-green-100 text-green-800',
-      completed: 'bg-gray-100 text-gray-800'
+    switch (status) {
+      case 'upcoming':
+        return (
+          <Badge variant="secondary" className="flex items-center gap-1">
+            <Clock className="h-3 w-3" />
+            Upcoming
+          </Badge>
+        )
+      case 'ongoing':
+        return (
+          <Badge variant="default" className="flex items-center gap-1 bg-green-100 text-green-800">
+            <CheckCircle className="h-3 w-3" />
+            Ongoing
+          </Badge>
+        )
+      case 'completed':
+        return (
+          <Badge variant="outline" className="flex items-center gap-1">
+            <CheckCircle className="h-3 w-3" />
+            Completed
+          </Badge>
+        )
     }
+  }
 
-    const icons = {
-      upcoming: Clock,
-      ongoing: CheckCircle,
-      completed: CheckCircle
+  const getPerformanceIndicator = (sellThroughRate: number, revenue: number, netProfit: number) => {
+    // Performance logic: good if sell-through > 50% OR net profit > 0
+    const isGoodPerformance = sellThroughRate >= 50 || netProfit > 0
+    
+    if (isGoodPerformance) {
+      return (
+        <div className="flex items-center gap-1 text-green-600">
+          <TrendingUp className="h-4 w-4" />
+          <span className="text-sm font-medium">Good</span>
+        </div>
+      )
+    } else {
+      return (
+        <div className="flex items-center gap-1 text-yellow-600">
+          <AlertTriangle className="h-4 w-4" />
+          <span className="text-sm font-medium">Review</span>
+        </div>
+      )
     }
-
-    const Icon = icons[status]
-
-    return (
-      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${styles[status]}`}>
-        <Icon className="mr-1 h-3 w-3" />
-        {status.charAt(0).toUpperCase() + status.slice(1)}
-      </span>
-    )
   }
 
   return (
     <Card>
       <CardHeader>
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <CardTitle className="flex items-center gap-2">
-            <Calendar className="h-5 w-5" />
-            All Exhibitions ({exhibitions.length})
-          </CardTitle>
-          
-          <Link href="/admin/exhibitions/new">
-            <Button className="flex items-center gap-2">
-              <Plus className="h-4 w-4" />
-              Add Exhibition
-            </Button>
-          </Link>
-        </div>
+        <CardTitle className="flex items-center gap-2">
+          <Calendar className="h-5 w-5" />
+          Exhibitions ({exhibitions.length})
+        </CardTitle>
       </CardHeader>
       <CardContent>
         {exhibitions.length === 0 ? (
@@ -189,7 +213,7 @@ export default function ExhibitionsTable({ exhibitions }: ExhibitionsTableProps)
                     Products
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Revenue
+                    Revenue & ROI
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Status
@@ -202,92 +226,73 @@ export default function ExhibitionsTable({ exhibitions }: ExhibitionsTableProps)
               <tbody className="bg-white divide-y divide-gray-200">
                 {exhibitions.map((exhibition) => {
                   const stats = calculateExhibitionStats(exhibition)
-                  
+                  const isDeleting = deletingId === exhibition.id
+
                   return (
                     <tr key={exhibition.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
-                          <div className="flex-shrink-0 w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                            <Calendar className="h-5 w-5 text-blue-600" />
-                          </div>
-                          <div className="ml-4">
+                          <div>
                             <div className="text-sm font-medium text-gray-900">
                               {exhibition.title}
                             </div>
-                            <div className="text-sm text-gray-500">
-                              Fee: {formatPrice(exhibition.participationFee)}
+                            <div className="text-sm text-gray-500 flex items-center gap-1">
+                              <MapPin className="h-3 w-3" />
+                              {exhibition.location}
                             </div>
                           </div>
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm text-gray-900">
-                          <div className="flex items-center gap-1 mb-1">
-                            <MapPin className="h-4 w-4 text-gray-400" />
-                            {exhibition.location}
-                          </div>
-                          <div className="text-xs text-gray-500">
-                            {formatDate(exhibition.startDate)} - {formatDate(exhibition.endDate)}
-                          </div>
+                          {formatDate(exhibition.startDate)} - {formatDate(exhibition.endDate)}
+                        </div>
+                        <div className="text-sm text-gray-500">
+                          Fee: {formatPrice(exhibition.participationFee)}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm text-gray-900">
-                          <div className="flex items-center gap-1">
-                            <Package className="h-4 w-4 text-gray-400" />
-                            {stats.totalProductsTaken} taken
-                          </div>
-                          <div className="text-xs text-gray-500">
-                            {stats.totalProductsSold} sold ({stats.sellThroughRate.toFixed(1)}%)
-                          </div>
+                          {stats.totalProductsTaken} taken • {stats.totalProductsSold} sold
+                        </div>
+                        <div className="text-sm text-gray-500">
+                          {stats.sellThroughRate}% sell-through
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">
-                          <div className="font-medium">
-                            {formatPrice(stats.revenue)}
-                          </div>
-                          <div className={`text-xs ${stats.netProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                            Net: {formatPrice(stats.netProfit)}
-                          </div>
+                        <div className="text-sm font-medium text-gray-900">
+                          Revenue: {formatPrice(stats.revenue)}
+                        </div>
+                        <div className={`text-sm ${stats.netProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          Net Profit: {formatPrice(stats.netProfit)}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        {getStatusBadge(stats.status)}
-                        {!exhibition.isActive && (
-                          <div className="mt-1">
-                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                              Inactive
-                            </span>
-                          </div>
-                        )}
+                        <div className="flex flex-col gap-2">
+                          {getStatusBadge(stats.status)}
+                          {getPerformanceIndicator(stats.sellThroughRate, stats.revenue, stats.netProfit)}
+                        </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                         <div className="flex items-center justify-end gap-2">
                           <Link href={`/admin/exhibitions/${exhibition.id}`}>
-                            <Button variant="ghost" size="sm" title="View Exhibition">
+                            <Button variant="outline" size="sm">
                               <Eye className="h-4 w-4" />
                             </Button>
                           </Link>
                           <Link href={`/admin/exhibitions/${exhibition.id}/edit`}>
-                            <Button variant="ghost" size="sm" title="Edit Exhibition">
+                            <Button variant="outline" size="sm">
                               <Edit className="h-4 w-4" />
                             </Button>
                           </Link>
-                          <Link href={`/admin/exhibitions/${exhibition.id}/products`}>
-                            <Button variant="ghost" size="sm" title="Manage Products">
-                              <Package className="h-4 w-4" />
-                            </Button>
-                          </Link>
-                          <Button 
-                            variant="ghost" 
+                          <Button
+                            variant="outline"
                             size="sm"
-                            className="text-red-600 hover:text-red-700"
                             onClick={() => handleDelete(exhibition.id, exhibition.title)}
-                            disabled={deletingId === exhibition.id}
-                            title="Delete Exhibition"
+                            disabled={isDeleting}
+                            className="text-red-600 hover:text-red-700"
                           >
-                            {deletingId === exhibition.id ? (
+                            {isDeleting ? (
                               <div className="h-4 w-4 animate-spin rounded-full border-2 border-red-600 border-t-transparent" />
                             ) : (
                               <Trash2 className="h-4 w-4" />
@@ -312,7 +317,7 @@ export default function ExhibitionsTable({ exhibitions }: ExhibitionsTableProps)
                 <h4 className="text-sm font-medium text-gray-700">Exhibition Performance Tips</h4>
                 <ul className="mt-1 text-sm text-gray-600 space-y-1">
                   <li>• Track sell-through rates to optimize product selection</li>
-                  <li>• Monitor net profit to ensure profitable participation</li>
+                  <li>• Monitor net profit (Revenue - Participation Fee) to ensure profitable participation</li>
                   <li>• Use past performance data to plan future exhibitions</li>
                   <li>• Add products to exhibitions to track inventory and sales</li>
                 </ul>
