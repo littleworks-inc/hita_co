@@ -32,7 +32,7 @@ interface ProductsPageProps {
 
 // ✅ GET STORE SETTINGS - Required for catalog mode
 async function getStoreSettings() {
-  return await db.storeSettings.findFirst({
+  return await db.storeSetting.findFirst({
     where: { id: 'default' }
   })
 }
