@@ -6,7 +6,7 @@ import CheckoutContent from '@/components/checkout/CheckoutContent'
 
 // Get store settings for branding
 async function getStoreSettings() {
-  return await db.storeSetting.findFirst({
+  return await db.storeSettings.findFirst({
     where: { id: 'default' }
   })
 }
