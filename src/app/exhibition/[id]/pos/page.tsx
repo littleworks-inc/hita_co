@@ -1,7 +1,7 @@
 // src/app/exhibition/[id]/pos/page.tsx
 // =====================================
-// Exhibition POS Interface - Mobile Sales Processing
-// Handles product selection, pricing, discounts, and payment processing
+// 🚀 TASK 3 ENHANCED: Exhibition POS Interface - Mobile Sales Processing
+// NEW FEATURES: Quick discount buttons, improved negotiation, enhanced mobile UX
 // =====================================
 
 'use client'
@@ -34,7 +34,9 @@ import {
   Calculator,
   Receipt,
   ArrowLeft,
-  X
+  X,
+  Zap,
+  TrendingDown
 } from 'lucide-react'
 
 // Types based on database schema
@@ -121,6 +123,10 @@ export default function ExhibitionPOS({ params }: POSProps) {
   const [processingPayment, setProcessingPayment] = useState(false)
   const [showBarcodeScanner, setShowBarcodeScanner] = useState(false)
 
+  // 🚀 NEW: Task 3 Enhancement States
+  const [activeDiscountMode, setActiveDiscountMode] = useState<'percentage' | 'custom' | 'manual'>('percentage')
+  const [showDiscountSuccess, setShowDiscountSuccess] = useState(false)
+
   // Load exhibition and products
   useEffect(() => {
     async function loadData() {
@@ -142,22 +148,49 @@ export default function ExhibitionPOS({ params }: POSProps) {
     loadData()
   }, [params.id])
 
-  // Calculate pricing for each product
+  // 🚀 NEW: Quick Discount Application with Visual Feedback
+  const applyQuickDiscount = (percentage: number) => {
+    const discountAmount = cartTotals.subtotal * (percentage / 100)
+    setBundleDiscount(discountAmount)
+    setCustomDiscount(0) // Clear manual discount
+    setBargainReason(`${percentage}% Quick Discount`)
+    setActiveDiscountMode('percentage')
+    
+    // Show success feedback
+    setShowDiscountSuccess(true)
+    setTimeout(() => setShowDiscountSuccess(false), 2000)
+  }
+
+  // 🚀 NEW: Custom Total Handler - "Customer wants $X"
+  const handleCustomerTotal = (customerWants: number) => {
+    if (customerWants > 0 && customerWants < cartTotals.subtotal) {
+      const discountAmount = cartTotals.subtotal - customerWants
+      setBundleDiscount(discountAmount)
+      setCustomDiscount(0)
+      setBargainReason(`Customer negotiated to ${formatPrice(customerWants, 'USD')}`)
+      setActiveDiscountMode('custom')
+    }
+  }
+
+  // 🚀 NEW: Clear All Discounts
+  const clearAllDiscounts = () => {
+    setBundleDiscount(0)
+    setCustomDiscount(0)
+    setBargainReason('')
+    setActiveDiscountMode('manual')
+  }
+
+  // Calculate pricing for each product (existing logic preserved)
   const calculateProductPricing = (exhibitionProduct: ExhibitionProduct) => {
     const product = exhibitionProduct.product
     
-    // Original store price (before any discounts)
     const originalStorePrice = product.discountPercentage > 0 
       ? product.sellingPriceUSD / (1 - product.discountPercentage / 100)
       : product.sellingPriceUSD
     
-    // Current store price (with store discount applied)
     const currentStorePrice = product.sellingPriceUSD
-    
-    // Exhibition price (custom or defaults to store price)
     const exhibitionPrice = exhibitionProduct.exhibitionPrice || currentStorePrice
     
-    // Final price after exhibition clearance discount
     const finalPrice = exhibitionProduct.isClearance && exhibitionProduct.discountPercentage
       ? exhibitionPrice * (1 - exhibitionProduct.discountPercentage / 100)
       : exhibitionPrice
@@ -166,61 +199,31 @@ export default function ExhibitionPOS({ params }: POSProps) {
       originalPrice: originalStorePrice,
       exhibitionPrice,
       finalPrice,
-      hasStoreDiscount: (product.discountPercentage || 0) > 0,
-      hasExhibitionPrice: exhibitionProduct.exhibitionPrice && exhibitionProduct.exhibitionPrice !== currentStorePrice,
-      hasExhibitionDiscount: exhibitionProduct.isClearance && (exhibitionProduct.discountPercentage || 0) > 0,
+      hasStoreDiscount: product.discountPercentage > 0,
+      hasExhibitionPrice: !!exhibitionProduct.exhibitionPrice,
+      hasExhibitionDiscount: exhibitionProduct.isClearance && exhibitionProduct.discountPercentage > 0,
       storeDiscountPercent: product.discountPercentage || 0,
       exhibitionDiscountPercent: exhibitionProduct.discountPercentage || 0
     }
   }
 
-  // Filter products for search
-  const filteredProducts = useMemo(() => {
-    return products.filter(ep => {
-      const product = ep.product
-      const availableStock = ep.quantityTaken - ep.quantitySold
-      
-      // Only show products with available stock
-      if (availableStock <= 0) return false
-      
-      // Search filter
-      const matchesSearch = !searchQuery || 
-        product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        product.sku.toLowerCase().includes(searchQuery.toLowerCase())
-      
-      // Category filter
-      const matchesCategory = !selectedCategory || product.category.name === selectedCategory
-      
-      return matchesSearch && matchesCategory
-    })
-  }, [products, searchQuery, selectedCategory])
-
-  // Get unique categories
-  const categories = useMemo(() => {
-    const cats = [...new Set(products.map(ep => ep.product.category.name))]
-    return cats.sort()
-  }, [products])
-
-  // Add product to cart
+  // Add to cart (existing logic preserved)
   const addToCart = (exhibitionProduct: ExhibitionProduct, quantity: number = 1) => {
     const pricing = calculateProductPricing(exhibitionProduct)
     const availableStock = exhibitionProduct.quantityTaken - exhibitionProduct.quantitySold
     
-    // Check if already in cart
     const existingItem = cart.find(item => item.exhibitionProductId === exhibitionProduct.id)
     
     if (existingItem) {
-      // Update quantity if there's stock
       const newQuantity = existingItem.quantity + quantity
       if (newQuantity <= availableStock) {
         setCart(cart.map(item => 
-          item.exhibitionProductId === exhibitionProduct.id
+          item.exhibitionProductId === exhibitionProduct.id 
             ? { ...item, quantity: newQuantity }
             : item
         ))
       }
     } else {
-      // Add new item
       if (quantity <= availableStock) {
         const cartItem: CartItem = {
           exhibitionProductId: exhibitionProduct.id,
@@ -275,14 +278,13 @@ export default function ExhibitionPOS({ params }: POSProps) {
     return { subtotal, totalDiscount, finalTotal }
   }, [cart, customDiscount, bundleDiscount])
 
-  // Process sale
+  // Process sale (existing logic preserved)
   const processSale = async () => {
     if (cart.length === 0) {
       setError('Cart is empty')
       return
     }
 
-    // Validate split payment if selected
     if (paymentMethod === 'SPLIT_PAYMENT') {
       const totalPaid = cashAmount + zelleAmount + cardAmount
       if (Math.abs(totalPaid - cartTotals.finalTotal) > 0.01) {
@@ -305,7 +307,8 @@ export default function ExhibitionPOS({ params }: POSProps) {
         bundleDiscount,
         finalTotal: cartTotals.finalTotal,
         paymentMethod,
-        cashAmount: paymentMethod === 'CASH' || paymentMethod === 'SPLIT_PAYMENT' ? cashAmount || cartTotals.finalTotal : null,
+        cashAmount: paymentMethod === 'CASH' || paymentMethod === 'SPLIT_PAYMENT' ? 
+          (paymentMethod === 'CASH' ? cartTotals.finalTotal : cashAmount) : null,
         zelleAmount: paymentMethod === 'ZELLE' || paymentMethod === 'SPLIT_PAYMENT' ? zelleAmount : null,
         cardAmount: paymentMethod === 'CARD' || paymentMethod === 'SPLIT_PAYMENT' ? cardAmount : null,
         bargainApplied: customDiscount > 0 || bundleDiscount > 0,
@@ -363,6 +366,23 @@ export default function ExhibitionPOS({ params }: POSProps) {
     }
   }
 
+  // Filter products for display
+  const filteredProducts = products.filter(product => {
+    const matchesSearch = searchQuery === '' || 
+      product.product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      product.product.sku.toLowerCase().includes(searchQuery.toLowerCase())
+    
+    const matchesCategory = selectedCategory === '' || 
+      product.product.category.name === selectedCategory
+    
+    const hasStock = (product.quantityTaken - product.quantitySold) > 0
+    
+    return matchesSearch && matchesCategory && hasStock
+  })
+
+  // Get unique categories
+  const categories = [...new Set(products.map(p => p.product.category.name))].sort()
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -391,592 +411,665 @@ export default function ExhibitionPOS({ params }: POSProps) {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 pb-20">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-4 py-3 sticky top-0 z-40">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Button 
-              variant="ghost" 
-              size="sm"
-              onClick={() => router.push(`/exhibition`)}
-            >
-              <ArrowLeft className="w-4 h-4" />
-            </Button>
-            <div>
-              <h1 className="text-lg font-semibold text-gray-900">Point of Sale</h1>
-              <p className="text-sm text-gray-600">{exhibition.title}</p>
+      <div className="bg-white shadow-sm border-b sticky top-0 z-10">
+        <div className="max-w-7xl mx-auto px-4 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => router.back()}
+              >
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Back
+              </Button>
+              <div>
+                <h1 className="text-xl font-bold text-gray-900">POS System</h1>
+                <p className="text-sm text-gray-600">{exhibition.title}</p>
+              </div>
             </div>
-          </div>
-          
-          <div className="flex items-center gap-2">
-            <Badge variant="outline" className="text-xs">
-              {cart.length} items
-            </Badge>
-            <Badge variant="default" className="text-xs bg-green-100 text-green-800">
-              {formatPrice(cartTotals.finalTotal, 'USD')}
-            </Badge>
+            
+            {/* Cart Items Count */}
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <ShoppingCart className="w-5 h-5 text-blue-600" />
+                <span className="font-semibold text-blue-600">
+                  {cart.reduce((sum, item) => sum + item.quantity, 0)} items
+                </span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Error Alert */}
-      {error && (
-        <div className="p-4">
-          <Alert variant="destructive">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
+      {/* Success Animation */}
+      {showDiscountSuccess && (
+        <div className="fixed top-20 left-1/2 transform -translate-x-1/2 z-50 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg animate-bounce">
+          <div className="flex items-center gap-2">
+            <CheckCircle className="w-5 h-5" />
+            <span>Discount Applied!</span>
+          </div>
         </div>
       )}
 
-      <div className="grid lg:grid-cols-2 gap-6 p-4">
-        {/* Left Column - Product Selection */}
-        <div className="space-y-4">
-          {/* Search and Filters */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Search className="w-5 h-5" />
-                Product Search
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {/* Search Input */}
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                <Input
-                  placeholder="Search products by name or SKU..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-              
-              {/* Category Filter */}
-              <div className="flex gap-2 flex-wrap">
-                <Button
-                  variant={selectedCategory === '' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setSelectedCategory('')}
-                >
-                  All Categories
-                </Button>
-                {categories.map(category => (
-                  <Button
-                    key={category}
-                    variant={selectedCategory === category ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => setSelectedCategory(category)}
-                  >
-                    {category}
-                  </Button>
-                ))}
-              </div>
+      <div className="max-w-7xl mx-auto px-4 py-6">
+        <div className="grid lg:grid-cols-3 gap-6">
+          {/* Left Column - Product Selection */}
+          <div className="lg:col-span-2 space-y-6">
+            {/* Search and Filters */}
+            <Card>
+              <CardContent className="p-4">
+                <div className="space-y-4">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                    <Input
+                      placeholder="Search products by name or SKU..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-10 h-12"
+                    />
+                  </div>
+                  
+                  <div className="flex gap-2 overflow-x-auto pb-2">
+                    <Button
+                      variant={selectedCategory === '' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setSelectedCategory('')}
+                    >
+                      All Categories
+                    </Button>
+                    {categories.map(category => (
+                      <Button
+                        key={category}
+                        variant={selectedCategory === category ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => setSelectedCategory(category)}
+                        className="whitespace-nowrap"
+                      >
+                        {category}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
 
-              {/* Barcode Scanner Button */}
-              <Button
-                variant="outline"
-                className="w-full"
-                onClick={() => setShowBarcodeScanner(true)}
-              >
-                <Scan className="w-4 h-4 mr-2" />
-                Scan Barcode
-              </Button>
-            </CardContent>
-          </Card>
-
-          {/* Product Grid */}
-          <div className="grid gap-3 md:grid-cols-2">
-            {filteredProducts.map(exhibitionProduct => {
-              const pricing = calculateProductPricing(exhibitionProduct)
-              const availableStock = exhibitionProduct.quantityTaken - exhibitionProduct.quantitySold
-              const product = exhibitionProduct.product
-              
-              return (
-                <Card key={exhibitionProduct.id} className="hover:shadow-md transition-shadow">
-                  <CardContent className="p-4">
-                    {/* Product Image */}
-                    <div className="w-full h-32 bg-gray-100 rounded-lg mb-3 flex items-center justify-center">
-                      {product.images?.[0] ? (
-                        <img 
-                          src={product.images[0]} 
-                          alt={product.name}
-                          className="w-full h-full object-cover rounded-lg"
-                        />
-                      ) : (
-                        <Package className="w-8 h-8 text-gray-400" />
-                      )}
-                    </div>
-
-                    {/* Product Info */}
-                    <div className="space-y-2">
-                      <h3 className="font-medium text-sm text-gray-900 line-clamp-2">
-                        {product.name}
-                      </h3>
-                      
-                      <div className="flex items-center justify-between text-xs text-gray-500">
-                        <span>SKU: {product.sku}</span>
-                        <span>{availableStock} available</span>
-                      </div>
-
-                      {/* Price Display */}
-                      <div className="space-y-1">
-                        {pricing.hasStoreDiscount && (
-                          <div className="text-xs text-gray-500">
-                            <span className="line-through">
-                              {formatPrice(pricing.originalPrice, 'USD')}
-                            </span>
-                            <Badge variant="secondary" className="ml-1 text-xs">
-                              -{pricing.storeDiscountPercent}%
-                            </Badge>
+            {/* Products Grid */}
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filteredProducts.map((exhibitionProduct) => {
+                const pricing = calculateProductPricing(exhibitionProduct)
+                const availableStock = exhibitionProduct.quantityTaken - exhibitionProduct.quantitySold
+                const cartItem = cart.find(item => item.exhibitionProductId === exhibitionProduct.id)
+                
+                return (
+                  <Card key={exhibitionProduct.id} className="hover:shadow-md transition-shadow">
+                    <CardContent className="p-4">
+                      <div className="space-y-3">
+                        {/* Product Image */}
+                        {exhibitionProduct.product.images.length > 0 && (
+                          <div className="aspect-square bg-gray-100 rounded-lg overflow-hidden">
+                            <img
+                              src={exhibitionProduct.product.images[0]}
+                              alt={exhibitionProduct.product.name}
+                              className="w-full h-full object-cover"
+                            />
                           </div>
                         )}
                         
-                        <div className="flex items-center justify-between">
-                          <div>
+                        {/* Product Info */}
+                        <div>
+                          <h3 className="font-semibold text-gray-900 line-clamp-2">
+                            {exhibitionProduct.product.name}
+                          </h3>
+                          <p className="text-sm text-gray-500">
+                            SKU: {exhibitionProduct.product.sku}
+                          </p>
+                          <p className="text-sm text-gray-500">
+                            {exhibitionProduct.product.category.name}
+                          </p>
+                        </div>
+                        
+                        {/* Pricing */}
+                        <div className="space-y-1">
+                          <div className="flex items-center justify-between">
                             <span className="text-lg font-bold text-gray-900">
                               {formatPrice(pricing.finalPrice, 'USD')}
                             </span>
-                            {pricing.hasExhibitionDiscount && (
-                              <Badge variant="destructive" className="ml-1 text-xs">
-                                Clearance
+                            {pricing.hasStoreDiscount && (
+                              <Badge variant="secondary" className="text-xs">
+                                {pricing.storeDiscountPercent}% OFF
                               </Badge>
                             )}
                           </div>
                           
-                          <Button
-                            size="sm"
-                            onClick={() => addToCart(exhibitionProduct)}
-                            disabled={availableStock <= 0}
-                            className="px-3"
-                          >
-                            <Plus className="w-3 h-3 mr-1" />
-                            Add
-                          </Button>
+                          {pricing.originalPrice !== pricing.finalPrice && (
+                            <p className="text-sm text-gray-500 line-through">
+                              {formatPrice(pricing.originalPrice, 'USD')}
+                            </p>
+                          )}
                         </div>
+                        
+                        {/* Stock Info */}
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-gray-600">
+                            Stock: {availableStock}
+                          </span>
+                          {exhibitionProduct.isClearance && (
+                            <Badge variant="destructive" className="text-xs">
+                              CLEARANCE
+                            </Badge>
+                          )}
+                        </div>
+                        
+                        {/* Add to Cart */}
+                        {cartItem ? (
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => updateCartQuantity(exhibitionProduct.id, cartItem.quantity - 1)}
+                            >
+                              <Minus className="w-3 h-3" />
+                            </Button>
+                            <span className="flex-1 text-center font-medium">
+                              {cartItem.quantity}
+                            </span>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => updateCartQuantity(exhibitionProduct.id, cartItem.quantity + 1)}
+                              disabled={cartItem.quantity >= availableStock}
+                            >
+                              <Plus className="w-3 h-3" />
+                            </Button>
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => removeFromCart(exhibitionProduct.id)}
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </Button>
+                          </div>
+                        ) : (
+                          <Button
+                            onClick={() => addToCart(exhibitionProduct)}
+                            disabled={availableStock === 0}
+                            className="w-full h-10"
+                          >
+                            <Plus className="w-4 h-4 mr-2" />
+                            Add to Cart
+                          </Button>
+                        )}
                       </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              )
-            })}
+                    </CardContent>
+                  </Card>
+                )
+              })}
+            </div>
+            
+            {filteredProducts.length === 0 && (
+              <div className="text-center py-12">
+                <Search className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">No products found</h3>
+                <p className="text-gray-600">
+                  Try adjusting your search or filter criteria
+                </p>
+              </div>
+            )}
           </div>
 
-          {filteredProducts.length === 0 && (
-            <div className="text-center py-8">
-              <Package className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-              <h3 className="text-lg font-medium text-gray-900 mb-1">No Products Found</h3>
-              <p className="text-gray-500">
-                {searchQuery || selectedCategory 
-                  ? 'Try adjusting your search or filters'
-                  : 'No products available for sale'
-                }
-              </p>
-            </div>
-          )}
-        </div>
-
-        {/* Right Column - Cart and Checkout */}
-        <div className="space-y-4">
-          {/* Shopping Cart */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center justify-between">
-                <span className="flex items-center gap-2">
-                  <ShoppingCart className="w-5 h-5" />
-                  Shopping Cart
-                </span>
-                {cart.length > 0 && (
-                  <Button 
-                    variant="ghost" 
-                    size="sm"
-                    onClick={() => setCart([])}
-                  >
-                    Clear All
-                  </Button>
-                )}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {cart.length === 0 ? (
-                <div className="text-center py-8">
-                  <ShoppingCart className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-                  <p className="text-gray-500">Cart is empty</p>
-                  <p className="text-sm text-gray-400">Add products to start a sale</p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {cart.map(item => (
-                    <div key={item.exhibitionProductId} className="flex items-center gap-3 p-3 border rounded-lg">
-                      <div className="flex-1 min-w-0">
-                        <h4 className="font-medium text-sm text-gray-900 truncate">
-                          {item.productName}
-                        </h4>
-                        <p className="text-xs text-gray-500">SKU: {item.productSku}</p>
-                        
-                        {/* Price breakdown */}
-                        <div className="flex items-center gap-2 mt-1">
-                          <span className="text-sm font-medium">
-                            {formatPrice(item.finalPrice, 'USD')}
-                          </span>
-                          {item.priceBreakdown.hasStoreDiscount && (
-                            <Badge variant="secondary" className="text-xs">
-                              Store -{item.priceBreakdown.storeDiscountPercent}%
-                            </Badge>
-                          )}
-                          {item.priceBreakdown.hasExhibitionDiscount && (
-                            <Badge variant="destructive" className="text-xs">
-                              Clearance
-                            </Badge>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Quantity Controls */}
-                      <div className="flex items-center gap-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => updateCartQuantity(item.exhibitionProductId, item.quantity - 1)}
-                        >
-                          <Minus className="w-3 h-3" />
-                        </Button>
-                        <span className="w-8 text-center text-sm font-medium">
-                          {item.quantity}
-                        </span>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => updateCartQuantity(item.exhibitionProductId, item.quantity + 1)}
-                          disabled={item.quantity >= item.availableStock}
-                        >
-                          <Plus className="w-3 h-3" />
-                        </Button>
-                      </div>
-
-                      {/* Line Total */}
-                      <div className="text-right">
-                        <p className="text-sm font-medium">
-                          {formatPrice(item.finalPrice * item.quantity, 'USD')}
-                        </p>
-                      </div>
-
-                      {/* Remove Button */}
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => removeFromCart(item.exhibitionProductId)}
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Cart Totals and Discounts */}
-          {cart.length > 0 && (
+          {/* Right Column - Cart and Checkout */}
+          <div className="space-y-6">
+            {/* 🚀 ENHANCED ORDER SUMMARY - Task 3 Implementation */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Calculator className="w-5 h-5" />
+                  <ShoppingCart className="w-5 h-5" />
                   Order Summary
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                {/* Subtotal */}
-                <div className="flex justify-between">
-                  <span>Subtotal:</span>
-                  <span>{formatPrice(cartTotals.subtotal, 'USD')}</span>
-                </div>
-
-                {/* Custom Discount */}
-                <div className="space-y-2">
-                  <Label htmlFor="customDiscount">Custom Discount ($)</Label>
-                  <Input
-                    id="customDiscount"
-                    type="number"
-                    step="0.01"
-                    value={customDiscount}
-                    onChange={(e) => setCustomDiscount(parseFloat(e.target.value) || 0)}
-                    placeholder="0.00"
-                  />
-                </div>
-
-                {/* Bundle Discount */}
-                <div className="space-y-2">
-                  <Label htmlFor="bundleDiscount">Bundle/Negotiation Discount ($)</Label>
-                  <Input
-                    id="bundleDiscount"
-                    type="number"
-                    step="0.01"
-                    value={bundleDiscount}
-                    onChange={(e) => setBundleDiscount(parseFloat(e.target.value) || 0)}
-                    placeholder="0.00"
-                  />
-                </div>
-
-                {/* Bargain Reason */}
-                {(customDiscount > 0 || bundleDiscount > 0) && (
-                  <div className="space-y-2">
-                    <Label htmlFor="bargainReason">Discount Reason</Label>
-                    <Input
-                      id="bargainReason"
-                      value={bargainReason}
-                      onChange={(e) => setBargainReason(e.target.value)}
-                      placeholder="Why was discount given?"
-                    />
+                {/* Cart Items */}
+                {cart.length > 0 && (
+                  <div className="space-y-3 max-h-48 overflow-y-auto">
+                    {cart.map((item) => (
+                      <div key={item.exhibitionProductId} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-gray-900 line-clamp-1">
+                            {item.productName}
+                          </p>
+                          <p className="text-sm text-gray-500">
+                            {item.quantity} × {formatPrice(item.finalPrice, 'USD')}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-medium">
+                            {formatPrice(item.finalPrice * item.quantity, 'USD')}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 )}
 
-                {/* Total Discount */}
-                {cartTotals.totalDiscount > 0 && (
-                  <div className="flex justify-between text-red-600">
-                    <span>Total Discount:</span>
-                    <span>-{formatPrice(cartTotals.totalDiscount, 'USD')}</span>
+                {cart.length === 0 && (
+                  <div className="text-center py-8">
+                    <ShoppingCart className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                    <p className="text-gray-500">Cart is empty</p>
+                    <p className="text-sm text-gray-400">Add products to start a sale</p>
                   </div>
                 )}
 
-                {/* Final Total */}
-                <div className="flex justify-between text-lg font-bold border-t pt-2">
-                  <span>Total:</span>
-                  <span>{formatPrice(cartTotals.finalTotal, 'USD')}</span>
-                </div>
-
-                {/* Customer Information Button */}
-                <Button
-                  variant="outline"
-                  className="w-full"
-                  onClick={() => setShowCustomerForm(!showCustomerForm)}
-                >
-                  <Users className="w-4 h-4 mr-2" />
-                  {showCustomerForm ? 'Hide' : 'Add'} Customer Info
-                </Button>
-
-                {/* Customer Form */}
-                {showCustomerForm && (
-                  <div className="space-y-3 p-3 border rounded-lg bg-gray-50">
-                    <div className="space-y-2">
-                      <Label htmlFor="customerName">Customer Name</Label>
-                      <Input
-                        id="customerName"
-                        value={customerName}
-                        onChange={(e) => setCustomerName(e.target.value)}
-                        placeholder="Enter customer name"
-                      />
+                {cart.length > 0 && (
+                  <>
+                    {/* Subtotal */}
+                    <div className="flex justify-between border-t pt-3">
+                      <span>Subtotal:</span>
+                      <span className="font-medium">{formatPrice(cartTotals.subtotal, 'USD')}</span>
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="customerPhone">Phone Number</Label>
-                      <Input
-                        id="customerPhone"
-                        value={customerPhone}
-                        onChange={(e) => setCustomerPhone(e.target.value)}
-                        placeholder="Enter phone number"
-                      />
+
+                    {/* 🚀 NEW: Quick Discount Buttons */}
+                    <div className="space-y-3">
+                      <Label className="text-sm font-medium flex items-center gap-2">
+                        <Zap className="w-4 h-4 text-yellow-500" />
+                        Quick Discounts
+                      </Label>
+                      <div className="grid grid-cols-3 gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-14 text-xs font-bold bg-blue-50 border-blue-200 hover:bg-blue-100 flex-col"
+                          onClick={() => applyQuickDiscount(5)}
+                        >
+                          <div className="flex items-center gap-1">
+                            <Percent className="h-3 w-3" />
+                            5% OFF
+                          </div>
+                          <span className="text-xs text-gray-500 mt-1">
+                            {formatPrice(cartTotals.subtotal * 0.05, 'USD')}
+                          </span>
+                        </Button>
+                        
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-14 text-xs font-bold bg-green-50 border-green-200 hover:bg-green-100 flex-col"
+                          onClick={() => applyQuickDiscount(10)}
+                        >
+                          <div className="flex items-center gap-1">
+                            <Percent className="h-3 w-3" />
+                            10% OFF
+                          </div>
+                          <span className="text-xs text-gray-500 mt-1">
+                            {formatPrice(cartTotals.subtotal * 0.10, 'USD')}
+                          </span>
+                        </Button>
+                        
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-14 text-xs font-bold bg-orange-50 border-orange-200 hover:bg-orange-100 flex-col"
+                          onClick={() => applyQuickDiscount(15)}
+                        >
+                          <div className="flex items-center gap-1">
+                            <Percent className="h-3 w-3" />
+                            15% OFF
+                          </div>
+                          <span className="text-xs text-gray-500 mt-1">
+                            {formatPrice(cartTotals.subtotal * 0.15, 'USD')}
+                          </span>
+                        </Button>
+                      </div>
                     </div>
+
+                    {/* 🚀 NEW: Custom Total Input - "Customer wants $X" */}
                     <div className="space-y-2">
-                      <Label htmlFor="customerEmail">Email</Label>
-                      <Input
-                        id="customerEmail"
-                        type="email"
-                        value={customerEmail}
-                        onChange={(e) => setCustomerEmail(e.target.value)}
-                        placeholder="Enter email address"
-                      />
+                      <Label className="flex items-center gap-2 text-sm font-medium">
+                        <Calculator className="h-4 w-4 text-purple-500" />
+                        Customer Wants To Pay
+                      </Label>
+                      <div className="flex gap-2">
+                        <div className="relative flex-1">
+                          <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 font-medium">$</span>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            placeholder={cartTotals.finalTotal.toFixed(2)}
+                            className="pl-8 h-12 text-lg font-medium"
+                            onChange={(e) => {
+                              const customerTotal = parseFloat(e.target.value) || 0
+                              if (customerTotal > 0 && customerTotal < cartTotals.subtotal) {
+                                handleCustomerTotal(customerTotal)
+                              }
+                            }}
+                          />
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-12 px-3"
+                          onClick={clearAllDiscounts}
+                          title="Clear all discounts"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      {bundleDiscount > 0 && activeDiscountMode === 'custom' && (
+                        <div className="text-xs text-green-600 bg-green-50 p-2 rounded flex items-center gap-2">
+                          <TrendingDown className="h-3 w-3" />
+                          Saving customer {formatPrice(bundleDiscount, 'USD')} from original subtotal
+                        </div>
+                      )}
                     </div>
-                  </div>
-                )}
 
-                {/* Sales Notes */}
-                <div className="space-y-2">
-                  <Label htmlFor="salesNotes">Sales Notes (Optional)</Label>
-                  <Textarea
-                    id="salesNotes"
-                    value={salesNotes}
-                    onChange={(e) => setSalesNotes(e.target.value)}
-                    placeholder="Internal notes about this sale..."
-                    rows={2}
-                  />
-                </div>
-
-                {/* Payment Method Selection */}
-                <div className="space-y-3">
-                  <Label>Payment Method</Label>
-                  <div className="grid grid-cols-2 gap-2">
-                    <Button
-                      variant={paymentMethod === 'CASH' ? 'default' : 'outline'}
-                      size="sm"
-                      onClick={() => setPaymentMethod('CASH')}
-                      className="flex items-center gap-2"
-                    >
-                      <DollarSign className="w-4 h-4" />
-                      Cash
-                    </Button>
-                    <Button
-                      variant={paymentMethod === 'ZELLE' ? 'default' : 'outline'}
-                      size="sm"
-                      onClick={() => setPaymentMethod('ZELLE')}
-                      className="flex items-center gap-2"
-                    >
-                      <Smartphone className="w-4 h-4" />
-                      Zelle
-                    </Button>
-                    <Button
-                      variant={paymentMethod === 'CARD' ? 'default' : 'outline'}
-                      size="sm"
-                      onClick={() => setPaymentMethod('CARD')}
-                      className="flex items-center gap-2"
-                    >
-                      <CreditCard className="w-4 h-4" />
-                      Card
-                    </Button>
-                    <Button
-                      variant={paymentMethod === 'SPLIT_PAYMENT' ? 'default' : 'outline'}
-                      size="sm"
-                      onClick={() => setPaymentMethod('SPLIT_PAYMENT')}
-                      className="flex items-center gap-2"
-                    >
-                      <Tag className="w-4 h-4" />
-                      Split
-                    </Button>
-                  </div>
-                </div>
-
-                {/* Split Payment Details */}
-                {paymentMethod === 'SPLIT_PAYMENT' && (
-                  <div className="space-y-3 p-3 border rounded-lg bg-blue-50">
-                    <h4 className="font-medium text-sm">Split Payment Amounts</h4>
-                    <div className="grid gap-3">
-                      <div className="space-y-1">
-                        <Label htmlFor="cashAmount">Cash Amount</Label>
+                    {/* Enhanced Manual Discount Inputs */}
+                    <div className="grid grid-cols-2 gap-3">
+                      {/* Staff Discount */}
+                      <div className="space-y-2">
+                        <Label htmlFor="customDiscount" className="text-xs">Staff Discount ($)</Label>
                         <Input
-                          id="cashAmount"
+                          id="customDiscount"
                           type="number"
                           step="0.01"
-                          value={cashAmount}
-                          onChange={(e) => setCashAmount(parseFloat(e.target.value) || 0)}
+                          value={customDiscount}
+                          onChange={(e) => {
+                            setCustomDiscount(parseFloat(e.target.value) || 0)
+                            setActiveDiscountMode('manual')
+                          }}
                           placeholder="0.00"
+                          className="h-10"
                         />
                       </div>
-                      <div className="space-y-1">
-                        <Label htmlFor="zelleAmount">Zelle Amount</Label>
-                        <Input
-                          id="zelleAmount"
-                          type="number"
-                          step="0.01"
-                          value={zelleAmount}
-                          onChange={(e) => setZelleAmount(parseFloat(e.target.value) || 0)}
-                          placeholder="0.00"
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <Label htmlFor="cardAmount">Card Amount</Label>
-                        <Input
-                          id="cardAmount"
-                          type="number"
-                          step="0.01"
-                          value={cardAmount}
-                          onChange={(e) => setCardAmount(parseFloat(e.target.value) || 0)}
-                          placeholder="0.00"
-                        />
-                      </div>
-                      <div className="flex justify-between text-sm font-medium border-t pt-2">
-                        <span>Total Paid:</span>
-                        <span>{formatPrice(cashAmount + zelleAmount + cardAmount, 'USD')}</span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span>Amount Due:</span>
-                        <span className={cartTotals.finalTotal === (cashAmount + zelleAmount + cardAmount) ? 'text-green-600' : 'text-red-600'}>
-                          {formatPrice(cartTotals.finalTotal, 'USD')}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                )}
 
-                {/* Process Sale Button */}
-                <Button
-                  className="w-full h-12 text-lg font-medium"
-                  onClick={processSale}
-                  disabled={processingPayment || cart.length === 0}
-                >
-                  {processingPayment ? (
-                    <div className="flex items-center gap-2">
-                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      Processing...
+                      {/* Bundle/Negotiation Discount */}
+                      <div className="space-y-2">
+                        <Label htmlFor="bundleDiscount" className="text-xs">Negotiation ($)</Label>
+                        <Input
+                          id="bundleDiscount"
+                          type="number"
+                          step="0.01"
+                          value={bundleDiscount}
+                          onChange={(e) => {
+                            setBundleDiscount(parseFloat(e.target.value) || 0)
+                            setActiveDiscountMode('manual')
+                          }}
+                          placeholder="0.00"
+                          className="h-10"
+                        />
+                      </div>
                     </div>
-                  ) : (
-                    <div className="flex items-center gap-2">
-                      <CheckCircle className="w-5 h-5" />
-                      Complete Sale • {formatPrice(cartTotals.finalTotal, 'USD')}
+
+                    {/* 🚀 NEW: Enhanced Discount Reason with Quick Select */}
+                    {(customDiscount > 0 || bundleDiscount > 0) && (
+                      <div className="space-y-3">
+                        <Label htmlFor="bargainReason" className="text-sm font-medium">
+                          Discount Reason
+                        </Label>
+                        
+                        {/* Quick Reason Buttons */}
+                        <div className="grid grid-cols-2 gap-2">
+                          {[
+                            'Customer negotiation',
+                            'Bulk purchase',
+                            'Repeat customer',
+                            'End of day sale',
+                            'Minor defect',
+                            'Floor model'
+                          ].map((reason) => (
+                            <Button
+                              key={reason}
+                              variant="outline"
+                              size="sm"
+                              className={`h-8 text-xs transition-all ${
+                                bargainReason === reason 
+                                  ? 'bg-blue-100 border-blue-300 text-blue-700' 
+                                  : 'hover:bg-gray-50'
+                              }`}
+                              onClick={() => setBargainReason(reason)}
+                            >
+                              {reason}
+                            </Button>
+                          ))}
+                        </div>
+                        
+                        {/* Custom Reason Input */}
+                        <Input
+                          id="bargainReason"
+                          value={bargainReason}
+                          onChange={(e) => setBargainReason(e.target.value)}
+                          placeholder="Or enter custom reason..."
+                          className="h-10"
+                        />
+                      </div>
+                    )}
+
+                    {/* Total Discount Display */}
+                    {cartTotals.totalDiscount > 0 && (
+                      <div className="flex justify-between text-red-600 bg-red-50 p-3 rounded-lg border border-red-200">
+                        <span className="font-medium">Total Discount:</span>
+                        <span className="font-bold">-{formatPrice(cartTotals.totalDiscount, 'USD')}</span>
+                      </div>
+                    )}
+
+                    {/* Final Total */}
+                    <div className="flex justify-between text-xl font-bold border-t-2 pt-4 bg-green-50 p-4 rounded-lg border border-green-200">
+                      <span>TOTAL:</span>
+                      <span className="text-green-700">{formatPrice(cartTotals.finalTotal, 'USD')}</span>
                     </div>
-                  )}
-                </Button>
+
+                    {/* Savings Summary */}
+                    {cartTotals.totalDiscount > 0 && (
+                      <div className="text-center text-sm text-green-600 bg-green-50 p-3 rounded-lg border border-green-200">
+                        <div className="flex items-center justify-center gap-2">
+                          <CheckCircle className="w-4 h-4" />
+                          <span>
+                            🎉 Customer saves {formatPrice(cartTotals.totalDiscount, 'USD')} • 
+                            {((cartTotals.totalDiscount / cartTotals.subtotal) * 100).toFixed(1)}% off!
+                          </span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Customer Information Button */}
+                    <Button
+                      variant="outline"
+                      className="w-full h-12"
+                      onClick={() => setShowCustomerForm(!showCustomerForm)}
+                    >
+                      <Users className="w-4 h-4 mr-2" />
+                      {showCustomerForm ? 'Hide' : 'Add'} Customer Info
+                    </Button>
+
+                    {/* Customer Form */}
+                    {showCustomerForm && (
+                      <Card className="border-dashed">
+                        <CardContent className="p-4 space-y-3">
+                          <Input
+                            placeholder="Customer Name"
+                            value={customerName}
+                            onChange={(e) => setCustomerName(e.target.value)}
+                          />
+                          <Input
+                            placeholder="Phone Number"
+                            value={customerPhone}
+                            onChange={(e) => setCustomerPhone(e.target.value)}
+                          />
+                          <Input
+                            placeholder="Email Address"
+                            value={customerEmail}
+                            onChange={(e) => setCustomerEmail(e.target.value)}
+                          />
+                        </CardContent>
+                      </Card>
+                    )}
+
+                    {/* Process Payment Button */}
+                    <Button
+                      onClick={() => setShowPaymentForm(true)}
+                      className="w-full h-12 text-lg font-semibold"
+                      disabled={processingPayment}
+                    >
+                      {processingPayment ? (
+                        <div className="flex items-center gap-2">
+                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                          Processing...
+                        </div>
+                      ) : (
+                        <>
+                          <CreditCard className="w-5 h-5 mr-2" />
+                          Process Payment
+                        </>
+                      )}
+                    </Button>
+                  </>
+                )}
               </CardContent>
             </Card>
-          )}
+
+            {/* Payment Modal */}
+            {showPaymentForm && (
+              <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                <Card className="w-full max-w-md max-h-[90vh] overflow-y-auto">
+                  <CardHeader>
+                    <CardTitle className="flex items-center justify-between">
+                      Payment
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setShowPaymentForm(false)}
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {/* Payment Method Selection */}
+                    <div className="space-y-3">
+                      <Label>Payment Method</Label>
+                      <div className="grid grid-cols-2 gap-2">
+                        {[
+                          { value: 'CASH', label: 'Cash', icon: DollarSign },
+                          { value: 'ZELLE', label: 'Zelle', icon: Smartphone },
+                          { value: 'CARD', label: 'Card', icon: CreditCard },
+                          { value: 'SPLIT_PAYMENT', label: 'Split', icon: Receipt }
+                        ].map(({ value, label, icon: Icon }) => (
+                          <Button
+                            key={value}
+                            variant={paymentMethod === value ? 'default' : 'outline'}
+                            onClick={() => setPaymentMethod(value as any)}
+                            className="h-12 flex-col"
+                          >
+                            <Icon className="w-4 h-4 mb-1" />
+                            {label}
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Split Payment Details */}
+                    {paymentMethod === 'SPLIT_PAYMENT' && (
+                      <div className="space-y-3">
+                        <Label>Split Payment Amounts</Label>
+                        <div className="space-y-2">
+                          <div className="grid grid-cols-2 gap-2">
+                            <Label htmlFor="cashAmount" className="text-sm">Cash ($)</Label>
+                            <Input
+                              id="cashAmount"
+                              type="number"
+                              step="0.01"
+                              value={cashAmount}
+                              onChange={(e) => setCashAmount(parseFloat(e.target.value) || 0)}
+                            />
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            <Label htmlFor="zelleAmount" className="text-sm">Zelle ($)</Label>
+                            <Input
+                              id="zelleAmount"
+                              type="number"
+                              step="0.01"
+                              value={zelleAmount}
+                              onChange={(e) => setZelleAmount(parseFloat(e.target.value) || 0)}
+                            />
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            <Label htmlFor="cardAmount" className="text-sm">Card ($)</Label>
+                            <Input
+                              id="cardAmount"
+                              type="number"
+                              step="0.01"
+                              value={cardAmount}
+                              onChange={(e) => setCardAmount(parseFloat(e.target.value) || 0)}
+                            />
+                          </div>
+                          <div className="text-sm text-gray-600">
+                            Total: {formatPrice(cashAmount + zelleAmount + cardAmount, 'USD')} / 
+                            {formatPrice(cartTotals.finalTotal, 'USD')}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Sales Notes */}
+                    <div className="space-y-2">
+                      <Label htmlFor="salesNotes">Sales Notes (Optional)</Label>
+                      <Textarea
+                        id="salesNotes"
+                        placeholder="Any additional notes about this sale..."
+                        value={salesNotes}
+                        onChange={(e) => setSalesNotes(e.target.value)}
+                        rows={3}
+                      />
+                    </div>
+
+                    {/* Error Display */}
+                    {error && (
+                      <Alert>
+                        <AlertCircle className="h-4 w-4" />
+                        <AlertDescription>{error}</AlertDescription>
+                      </Alert>
+                    )}
+
+                    {/* Payment Total */}
+                    <div className="bg-gray-50 p-4 rounded-lg">
+                      <div className="flex justify-between text-lg font-bold">
+                        <span>Total to Pay:</span>
+                        <span>{formatPrice(cartTotals.finalTotal, 'USD')}</span>
+                      </div>
+                    </div>
+
+                    {/* Complete Sale Button */}
+                    <div className="flex gap-3">
+                      <Button
+                        variant="outline"
+                        onClick={() => setShowPaymentForm(false)}
+                        className="flex-1"
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        onClick={processSale}
+                        disabled={processingPayment}
+                        className="flex-1"
+                      >
+                        {processingPayment ? (
+                          <div className="flex items-center gap-2">
+                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                            Processing...
+                          </div>
+                        ) : (
+                          'Complete Sale'
+                        )}
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+          </div>
         </div>
       </div>
-
-      {/* Barcode Scanner Modal */}
-      {showBarcodeScanner && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <Card className="w-full max-w-md">
-            <CardHeader>
-              <CardTitle className="flex items-center justify-between">
-                <span className="flex items-center gap-2">
-                  <Scan className="w-5 h-5" />
-                  Barcode Scanner
-                </span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setShowBarcodeScanner(false)}
-                >
-                  <X className="w-4 h-4" />
-                </Button>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="text-center py-8">
-              <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Scan className="w-8 h-8 text-gray-400" />
-              </div>
-              <h3 className="text-lg font-medium text-gray-900 mb-2">
-                Barcode Scanner
-              </h3>
-              <p className="text-gray-600 mb-4">
-                Camera-based barcode scanning would be implemented here using a library like QuaggaJS or ZXing.
-              </p>
-              <div className="space-y-2">
-                <Input
-                  placeholder="Or manually enter barcode/SKU"
-                  onKeyPress={(e) => {
-                    if (e.key === 'Enter') {
-                      const sku = e.currentTarget.value
-                      const product = products.find(ep => ep.product.sku === sku)
-                      if (product) {
-                        addToCart(product)
-                        setShowBarcodeScanner(false)
-                        e.currentTarget.value = ''
-                      }
-                    }
-                  }}
-                />
-                <Button
-                  variant="outline"
-                  className="w-full"
-                  onClick={() => setShowBarcodeScanner(false)}
-                >
-                  Close Scanner
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
     </div>
   )
 }
