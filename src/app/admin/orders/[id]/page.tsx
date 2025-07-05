@@ -106,7 +106,7 @@ function formatDateTime(date: Date) {
 
 export default async function OrderDetailPage({ params }: OrderDetailPageProps) {
   const session = await getSession()
-  
+
   if (!session) {
     redirect('/admin/login')
   }
@@ -120,7 +120,7 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps) 
   return (
     <div className="min-h-screen bg-gray-50">
       <AdminNavigation />
-      
+
       <main className="lg:pl-64">
         <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
           <div className="px-4 py-6 sm:px-0">
@@ -143,7 +143,7 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps) 
                     </p>
                   </div>
                 </div>
-                
+
                 <div className="flex gap-2">
                   <Button variant="outline">
                     <Edit className="h-4 w-4 mr-2" />
@@ -171,8 +171,8 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps) 
                           <div className="flex items-center gap-4">
                             <div className="w-16 h-16 bg-gray-100 rounded-lg overflow-hidden">
                               {item.product.images[0] && (
-                                <img 
-                                  src={item.product.images[0]} 
+                                <img
+                                  src={item.product.images[0]}
                                   alt={item.product.name}
                                   className="w-full h-full object-cover"
                                 />
@@ -182,8 +182,8 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps) 
                               <h4 className="font-medium text-gray-900">{item.product.name}</h4>
                               <p className="text-sm text-gray-500">SKU: {item.product.sku}</p>
                               {item.sizeLabel && (
-  <p className="text-sm text-gray-500">Size: {item.sizeLabel}</p>
-)}
+                                <p className="text-sm text-gray-500">Size: {item.sizeLabel}</p>
+                              )}
                             </div>
                           </div>
                           <div className="text-right">
