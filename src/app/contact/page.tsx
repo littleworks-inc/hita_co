@@ -40,7 +40,7 @@ async function getStoreSettings() {
 export async function generateMetadata() {
   const storeSettings = await getStoreSettings()
   const storeName = storeSettings?.storeName || 'LittleWorks Inc' // Updated default
-  
+
   return {
     title: `Contact Us - ${storeName}`,
     description: `Get in touch with ${storeName}. We're here to help with your questions and provide excellent customer service.`,
@@ -62,10 +62,10 @@ function DynamicNavigation({ storeSettings }: { storeSettings: any }) {
   return (
     <>
       {/* Dynamic Top Banner */}
-      <div 
+      <div
         className="text-white text-center py-2 px-4"
-        style={{ 
-          background: `linear-gradient(to right, ${primaryColor}, ${storeSettings?.accentColor || '#f59e0b'})` 
+        style={{
+          background: `linear-gradient(to right, ${primaryColor}, ${storeSettings?.accentColor || '#f59e0b'})`
         }}
       >
         <p className="text-sm font-medium">
@@ -85,11 +85,11 @@ function DynamicNavigation({ storeSettings }: { storeSettings: any }) {
                     className="h-8 w-auto"
                   />
                 ) : (
-                  <div 
+                  <div
                     className="w-8 h-8 rounded flex items-center justify-center text-white font-bold text-sm"
                     style={{ backgroundColor: primaryColor }}
                   >
-                    {storeName.split(' ').map(word => word.charAt(0)).join('').substring(0, 2)}
+                    {storeName.split(' ').map((word: string) => word.charAt(0)).join('').substring(0, 2)}
                   </div>
                 )}
                 <div>
@@ -112,7 +112,7 @@ function DynamicNavigation({ storeSettings }: { storeSettings: any }) {
               <Search className="h-5 w-5 text-gray-600 hover:text-purple-600 cursor-pointer" />
               <div className="relative">
                 <ShoppingBag className="h-6 w-6 text-gray-700 hover:text-purple-600 cursor-pointer" />
-                <span 
+                <span
                   className="absolute -top-2 -right-2 h-4 w-4 rounded-full text-xs font-bold text-white flex items-center justify-center"
                   style={{ backgroundColor: primaryColor }}
                 >
@@ -139,9 +139,9 @@ function ContactHero({ storeSettings }: { storeSettings: any }) {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
         <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-6">
           Contact{' '}
-          <span 
+          <span
             className="bg-clip-text text-transparent"
-            style={{ 
+            style={{
               background: `linear-gradient(to right, ${primaryColor}, ${accentColor})`,
               WebkitBackgroundClip: 'text',
               WebkitTextFillColor: 'transparent'
@@ -151,10 +151,10 @@ function ContactHero({ storeSettings }: { storeSettings: any }) {
           </span>
         </h1>
         <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
-          We'd love to hear from you! Reach out with any questions about our products, 
+          We'd love to hear from you! Reach out with any questions about our products,
           orders, shipping, or just to say hello.
         </p>
-        <div 
+        <div
           className="flex items-center justify-center gap-2"
           style={{ color: primaryColor }}
         >
@@ -210,7 +210,7 @@ function ContactInformation({ storeSettings }: { storeSettings: any }) {
 
   const colorClasses = {
     blue: 'border-blue-200 hover:bg-blue-50',
-    green: 'border-green-200 hover:bg-green-50', 
+    green: 'border-green-200 hover:bg-green-50',
     purple: 'border-purple-200 hover:bg-purple-50',
     red: 'border-red-200 hover:bg-red-50'
   }
@@ -235,7 +235,7 @@ function ContactInformation({ storeSettings }: { storeSettings: any }) {
                 key={index}
                 className={`p-6 bg-white border-2 rounded-xl transition-all duration-300 hover:shadow-lg ${colorClasses[method.color as keyof typeof colorClasses]}`}
               >
-                <div 
+                <div
                   className="w-12 h-12 rounded-full flex items-center justify-center mb-4"
                   style={{ backgroundColor: `${primaryColor}20` }}
                 >
@@ -301,7 +301,9 @@ function ContactForm({ storeSettings }: { storeSettings: any }) {
                   type="text"
                   required
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent focus:outline-none"
-                  style={{ focusRingColor: primaryColor }}
+                  style={{
+                    '--tw-ring-color': primaryColor
+                  } as React.CSSProperties}
                   placeholder="Enter your first name"
                 />
               </div>
@@ -350,7 +352,7 @@ function ContactForm({ storeSettings }: { storeSettings: any }) {
                 type="text"
                 required
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent focus:outline-none"
-                                  placeholder="What can we help you with? (e.g., Product inquiry, Order status, Shipping question)"
+                placeholder="What can we help you with? (e.g., Product inquiry, Order status, Shipping question)"
               />
             </div>
 
@@ -466,7 +468,7 @@ function BusinessInfo({ storeSettings }: { storeSettings: any }) {
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
               <h4 className="font-semibold text-blue-900 mb-2">Customer Support</h4>
               <p className="text-sm text-blue-700">
-                {storeName} is committed to providing exceptional customer service. 
+                {storeName} is committed to providing exceptional customer service.
                 Whether you need help with product selection, order tracking, or returns, we're here to help!
               </p>
             </div>

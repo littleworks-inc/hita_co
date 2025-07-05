@@ -1,6 +1,9 @@
+// ✅ COMPLETELY FIXED: /src/app/exhibition/[id]/page.tsx
+// Back to single query approach with correct field names from schema
+
 // src/app/exhibition/[id]/page.tsx
 // =====================================
-// 🔥 NEW: Exhibition Detail Page - Individual Exhibition View
+// Exhibition Detail Page - Individual Exhibition View
 // Shows exhibition-specific products, pricing, and performance metrics
 // =====================================
 
@@ -35,7 +38,7 @@ interface ExhibitionDetailProps {
   }
 }
 
-// Get exhibition with detailed stats
+// ✅ FIXED: Single query approach with correct schema field names
 async function getExhibitionDetail(exhibitionId: string) {
   const exhibition = await db.exhibition.findUnique({
     where: { id: exhibitionId, isActive: true },
@@ -53,20 +56,7 @@ async function getExhibitionDetail(exhibitionId: string) {
       sales: {
         where: { isCompleted: true },
         include: {
-          items: {
-            include: {
-              exhibitionProduct: {
-                include: {
-                  product: {
-                    select: {
-                      name: true,
-                      sku: true
-                    }
-                  }
-                }
-              }
-            }
-          }
+          items: true // ✅ Include all fields - no select clause to avoid type issues
         }
       },
       _count: {
@@ -103,14 +93,15 @@ async function getExhibitionDetail(exhibitionId: string) {
   const sellThroughRate = totalProductsTaken > 0 ? 
     Math.round((totalProductsSold / totalProductsTaken) * 100) : 0
 
-  // Top selling products
+  // ✅ FIXED: Top selling products - using correct schema fields
   const productSales = new Map<string, { name: string, sku: string, quantitySold: number, revenue: number }>()
   
   exhibition.sales.forEach(sale => {
     sale.items.forEach(item => {
-      const productId = item.exhibitionProduct?.product?.id || 'unknown'
-      const productName = item.exhibitionProduct?.product?.name || 'Unknown Product'
-      const productSku = item.exhibitionProduct?.product?.sku || 'N/A'
+      // ✅ Using correct schema fields that actually exist
+      const productId = item.productId || 'unknown'
+      const productName = item.productName || 'Unknown Product'  // This field exists in schema
+      const productSku = item.productSku || 'N/A'               // This field exists in schema
       
       if (!productSales.has(productId)) {
         productSales.set(productId, {
@@ -123,7 +114,8 @@ async function getExhibitionDetail(exhibitionId: string) {
       
       const current = productSales.get(productId)!
       current.quantitySold += item.quantity
-      current.revenue += item.totalPrice
+      // ✅ Using lineTotal field which exists in schema, with fallback
+      current.revenue += item.lineTotal || (item.finalPrice * item.quantity) || 0
     })
   })
 
@@ -149,8 +141,37 @@ async function getExhibitionDetail(exhibitionId: string) {
   }
 }
 
+// ✅ Proper TypeScript interface for ExhibitionProduct
+interface ExhibitionProductWithRelations {
+  id: string
+  exhibitionId: string
+  productId: string
+  quantityTaken: number
+  quantitySold: number
+  exhibitionPrice?: number | null
+  originalPrice?: number | null
+  discountPercentage?: number | null
+  isClearance: boolean
+  product: {
+    id: string
+    name: string
+    sku: string
+    sellingPriceUSD: number
+    discountPercentage: number
+    images: string[]
+    category: {
+      id: string
+      name: string
+    }
+    country: {
+      id: string
+      name: string
+    }
+  }
+}
+
 // Calculate pricing hierarchy for a product
-function calculatePricingHierarchy(exhibitionProduct: any) {
+function calculatePricingHierarchy(exhibitionProduct: ExhibitionProductWithRelations) {
   const product = exhibitionProduct.product
   const storeOriginalPrice = product.sellingPriceUSD
   const storeDiscountedPrice = storeOriginalPrice * (1 - (product.discountPercentage || 0) / 100)
@@ -253,74 +274,74 @@ export default async function ExhibitionDetailPage({ params }: ExhibitionDetailP
               </Button>
             </Link>
           )}
-          <Link href={`/exhibition/${exhibition.id}/sales`}>
+          <Link href={`/exhibition/${exhibition.id}/products`}>
             <Button variant="outline">
-              <BarChart3 className="h-4 w-4 mr-2" />
-              View Sales
+              <Package className="h-4 w-4 mr-2" />
+              Manage Products
             </Button>
           </Link>
         </div>
       </div>
 
-      {/* Performance Overview */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      {/* Stats Overview */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
+          <CardContent className="p-6">
+            <div className="flex items-center">
+              <DollarSign className="h-8 w-8 text-green-600" />
+              <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600">Total Revenue</p>
                 <p className="text-2xl font-bold text-gray-900">{formatPrice(stats.totalRevenue)}</p>
               </div>
-              <DollarSign className="h-8 w-8 text-green-600" />
             </div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
+          <CardContent className="p-6">
+            <div className="flex items-center">
+              <TrendingUp className="h-8 w-8 text-blue-600" />
+              <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600">Net Profit</p>
                 <p className={`text-2xl font-bold ${stats.netProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                   {formatPrice(stats.netProfit)}
                 </p>
               </div>
-              <TrendingUp className="h-8 w-8 text-blue-600" />
             </div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
+          <CardContent className="p-6">
+            <div className="flex items-center">
+              <Package className="h-8 w-8 text-purple-600" />
+              <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600">Sell-Through Rate</p>
                 <p className="text-2xl font-bold text-gray-900">{stats.sellThroughRate}%</p>
               </div>
-              <Percent className="h-8 w-8 text-purple-600" />
             </div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
+          <CardContent className="p-6">
+            <div className="flex items-center">
+              <Users className="h-8 w-8 text-orange-600" />
+              <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600">Total Sales</p>
                 <p className="text-2xl font-bold text-gray-900">{stats.totalSales}</p>
               </div>
-              <Users className="h-8 w-8 text-orange-600" />
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Exhibition Products */}
+      {/* Products Performance */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Package className="h-5 w-5" />
-            Exhibition Products ({exhibition.products.length})
+            <BarChart3 className="h-5 w-5" />
+            Products Performance
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -353,71 +374,61 @@ export default async function ExhibitionDetailPage({ params }: ExhibitionDetailP
                     const pricing = calculatePricingHierarchy(exhibitionProduct)
                     const sellRate = exhibitionProduct.quantityTaken > 0 ? 
                       Math.round((exhibitionProduct.quantitySold / exhibitionProduct.quantityTaken) * 100) : 0
-
+                    
                     return (
-                      <tr key={exhibitionProduct.id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4">
+                      <tr key={exhibitionProduct.id}>
+                        <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex items-center">
-                            <div>
+                            <div className="flex-shrink-0 h-10 w-10">
+                              {exhibitionProduct.product.images?.[0] ? (
+                                <img
+                                  className="h-10 w-10 rounded-full object-cover"
+                                  src={exhibitionProduct.product.images[0]}
+                                  alt={exhibitionProduct.product.name}
+                                />
+                              ) : (
+                                <div className="h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center">
+                                  <Package className="h-5 w-5 text-gray-400" />
+                                </div>
+                              )}
+                            </div>
+                            <div className="ml-4">
                               <div className="text-sm font-medium text-gray-900">
                                 {exhibitionProduct.product.name}
                               </div>
                               <div className="text-sm text-gray-500">
-                                {exhibitionProduct.product.category.name} • {exhibitionProduct.product.country.name}
+                                {exhibitionProduct.product.category.name}
                               </div>
-                              {exhibitionProduct.isClearance && (
-                                <Badge className="mt-1 bg-red-100 text-red-800">
-                                  <Tag className="h-3 w-3 mr-1" />
-                                  Clearance
-                                </Badge>
-                              )}
                             </div>
                           </div>
                         </td>
-                        <td className="px-6 py-4 text-center">
-                          <div className="text-sm">
-                            <div className="font-medium text-gray-900">
-                              {exhibitionProduct.quantitySold} / {exhibitionProduct.quantityTaken}
-                            </div>
-                            <div className="text-gray-500">
-                              {sellRate}% sold
-                            </div>
+                        <td className="px-6 py-4 whitespace-nowrap text-center">
+                          <div className="text-sm text-gray-900">
+                            {exhibitionProduct.quantitySold} / {exhibitionProduct.quantityTaken}
                           </div>
+                          <div className="text-xs text-gray-500">Sold / Taken</div>
                         </td>
-                        <td className="px-6 py-4 text-center">
-                          <div className="text-sm">
-                            <div className="font-medium text-gray-900">
-                              {formatPrice(pricing.finalPrice)}
-                            </div>
-                            {pricing.totalSavings > 0 && (
-                              <div className="text-green-600">
-                                Save {formatPrice(pricing.totalSavings)} ({pricing.savingsPercentage}%)
-                              </div>
-                            )}
+                        <td className="px-6 py-4 whitespace-nowrap text-center">
+                          <div className="text-sm font-medium text-gray-900">
+                            {formatPrice(pricing.finalPrice)}
                           </div>
+                          {pricing.totalSavings > 0 && (
+                            <div className="text-xs text-green-600">
+                              {pricing.savingsPercentage}% off
+                            </div>
+                          )}
                         </td>
-                        <td className="px-6 py-4 text-center">
+                        <td className="px-6 py-4 whitespace-nowrap text-center">
                           <div className="flex items-center justify-center">
-                            {sellRate >= 75 ? (
-                              <Badge className="bg-green-100 text-green-800">
-                                <Star className="h-3 w-3 mr-1" />
-                                Excellent
-                              </Badge>
+                            <div className="text-sm font-medium text-gray-900">
+                              {sellRate}%
+                            </div>
+                            {sellRate >= 80 ? (
+                              <CheckCircle className="ml-1 h-4 w-4 text-green-500" />
                             ) : sellRate >= 50 ? (
-                              <Badge className="bg-blue-100 text-blue-800">
-                                <TrendingUp className="h-3 w-3 mr-1" />
-                                Good
-                              </Badge>
-                            ) : sellRate >= 25 ? (
-                              <Badge className="bg-yellow-100 text-yellow-800">
-                                <Clock className="h-3 w-3 mr-1" />
-                                Slow
-                              </Badge>
+                              <Clock className="ml-1 h-4 w-4 text-yellow-500" />
                             ) : (
-                              <Badge className="bg-red-100 text-red-800">
-                                <AlertTriangle className="h-3 w-3 mr-1" />
-                                Poor
-                              </Badge>
+                              <AlertTriangle className="ml-1 h-4 w-4 text-red-500" />
                             )}
                           </div>
                         </td>
@@ -441,21 +452,21 @@ export default async function ExhibitionDetailPage({ params }: ExhibitionDetailP
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
+            <div className="space-y-4">
               {stats.topSellingProducts.map((product, index) => (
-                <div key={product.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <div key={product.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
                   <div className="flex items-center gap-3">
-                    <div className="w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-xs font-bold">
+                    <div className="flex items-center justify-center w-8 h-8 bg-purple-100 text-purple-600 rounded-full text-sm font-bold">
                       {index + 1}
                     </div>
                     <div>
                       <div className="font-medium text-gray-900">{product.name}</div>
-                      <div className="text-sm text-gray-600">SKU: {product.sku}</div>
+                      <div className="text-sm text-gray-500">SKU: {product.sku}</div>
                     </div>
                   </div>
                   <div className="text-right">
                     <div className="font-medium text-gray-900">{formatPrice(product.revenue)}</div>
-                    <div className="text-sm text-gray-600">{product.quantitySold} units sold</div>
+                    <div className="text-sm text-gray-500">{product.quantitySold} sold</div>
                   </div>
                 </div>
               ))}
@@ -463,75 +474,6 @@ export default async function ExhibitionDetailPage({ params }: ExhibitionDetailP
           </CardContent>
         </Card>
       )}
-
-      {/* Exhibition Summary */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <BarChart3 className="h-5 w-5" />
-            Exhibition Summary
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-3">
-              <h4 className="font-medium text-gray-900">Financial Performance</h4>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Participation Fee:</span>
-                  <span className="font-medium">{formatPrice(exhibition.participationFee)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Total Revenue:</span>
-                  <span className="font-medium">{formatPrice(stats.totalRevenue)}</span>
-                </div>
-                <div className="flex justify-between border-t pt-2">
-                  <span className="text-gray-600">Net Profit:</span>
-                  <span className={`font-bold ${stats.netProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                    {formatPrice(stats.netProfit)}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">ROI:</span>
-                  <span className={`font-medium ${stats.roi >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                    {stats.roi}%
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-3">
-              <h4 className="font-medium text-gray-900">Product Performance</h4>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Products Taken:</span>
-                  <span className="font-medium">{stats.totalProductsTaken}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Products Sold:</span>
-                  <span className="font-medium">{stats.totalProductsSold}</span>
-                </div>
-                <div className="flex justify-between border-t pt-2">
-                  <span className="text-gray-600">Sell-Through Rate:</span>
-                  <span className="font-bold">{stats.sellThroughRate}%</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Average Order Value:</span>
-                  <span className="font-medium">{formatPrice(stats.averageOrderValue)}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Description */}
-          {exhibition.description && (
-            <div className="mt-6 pt-6 border-t">
-              <h4 className="font-medium text-gray-900 mb-2">Description</h4>
-              <p className="text-gray-600">{exhibition.description}</p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
     </div>
   )
 }
