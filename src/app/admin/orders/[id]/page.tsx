@@ -181,9 +181,9 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps) 
                             <div>
                               <h4 className="font-medium text-gray-900">{item.product.name}</h4>
                               <p className="text-sm text-gray-500">SKU: {item.product.sku}</p>
-                              {item.size && (
-                                <p className="text-sm text-gray-500">Size: {item.size}</p>
-                              )}
+                              {item.sizeLabel && (
+  <p className="text-sm text-gray-500">Size: {item.sizeLabel}</p>
+)}
                             </div>
                           </div>
                           <div className="text-right">
