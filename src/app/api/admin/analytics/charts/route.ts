@@ -17,10 +17,10 @@ export async function GET(request: NextRequest) {
 
     // Calculate date range
     const dateRange = calculateDateRange(period, startDate, endDate)
-    
+
     // Fetch REAL chart data
     const chartData = await fetchRealChartData(dateRange, currency)
-    
+
     return NextResponse.json(chartData)
   } catch (error) {
     console.error('Analytics Charts API error:', error)
@@ -83,13 +83,13 @@ async function fetchRealChartData(dateRange: { start: Date, end: Date }, currenc
 
     // 3. Generate real sales trend from actual orders
     const salesTrend = await generateRealSalesTrend(start, end)
-    
+
     // 4. Get real category performance
     const categoryPerformance = await getRealCategoryPerformance()
-    
+
     // 5. Get real geographic data from orders
     const geographicData = await getRealGeographicData(start, end)
-    
+
     // 6. Get real inventory status
     const inventoryStatus = await getRealInventoryStatus()
 
@@ -103,7 +103,7 @@ async function fetchRealChartData(dateRange: { start: Date, end: Date }, currenc
 
   } catch (error) {
     console.error('Error fetching real chart data:', error)
-    
+
     // Fallback to empty state
     const productCount = await db.product.count({ where: { isActive: true } }).catch(() => 0)
     return getEmptyChartData(productCount)
@@ -151,7 +151,7 @@ async function generateRealSalesTrend(start: Date, end: Date) {
 
     // Group by day
     const dailyData = new Map()
-    
+
     // Initialize all days in range with zero values
     const current = new Date(start)
     while (current <= end) {
@@ -195,10 +195,16 @@ async function getRealCategoryPerformance() {
           where: { isActive: true },
           include: {
             orderItems: {
+              where: {  // ✅ Correct place for where clause
+                order: {
+                  status: { not: 'CANCELLED' }
+                }
+              },
               include: {
                 order: {
-                  where: {
-                    status: { not: 'CANCELLED' }
+                  select: {
+                    id: true,
+                    status: true
                   }
                 }
               }
@@ -265,7 +271,7 @@ async function getRealGeographicData(start: Date, end: Date) {
     orders.forEach(order => {
       const shippingAddress = order.shippingAddress as any
       const country = shippingAddress?.country || 'Unknown'
-      
+
       if (!countryData.has(country)) {
         countryData.set(country, {
           revenue: 0,
@@ -273,7 +279,7 @@ async function getRealGeographicData(start: Date, end: Date) {
           customers: new Set()
         })
       }
-      
+
       const data = countryData.get(country)
       data.revenue += order.total
       data.orders += 1
@@ -324,18 +330,18 @@ async function getRealInventoryStatus() {
     }
 
     return [
-      { 
-        status: 'In Stock', 
+      {
+        status: 'In Stock',
         count: inStockCount,
         percentage: Math.round((inStockCount / totalProducts) * 100 * 100) / 100
       },
-      { 
-        status: 'Low Stock', 
+      {
+        status: 'Low Stock',
         count: lowStockCount,
         percentage: Math.round((lowStockCount / totalProducts) * 100 * 100) / 100
       },
-      { 
-        status: 'Out of Stock', 
+      {
+        status: 'Out of Stock',
         count: outOfStockCount,
         percentage: Math.round((outOfStockCount / totalProducts) * 100 * 100) / 100
       }

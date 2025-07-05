@@ -100,8 +100,8 @@ async function fetchRealAnalyticsData(dateRange: { start: Date, end: Date }, cur
     // 2. Calculate real metrics
     const currentRevenueAmount = currentRevenue._sum.total || 0
     const previousRevenueAmount = previousRevenue._sum.total || 0
-    const currentOrders = currentRevenue._count || 0
-    const previousOrders = previousRevenue._count || 0
+    const currentOrders = currentRevenue._count.id || 0
+    const previousOrders = previousRevenue._count.id || 0
     
     const revenueChange = previousRevenueAmount > 0 
       ? ((currentRevenueAmount - previousRevenueAmount) / previousRevenueAmount) * 100 

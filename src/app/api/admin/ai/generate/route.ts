@@ -64,19 +64,26 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const body: AIGenerationRequest = await request.json()
+    const body = await request.json()
     
     // Handle different request formats for backward compatibility
     let type, context, options = {}
     
-    if (body.contentType) {
+    if (body.type) {
+      // Standard AIGenerationRequest format
+      type = body.type
+      context = body.context
+      options = body.options || {}
+    } else if (body.contentType) {
+      // Legacy format - convert contentType to type
       type = body.contentType === 'custom' ? 'product_description' : body.contentType
       context = body.productContext || body.context
       options = body.options || {}
     } else {
-      type = body.type
-      context = body.context
-      options = body.options || {}
+      return NextResponse.json({
+        success: false,
+        error: 'Missing content type. Please specify either "type" or "contentType"'
+      }, { status: 400 })
     }
 
     console.log('AI Generate Request:', { type, context, options })
@@ -181,7 +188,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
 
   } catch (error) {
-    console.error('AI API error:', error)
+    console.error('AI generation error:', error)
     return NextResponse.json({
       success: false,
       error: 'Internal server error'
