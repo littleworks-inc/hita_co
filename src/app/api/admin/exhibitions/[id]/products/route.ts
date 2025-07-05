@@ -8,6 +8,18 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth'
 import { db } from '@/lib/db'
 
+interface ExhibitionProductsSummary {
+  totalProducts: number
+  totalQuantityTaken: number
+  totalQuantitySold: number
+  totalValue: number
+  totalRevenue: number
+  clearanceProducts: number
+  customPricedProducts: number
+  sellThroughRate: number // ✅ ADD: Include sellThroughRate property
+}
+
+
 export async function POST(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -193,8 +205,8 @@ export async function GET(
       }
     })
 
-    // Calculate summary statistics
-    const summary = {
+    // ✅ FIXED: Calculate summary statistics with proper typing
+    const summary: ExhibitionProductsSummary = {
       totalProducts: exhibitionProducts.length,
       totalQuantityTaken: exhibitionProducts.reduce((sum, ep) => sum + ep.quantityTaken, 0),
       totalQuantitySold: exhibitionProducts.reduce((sum, ep) => sum + ep.quantitySold, 0),
@@ -213,10 +225,12 @@ export async function GET(
       clearanceProducts: exhibitionProducts.filter(ep => ep.isClearance).length,
       customPricedProducts: exhibitionProducts.filter(ep => 
         ep.exhibitionPrice && ep.exhibitionPrice !== ep.product.sellingPriceUSD
-      ).length
+      ).length,
+      // ✅ FIXED: Calculate sell-through rate directly in the object
+      sellThroughRate: 0 // Will be calculated below
     }
 
-    // Calculate sell-through rate
+    // ✅ FIXED: Calculate sell-through rate
     summary.sellThroughRate = summary.totalQuantityTaken > 0 
       ? (summary.totalQuantitySold / summary.totalQuantityTaken) * 100 
       : 0
