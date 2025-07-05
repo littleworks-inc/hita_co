@@ -29,12 +29,6 @@ model Category {
   slug                  String     @unique
   parentId              String?
   
-  // ✅ NEW: Category-specific business defaults
-  defaultProfitMargin   Float?     // Recommended profit margin for this category
-  defaultDiscountMax    Float?     // Maximum discount allowed for this category
-  suggestedTags         String[]   // Common tags for this category
-  averagePrice          Float?     // Average price point for pricing guidance
-  seasonality           String?    // JSON for seasonal data
   
   // Size system defaults
   defaultRequiresSizes  Boolean    @default(false)
@@ -411,31 +405,32 @@ model ExhibitionSaleItem {
   saleId                String
   exhibitionProductId   String
   productId             String
-  productSizeId         String?           // ✅ NEW: Size reference
-  sizeLabel             String?           // ✅ NEW: Size display
+  productSizeId         String?           // ✅ Size reference
+  sizeLabel             String?           // ✅ Size display text ("Medium", "Large")
   
-  // Pricing (at time of sale)
-  originalPrice         Float             // Product's original price
-  exhibitionPrice       Float             // Exhibition price (if different)
-  discountApplied       Float             @default(0) // Individual item discount
-  finalPrice            Float             // What was actually charged
+  // ✅ ADD: Product information (for receipt and reporting)
+  productName           String            // Product name at time of sale
+  productSku            String            // Product SKU at time of sale
+  categoryName          String            // Category name at time of sale
   
-  quantity              Int               @default(1)
-  lineTotal             Float             // finalPrice * quantity
+  // ✅ ADD: Quantity and pricing details
+  quantity              Int               // Quantity sold
+  originalPrice         Float             // Original store price
+  exhibitionPrice       Float             // Exhibition price (before discounts)
+  finalPrice            Float             // Final price per item (after all discounts)
+  lineTotal             Float             // Final price × quantity
+  discount              Float             @default(0) // Total discount amount for this line
   
-  // Metadata
-  wasScanned            Boolean           @default(false) // Was barcode scanned?
-  scanMethod            String?           // "BARCODE" or "SKU" or "MANUAL"
-  appliedDiscount       Float             @default(0)     // Individual item discount
-  
+  // ✅ ADD: Timestamps
   createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
   
   // Relations
   sale                  ExhibitionSale    @relation(fields: [saleId], references: [id], onDelete: Cascade)
   exhibitionProduct     ExhibitionProduct @relation(fields: [exhibitionProductId], references: [id])
   product               Product           @relation(fields: [productId], references: [id])
   productSize           ProductSize?      @relation(fields: [productSizeId], references: [id])
-  
+
   @@map("exhibition_sale_items")
 }
 

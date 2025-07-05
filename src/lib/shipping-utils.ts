@@ -2,6 +2,8 @@
 // Updated to work with new explicit many-to-many relationship
 
 import { db } from '@/lib/db'
+import { Prisma } from '@prisma/client'
+
 
 // =================
 // INTERFACES
@@ -29,6 +31,15 @@ export interface ShippingCalculationResult {
   error?: string
 }
 
+export interface ShippingAddress {
+  street: string
+  city: string
+  state: string
+  postalCode: string
+  country: string
+  apartment?: string
+}
+
 export interface ShippingZoneWithRates {
   id: string
   name: string
@@ -47,6 +58,96 @@ export interface ShippingZoneWithRates {
   }>
 }
 
+/**
+ * Safely parse shipping address from Prisma JsonValue
+ * @param jsonValue - The JsonValue from Prisma (can be null, string, object, etc.)
+ * @returns Parsed shipping address or null if invalid
+ */
+export function parseShippingAddress(jsonValue: Prisma.JsonValue): ShippingAddress | null {
+  try {
+    // Handle null or undefined
+    if (jsonValue === null || jsonValue === undefined) {
+      return null
+    }
+
+    // If it's already an object, validate and return it
+    if (typeof jsonValue === 'object' && jsonValue !== null && !Array.isArray(jsonValue)) {
+      const obj = jsonValue as any
+      if (obj.street && obj.city && obj.state && obj.postalCode && obj.country) {
+        return obj as ShippingAddress
+      }
+    }
+
+    // If it's a string, try to parse it
+    if (typeof jsonValue === 'string') {
+      const parsed = JSON.parse(jsonValue)
+      
+      // Validate parsed object has required fields
+      if (parsed && typeof parsed === 'object' && 
+          parsed.street && parsed.city && parsed.state && 
+          parsed.postalCode && parsed.country) {
+        return parsed as ShippingAddress
+      }
+    }
+
+    // Invalid format
+    return null
+
+  } catch (error) {
+    console.error('Error parsing shipping address:', error)
+    return null
+  }
+}
+
+/**
+ * Format shipping address for display
+ * @param address - Shipping address object or null
+ * @returns Formatted address string
+ */
+export function formatShippingAddressDisplay(address: ShippingAddress | null): string {
+  if (!address) {
+    return 'No shipping address provided'
+  }
+
+  const parts = [
+    address.street,
+    address.apartment && `Apt ${address.apartment}`,
+    address.city,
+    address.state,
+    address.postalCode,
+    address.country
+  ].filter(Boolean)
+
+  return parts.join(', ')
+}
+
+/**
+ * Validate shipping address completeness
+ * @param address - Shipping address to validate
+ * @returns Validation result
+ */
+export function validateShippingAddress(address: any): {
+  isValid: boolean
+  errors: string[]
+} {
+  const errors: string[] = []
+
+  if (!address) {
+    errors.push('Shipping address is required')
+    return { isValid: false, errors }
+  }
+
+  if (!address.street?.trim()) errors.push('Street address is required')
+  if (!address.city?.trim()) errors.push('City is required')
+  if (!address.state?.trim()) errors.push('State/Province is required')
+  if (!address.postalCode?.trim()) errors.push('Postal code is required')
+  if (!address.country?.trim()) errors.push('Country is required')
+
+  return {
+    isValid: errors.length === 0,
+    errors
+  }
+}
 // =================
 // CORE FUNCTIONS (FIXED)
 // =================

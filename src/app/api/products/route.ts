@@ -1,9 +1,10 @@
 // =====================================
-// src/app/api/products/route.ts - UPDATED Customer Products API
+// src/app/api/products/route.ts - FIXED Customer Products API
 // =====================================
 
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { Prisma } from '@prisma/client' // ✅ FIXED: Add Prisma import for types
 
 // GET /api/products - Fetch published products for customers with proper stock filtering
 export async function GET(request: NextRequest) {
@@ -19,6 +20,9 @@ export async function GET(request: NextRequest) {
     const sortOrder = searchParams.get('sortOrder') || 'desc'
     const featured = searchParams.get('featured') === 'true'
     const inStock = searchParams.get('inStock') === 'true'
+
+    // ✅ FIXED: Ensure sortOrder is properly typed as SortOrder
+    const validSortOrder: Prisma.SortOrder = (sortOrder === 'asc' || sortOrder === 'desc') ? sortOrder : 'desc'
 
     // Build where clause for customer products
     const where: any = {
@@ -64,6 +68,27 @@ export async function GET(request: NextRequest) {
 
     // Count total products matching criteria
     const totalCount = await db.product.count({ where })
+
+    // ✅ FIXED: Properly typed orderBy array
+    let orderByArray: Prisma.ProductOrderByWithRelationInput[] = []
+
+    // Build dynamic sorting based on sortBy parameter
+    if (sortBy === 'price') {
+      orderByArray.push({ sellingPriceUSD: validSortOrder })
+    } else if (sortBy === 'name') {
+      orderByArray.push({ name: validSortOrder })
+    } else if (sortBy === 'featured') {
+      orderByArray.push({ isFeatured: 'desc' }, { createdAt: 'desc' })
+    } else {
+      // Default: sort by creation date
+      orderByArray.push({ createdAt: validSortOrder })
+    }
+
+    // Add secondary sorts
+    orderByArray.push(
+      { isFeatured: 'desc' },      // Secondary sort by featured status
+      { stockQuantity: 'desc' }     // Tertiary sort by stock status (in-stock first)
+    )
 
     // Fetch products with all necessary data
     const products = await db.product.findMany({
@@ -117,21 +142,7 @@ export async function GET(request: NextRequest) {
           }
         }
       },
-      orderBy: [
-        // Dynamic sorting
-        ...(sortBy === 'price' 
-          ? [{ sellingPriceUSD: sortOrder === 'asc' ? 'asc' : 'desc' }]
-          : sortBy === 'name'
-          ? [{ name: sortOrder === 'asc' ? 'asc' : 'desc' }]
-          : sortBy === 'featured'
-          ? [{ isFeatured: 'desc' }, { createdAt: 'desc' }]
-          : [{ createdAt: sortOrder === 'asc' ? 'asc' : 'desc' }]
-        ),
-        // Secondary sort by featured status
-        { isFeatured: 'desc' },
-        // Tertiary sort by stock status (in-stock first)
-        { stockQuantity: 'desc' }
-      ],
+      orderBy: orderByArray, // ✅ FIXED: Use properly typed array
       skip: (page - 1) * limit,
       take: limit
     })

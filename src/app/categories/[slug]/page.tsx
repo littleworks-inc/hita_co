@@ -1,7 +1,5 @@
-// src/app/categories/[slug]/page.tsx
-// =====================================
-// 🔧 FIXED: Category Slug Page - Syntax Error Resolved
-// =====================================
+// ✅ FIXED: /src/app/categories/[slug]/page.tsx
+// Removed non-existent isActive field from Category queries
 
 import { Suspense } from 'react'
 import { notFound } from 'next/navigation'
@@ -35,7 +33,7 @@ interface CategoryPageProps {
 async function getStoreSettings() {
   try {
     return await db.storeSetting.findFirst({
-      where: { id: 'store_1' }
+      where: { id: 'default' }
     })
   } catch (error) {
     console.error('Error fetching store settings:', error)
@@ -43,13 +41,13 @@ async function getStoreSettings() {
   }
 }
 
-// Get category by slug
+// ✅ FIXED: Get category by slug (removed isActive filter)
 async function getCategory(slug: string) {
   try {
     return await db.category.findFirst({
       where: { 
-        slug: slug,
-        isActive: true
+        slug: slug
+        // ✅ REMOVED: isActive: true (field doesn't exist in Category model)
       },
       include: {
         _count: {
@@ -57,7 +55,7 @@ async function getCategory(slug: string) {
             products: {
               where: {
                 status: 'PUBLISHED',
-                isActive: true
+                isActive: true // ✅ This is valid - Product model HAS isActive field
               }
             }
           }
@@ -80,11 +78,11 @@ async function getCategoryProducts(
     const pageSize = 12
     const skip = (page - 1) * pageSize
 
-    // Build where clause
+    // Build where clause for products (Product model HAS isActive field)
     const where: any = {
       categoryId: categoryId,
       status: 'PUBLISHED',
-      isActive: true,
+      isActive: true, // ✅ Valid - Product model has isActive field
       stockQuantity: { gt: 0 }
     }
 
@@ -125,7 +123,7 @@ async function getCategoryProducts(
           category: true,
           country: true,
           productSizes: {
-            where: { isActive: true },
+            where: { isActive: true }, // ✅ Valid - ProductSize model has isActive field
             orderBy: { sortOrder: 'asc' }
           }
         },
@@ -164,76 +162,57 @@ export async function generateMetadata({ params }: CategoryPageProps) {
     }
   }
 
-  return {
-    title: `${category.name} - Hita&Co`,
-    description: category.description || `Browse our collection of ${category.name} products.`,
-    openGraph: {
-      title: category.name,
-      description: category.description || `Browse our collection of ${category.name} products.`,
-      type: 'website'
-    }
-  }
+  return generateCategoryMetadata(category)
 }
 
 export default async function CategoryPage({ params, searchParams }: CategoryPageProps) {
   // Fetch data in parallel
-  const [storeSettings, category] = await Promise.all([
-    getStoreSettings(),
-    getCategory(params.slug)
+  const [category, storeSettings] = await Promise.all([
+    getCategory(params.slug),
+    getStoreSettings()
   ])
 
-  // If category not found, show 404
+  // Handle category not found
   if (!category) {
     notFound()
   }
 
   // Get products for this category
   const { products, totalCount, totalPages, currentPage } = await getCategoryProducts(
-    category.id,
+    category.id, 
     searchParams
   )
 
+  // Generate structured data
+  const breadcrumbJsonLd = generateBreadcrumbJsonLd([
+    { name: 'Home', url: '/' },
+    { name: 'Categories', url: '/categories' },
+    { name: category.name, url: `/categories/${category.slug}` }
+  ])
+
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Structured Data */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
+      />
+
       <CustomerNavigation storeSettings={storeSettings} />
       
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Breadcrumb */}
-        <div className="mb-8">
-          <div className="flex items-center gap-2 text-sm text-gray-600">
-            <Link 
-              href="/" 
-              className="hover:text-purple-600 transition-colors"
-            >
-              Home
-            </Link>
-            <ChevronRight className="h-4 w-4" />
-            <Link 
-              href="/categories" 
-              className="hover:text-purple-600 transition-colors"
-            >
-              Categories
-            </Link>
-            <ChevronRight className="h-4 w-4" />
-            <span className="text-gray-900 font-medium">{category.name}</span>
-          </div>
-        </div>
-
         {/* Category Header */}
         <div className="mb-8">
-          <div className="flex items-start justify-between">
-            <div className="flex-1">
-              <h1 className="text-3xl font-bold text-gray-900 mb-4 flex items-center gap-3">
-                <Tag className="h-8 w-8 text-purple-600" />
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900 mb-2">
                 {category.name}
               </h1>
-              
               {category.description && (
-                <p className="text-lg text-gray-600 mb-4 max-w-3xl">
+                <p className="text-lg text-gray-600 mb-4">
                   {category.description}
                 </p>
               )}
-              
               <p className="text-sm text-gray-500">
                 {totalCount} product{totalCount !== 1 ? 's' : ''} in this category
               </p>
@@ -359,18 +338,6 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
           </>
         )}
       </main>
-
-      {/* JSON-LD Structured Data */}
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{
-          __html: JSON.stringify(generateBreadcrumbJsonLd([
-            { name: 'Home', url: '/' },
-            { name: 'Categories', url: '/categories' },
-            { name: category.name, url: `/categories/${category.slug}` }
-          ]))
-        }}
-      />
     </div>
   )
 }
