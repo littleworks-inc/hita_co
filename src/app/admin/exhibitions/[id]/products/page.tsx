@@ -24,7 +24,7 @@ interface ExhibitionProductsPageProps {
 
 export default async function ExhibitionProductsPage({ params }: ExhibitionProductsPageProps) {
   const session = await getSession()
-  
+
   if (!session) {
     redirect('/admin/login')
   }
@@ -70,13 +70,13 @@ export default async function ExhibitionProductsPage({ params }: ExhibitionProdu
   const totalProductsSold = exhibition.products.reduce((sum, p) => sum + p.quantitySold, 0)
   const totalValue = exhibition.products.reduce((sum, p) => sum + (p.quantityTaken * p.product.sellingPriceUSD), 0)
   const soldValue = exhibition.products.reduce((sum, p) => sum + (p.quantitySold * p.product.sellingPriceUSD), 0)
-  const sellThroughRate = totalProductsTaken > 0 ? 
+  const sellThroughRate = totalProductsTaken > 0 ?
     (totalProductsSold / totalProductsTaken) * 100 : 0
 
   return (
     <div className="min-h-screen bg-gray-50">
       <AdminNavigation />
-      
+
       <main className="lg:pl-64">
         <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
           <div className="px-4 py-6 sm:px-0">
@@ -164,9 +164,14 @@ export default async function ExhibitionProductsPage({ params }: ExhibitionProdu
 
             {/* Exhibition Products Manager - Full Width */}
             <div className="w-full">
-              <ExhibitionProductsManager 
+              <ExhibitionProductsManager
                 exhibition={exhibition}
-                exhibitionProducts={exhibition.products}
+                exhibitionProducts={exhibition.products.map((product: any) => ({
+                  ...product,
+                  exhibitionPrice: product.exhibitionPrice === null ? undefined : product.exhibitionPrice,
+                  originalPrice: product.originalPrice === null ? undefined : product.originalPrice,
+                  discountPercentage: product.discountPercentage === null ? undefined : product.discountPercentage
+                }))}
                 availableProducts={availableProducts}
               />
             </div>
