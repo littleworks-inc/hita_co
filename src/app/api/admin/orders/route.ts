@@ -1,6 +1,9 @@
+// File: src/app/api/admin/orders/route.ts
+
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth'
 import { db } from '@/lib/db'
+import { Prisma, OrderStatus, OrderSource } from '@prisma/client' // ✅ ADD: Import OrderSource enum
 
 export async function GET(request: NextRequest) {
   try {
@@ -16,27 +19,33 @@ export async function GET(request: NextRequest) {
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '10')
 
-    // Build where clause
-    const where: any = {}
+    // ✅ FIXED: Build where clause with proper typing
+    const where: Prisma.OrderWhereInput = {}
 
     // Search filter
     if (search) {
       where.OR = [
-        { orderNumber: { contains: search, mode: 'insensitive' } },
-        { customerName: { contains: search, mode: 'insensitive' } },
-        { customerEmail: { contains: search, mode: 'insensitive' } },
-        { customerPhone: { contains: search, mode: 'insensitive' } }
+        { orderNumber: { contains: search, mode: Prisma.QueryMode.insensitive } },
+        { customerName: { contains: search, mode: Prisma.QueryMode.insensitive } },
+        { customerEmail: { contains: search, mode: Prisma.QueryMode.insensitive } },
+        { customerPhone: { contains: search, mode: Prisma.QueryMode.insensitive } }
       ]
     }
 
-    // Status filter
+    // ✅ FIXED: Status filter with proper enum validation
     if (status !== 'all') {
-      where.status = status
+      // Validate that the status is a valid OrderStatus enum value
+      if (Object.values(OrderStatus).includes(status as OrderStatus)) {
+        where.status = status as OrderStatus
+      }
     }
 
-    // Source filter
+    // ✅ FIXED: Source filter with proper enum validation
     if (source !== 'all') {
-      where.source = source
+      // Validate that the source is a valid OrderSource enum value
+      if (Object.values(OrderSource).includes(source as OrderSource)) {
+        where.source = source as OrderSource
+      }
     }
 
     // Get total count
@@ -70,9 +79,21 @@ export async function GET(request: NextRequest) {
       take: limit
     })
 
-    // Calculate summary statistics
+    // ✅ FIXED: Calculate summary statistics with proper where clause typing
+    const statsWhere: Prisma.OrderWhereInput = {}
+    
+    // Add status filter if valid
+    if (status !== 'all' && Object.values(OrderStatus).includes(status as OrderStatus)) {
+      statsWhere.status = status as OrderStatus
+    }
+    
+    // Add source filter if valid
+    if (source !== 'all' && Object.values(OrderSource).includes(source as OrderSource)) {
+      statsWhere.source = source as OrderSource
+    }
+
     const stats = await db.order.aggregate({
-      where: status !== 'all' ? { status } : {},
+      where: statsWhere,
       _count: { id: true },
       _sum: { total: true },
       _avg: { total: true }
@@ -82,6 +103,13 @@ export async function GET(request: NextRequest) {
     const statusBreakdown = await db.order.groupBy({
       by: ['status'],
       _count: { status: true },
+      _sum: { total: true }
+    })
+
+    // Get source breakdown
+    const sourceBreakdown = await db.order.groupBy({
+      by: ['source'],
+      _count: { source: true },
       _sum: { total: true }
     })
 
@@ -100,6 +128,11 @@ export async function GET(request: NextRequest) {
         statusBreakdown: statusBreakdown.map(item => ({
           status: item.status,
           count: item._count.status,
+          revenue: item._sum.total || 0
+        })),
+        sourceBreakdown: sourceBreakdown.map(item => ({
+          source: item.source,
+          count: item._count.source,
           revenue: item._sum.total || 0
         }))
       }
@@ -122,20 +155,52 @@ export async function PATCH(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { orderId, status } = body
+    const { orderId, status, source } = body
 
-    if (!orderId || !status) {
+    if (!orderId) {
       return NextResponse.json(
-        { error: 'Order ID and status are required' },
+        { error: 'Order ID is required' },
         { status: 400 }
       )
     }
 
-    // Update order status only (since notes and trackingNumber don't exist in schema)
+    // Prepare update data
+    const updateData: any = {}
+
+    // ✅ FIXED: Validate status before updating
+    if (status !== undefined) {
+      if (!Object.values(OrderStatus).includes(status as OrderStatus)) {
+        return NextResponse.json(
+          { error: 'Invalid order status' },
+          { status: 400 }
+        )
+      }
+      updateData.status = status as OrderStatus
+    }
+
+    // ✅ FIXED: Validate source before updating
+    if (source !== undefined) {
+      if (!Object.values(OrderSource).includes(source as OrderSource)) {
+        return NextResponse.json(
+          { error: 'Invalid order source' },
+          { status: 400 }
+        )
+      }
+      updateData.source = source as OrderSource
+    }
+
+    if (Object.keys(updateData).length === 0) {
+      return NextResponse.json(
+        { error: 'No valid fields to update' },
+        { status: 400 }
+      )
+    }
+
+    // Update order with proper typing
     const updatedOrder = await db.order.update({
       where: { id: orderId },
       data: {
-        status,
+        ...updateData,
         updatedAt: new Date()
       },
       include: {

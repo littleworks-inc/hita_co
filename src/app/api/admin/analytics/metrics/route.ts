@@ -2,6 +2,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth'
 import { db } from '@/lib/db'
 
+interface CategoryWithProducts {
+  id: string
+  name: string
+  products: {
+    id: string
+  }[]
+}
+
 export async function GET(request: NextRequest) {
   try {
     const session = await getSession()
@@ -249,7 +257,12 @@ function getNoProductsState() {
   }
 }
 
-function getEmptyStateData(totalProducts: number, lowStockProducts: number, outOfStockProducts: number, categoryPerformance: any[]) {
+function getEmptyStateData(
+  totalProducts: number, 
+  lowStockProducts: number, 
+  outOfStockProducts: number, 
+  categoryPerformance: CategoryWithProducts[]
+) {
   const activeProducts = Math.max(0, totalProducts - outOfStockProducts)
   
   return {
@@ -273,7 +286,8 @@ function getEmptyStateData(totalProducts: number, lowStockProducts: number, outO
       topCountry: 'No orders yet'
     },
     salesTrend: [],
-    categoryPerformance: categoryPerformance.map(cat => ({
+    // ✅ FIXED: Proper typing here too
+    categoryPerformance: categoryPerformance.map((cat: CategoryWithProducts) => ({
       category: cat.name,
       revenue: 0,
       orders: 0,
@@ -300,7 +314,19 @@ function getEmptyStateData(totalProducts: number, lowStockProducts: number, outO
   }
 }
 
-function getRealAnalyticsData(data: any) {
+function getRealAnalyticsData(data: {
+  currentRevenueAmount: number
+  previousRevenueAmount: number
+  currentOrders: number
+  previousOrders: number
+  revenueChange: number
+  ordersChange: number
+  totalProducts: number
+  lowStockProducts: number
+  outOfStockProducts: number
+  categoryPerformance: CategoryWithProducts[]
+  salesTrend: any[]
+}) {
   const {
     currentRevenueAmount,
     previousRevenueAmount,
@@ -345,7 +371,8 @@ function getRealAnalyticsData(data: any) {
       topCountry: 'United States' // Get from real order data in production
     },
     salesTrend,
-    categoryPerformance: categoryPerformance.map(cat => ({
+    // ✅ FIXED: Now TypeScript knows the exact structure
+    categoryPerformance: categoryPerformance.map((cat: CategoryWithProducts) => ({
       category: cat.name,
       revenue: 0, // Calculate real revenue per category in production
       orders: 0,  // Calculate real orders per category in production

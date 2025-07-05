@@ -1,6 +1,9 @@
+// File: src/app/api/admin/customers/route.ts
+
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth'
 import { db } from '@/lib/db'
+import { Prisma } from '@prisma/client' // ✅ ADD THIS IMPORT
 
 export async function GET(request: NextRequest) {
   try {
@@ -16,12 +19,12 @@ export async function GET(request: NextRequest) {
     const sortBy = searchParams.get('sortBy') || 'lastOrderDate'
     const sortOrder = searchParams.get('sortOrder') || 'desc'
 
-    // Get all unique customers from orders
-    const whereClause = search ? {
+    // ✅ FIXED: Properly typed whereClause with Prisma types
+    const whereClause: Prisma.OrderWhereInput = search ? {
       OR: [
-        { customerName: { contains: search, mode: 'insensitive' } },
-        { customerEmail: { contains: search, mode: 'insensitive' } },
-        { customerPhone: { contains: search, mode: 'insensitive' } }
+        { customerName: { contains: search, mode: Prisma.QueryMode.insensitive } },
+        { customerEmail: { contains: search, mode: Prisma.QueryMode.insensitive } },
+        { customerPhone: { contains: search, mode: Prisma.QueryMode.insensitive } }
       ]
     } : {}
 
