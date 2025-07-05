@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { Prisma } from '@prisma/client'
+import { parseShippingAddress } from '@/lib/shipping-utils'
 
 // Order request interfaces
 interface OrderCreateRequest {
@@ -78,10 +79,10 @@ function generateOrderNumber(): string {
 
 // Payment method mapping
 const paymentMethodMap = {
-  'credit_card': 'CREDIT_CARD',
-  'debit_card': 'DEBIT_CARD', 
-  'paypal': 'PAYPAL',
-  'bank_transfer': 'BANK_TRANSFER'
+  'credit_card': 'CARD',      // ✅ FIXED: Map to CARD (not CREDIT_CARD)
+  'debit_card': 'CARD',       // ✅ FIXED: Map to CARD (not DEBIT_CARD)
+  'paypal': 'OTHER',          // ✅ FIXED: Map to OTHER (PAYPAL not in enum)
+  'bank_transfer': 'BANK_TRANSFER'  // ✅ This one is correct
 } as const
 
 // Create order with enhanced atomic stock management
@@ -338,7 +339,7 @@ export async function GET(request: NextRequest) {
       customerName: order.customerName,
       customerEmail: order.customerEmail,
       customerPhone: order.customerPhone,
-      shippingAddress: JSON.parse(order.shippingAddress),
+      shippingAddress: parseShippingAddress(order.shippingAddress),
       items: order.items.map(item => ({
         id: item.id,
         productId: item.productId,
