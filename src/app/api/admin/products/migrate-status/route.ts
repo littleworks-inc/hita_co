@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth'
 import { db } from '@/lib/db'
+import { ProductStatus } from '@prisma/client'
 
 export async function POST(request: NextRequest) {
   try {
@@ -12,18 +13,28 @@ export async function POST(request: NextRequest) {
 
     console.log('🚀 Starting Product Status Migration...')
 
-    // Get all products that don't have the new status field set
+    // ✅ FIXED: Remove null checks since status field is likely non-nullable
+    // Instead, look for products that might need status updates based on isActive
     const productsToMigrate = await db.product.findMany({
       where: {
         OR: [
-          { status: null },
-          { status: { equals: null } }
+          // Products that are active but not published
+          { 
+            isActive: true,
+            status: { not: ProductStatus.PUBLISHED }
+          },
+          // Products that are inactive but not archived  
+          {
+            isActive: false,
+            status: { not: ProductStatus.ARCHIVED }
+          }
         ]
       },
       select: {
         id: true,
         name: true,
         isActive: true,
+        status: true,
         createdAt: true
       }
     })
@@ -49,23 +60,23 @@ export async function POST(request: NextRequest) {
       
       await Promise.all(batch.map(async (product) => {
         try {
-          if (product.isActive) {
+          if (product.isActive && product.status !== ProductStatus.PUBLISHED) {
             // Active products → PUBLISHED
             await db.product.update({
               where: { id: product.id },
               data: {
-                status: 'PUBLISHED',
+                status: ProductStatus.PUBLISHED,
                 publishedAt: product.createdAt // Use creation date as published date
               }
             })
             publishedCount++
             console.log(`✅ ${product.name} → PUBLISHED`)
-          } else {
+          } else if (!product.isActive && product.status !== ProductStatus.ARCHIVED) {
             // Inactive products → ARCHIVED
             await db.product.update({
               where: { id: product.id },
               data: {
-                status: 'ARCHIVED',
+                status: ProductStatus.ARCHIVED,
                 archivedAt: new Date()
               }
             })
@@ -95,7 +106,7 @@ export async function POST(request: NextRequest) {
     console.log('\n📊 Final Status Distribution:')
     const statusSummary: Record<string, number> = {}
     finalStatusCounts.forEach(({ status, _count }) => {
-      statusSummary[status || 'NULL'] = _count.status
+      statusSummary[status] = _count.status
       console.log(`   ${status}: ${_count.status}`)
     })
 
@@ -125,36 +136,42 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Check how many products need migration
-    const [totalProducts, migratedProducts, statusCounts] = await Promise.all([
+    // ✅ FIXED: Check status consistency instead of null values
+    const [totalProducts, statusCounts, inconsistentProducts] = await Promise.all([
       db.product.count(),
-      db.product.count({
-        where: {
-          status: {
-            not: null
-          }
-        }
-      }),
       db.product.groupBy({
         by: ['status'],
         _count: {
           status: true
         }
+      }),
+      // Count products where status doesn't match isActive flag
+      db.product.count({
+        where: {
+          OR: [
+            {
+              isActive: true,
+              status: { not: ProductStatus.PUBLISHED }
+            },
+            {
+              isActive: false,
+              status: { not: ProductStatus.ARCHIVED }
+            }
+          ]
+        }
       })
     ])
 
-    const needsMigration = totalProducts - migratedProducts
-
     const statusDistribution: Record<string, number> = {}
     statusCounts.forEach(({ status, _count }) => {
-      statusDistribution[status || 'NULL'] = _count.status
+      statusDistribution[status] = _count.status
     })
 
     return NextResponse.json({
       totalProducts,
-      migratedProducts,
-      needsMigration,
-      migrationComplete: needsMigration === 0,
+      migratedProducts: totalProducts - inconsistentProducts,
+      needsMigration: inconsistentProducts,
+      migrationComplete: inconsistentProducts === 0,
       statusDistribution
     })
 

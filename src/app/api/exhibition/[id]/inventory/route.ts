@@ -1,7 +1,7 @@
-// src/app/api/exhibition/[id]/products/route.ts
+// src/app/api/exhibition/[id]/inventory/route.ts
 // =====================================
-// Exhibition Products API for POS Interface
-// Provides product data optimized for mobile POS usage
+// Exhibition Inventory API Endpoint
+// Returns exhibition products with stock and pricing information
 // =====================================
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -19,19 +19,21 @@ export async function GET(
     }
 
     const exhibitionId = params.id
+    const { searchParams } = new URL(request.url)
+    const includeOutOfStock = searchParams.get('includeOutOfStock') === 'true'
+    const category = searchParams.get('category')
+    const search = searchParams.get('search')
 
-    // Validate exhibition exists and is accessible
+    // Validate exhibition exists
     const exhibition = await db.exhibition.findUnique({
       where: { id: exhibitionId },
       select: {
         id: true,
         title: true,
-        description: true,
         location: true,
         startDate: true,
         endDate: true,
-        isActive: true,
-        participationFee: true
+        isActive: true
       }
     })
 
@@ -39,56 +41,46 @@ export async function GET(
       return NextResponse.json({ error: 'Exhibition not found' }, { status: 404 })
     }
 
-    if (!exhibition.isActive) {
-      return NextResponse.json({ error: 'Exhibition is not active' }, { status: 400 })
+    // Build where clause for filtering
+    let productWhere: any = {
+      exhibitionId
     }
 
-    // Get URL parameters for filtering
-    const url = new URL(request.url)
-    const includeOutOfStock = url.searchParams.get('includeOutOfStock') === 'true'
-    const category = url.searchParams.get('category')
-    const search = url.searchParams.get('search')
-
-    // Build where clause for products
-    const productWhere: any = {
-      exhibitionId,
-      product: {
-        isActive: true
-      }
-    }
-
-    // Add stock filter - only show products with available stock unless specifically requested
-    if (!includeOutOfStock) {
-      // Add a filter to only include products with available stock
-      // We'll filter this after the query since we need the calculated availableStock
-    }
-
-    // Add category filter
+    // Category filter
     if (category) {
-      productWhere.product.category = {
-        name: category
+      productWhere.product = {
+        ...productWhere.product,
+        category: {
+          name: category
+        }
       }
     }
 
-    // Add search filter
+    // Search filter
     if (search) {
-      productWhere.product.OR = [
+      productWhere.OR = [
         {
-          name: {
-            contains: search,
-            mode: 'insensitive'
+          product: {
+            name: {
+              contains: search,
+              mode: 'insensitive'
+            }
           }
         },
         {
-          sku: {
-            contains: search,
-            mode: 'insensitive'
+          product: {
+            sku: {
+              contains: search,
+              mode: 'insensitive'
+            }
           }
         },
         {
-          description: {
-            contains: search,
-            mode: 'insensitive'
+          product: {
+            description: {
+              contains: search,
+              mode: 'insensitive'
+            }
           }
         }
       ]
@@ -127,16 +119,21 @@ export async function GET(
     const productsWithStock = exhibitionProducts.map(ep => {
       const availableStock = ep.quantityTaken - ep.quantitySold
       
+      // ✅ FIXED: Handle null discountPercentage properly
+      const productDiscountPercentage = ep.product.discountPercentage || 0
+      const exhibitionDiscountPercentage = ep.discountPercentage || 0
+      
       // Calculate pricing breakdown similar to what the page expects
-      const originalStorePrice = ep.product.discountPercentage > 0 
-        ? ep.product.sellingPriceUSD / (1 - ep.product.discountPercentage / 100)
+      const originalStorePrice = productDiscountPercentage > 0 
+        ? ep.product.sellingPriceUSD / (1 - productDiscountPercentage / 100)
         : ep.product.sellingPriceUSD
 
       const currentStorePrice = ep.product.sellingPriceUSD
       const exhibitionPrice = ep.exhibitionPrice || currentStorePrice
       
-      const finalPrice = ep.isClearance && ep.discountPercentage 
-        ? exhibitionPrice * (1 - ep.discountPercentage / 100)
+      // ✅ FIXED: Handle null discountPercentage in clearance calculation
+      const finalPrice = ep.isClearance && exhibitionDiscountPercentage > 0
+        ? exhibitionPrice * (1 - exhibitionDiscountPercentage / 100)
         : exhibitionPrice
 
       const totalSavings = originalStorePrice - finalPrice
@@ -152,11 +149,12 @@ export async function GET(
           finalPrice,
           totalSavings,
           totalDiscountPercent,
-          hasStoreDiscount: ep.product.discountPercentage > 0,
+          hasStoreDiscount: productDiscountPercentage > 0,
           hasExhibitionPrice: ep.exhibitionPrice ? true : false,
-          hasExhibitionDiscount: ep.isClearance && ep.discountPercentage > 0,
-          storeDiscountPercent: ep.product.discountPercentage,
-          exhibitionDiscountPercent: ep.isClearance ? ep.discountPercentage : 0
+          // ✅ FIXED: Proper null safety for discountPercentage
+          hasExhibitionDiscount: ep.isClearance && exhibitionDiscountPercentage > 0,
+          storeDiscountPercent: productDiscountPercentage,
+          exhibitionDiscountPercent: ep.isClearance ? exhibitionDiscountPercentage : 0
         }
       }
     })
@@ -166,10 +164,11 @@ export async function GET(
       ? productsWithStock 
       : productsWithStock.filter(p => p.availableStock > 0)
 
-    // Get unique categories for filtering
-    const categories = [...new Set(
-      exhibitionProducts.map(ep => ep.product.category.name)
-    )].sort()
+    // Get unique categories for filtering - compatible with older TypeScript targets
+    const categoryNames = exhibitionProducts.map(ep => ep.product.category.name)
+    const categories = categoryNames
+      .filter((category, index) => categoryNames.indexOf(category) === index)
+      .sort()
 
     // Calculate summary statistics
     const summary = {

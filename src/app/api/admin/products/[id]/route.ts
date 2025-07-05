@@ -7,7 +7,21 @@ import { getSession } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { autoSyncAfterSizeChange } from '@/lib/stock-sync'
 
-// GET /api/admin/products/[id] - Fetch single product (unchanged)
+// =====================================
+// TYPE DEFINITIONS - TYPESCRIPT FIX
+// =====================================
+
+interface ProductSizeInput {
+  id?: string
+  size: string
+  sku: string
+  stockQuantity: number | string
+  lowStockAlert: number | string
+  isActive?: boolean
+  sortOrder?: number
+}
+
+// GET /api/admin/products/[id] - Fetch single product
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -192,12 +206,13 @@ export async function PUT(
 
         // Create new sizes if provided
         if (productSizes?.length > 0) {
-          const sizesData = productSizes.map((size, index) => ({
+          // ✅ TYPESCRIPT FIX: Properly typed size parameter
+          const sizesData = (productSizes as ProductSizeInput[]).map((size: ProductSizeInput, index: number) => ({
             productId: id,
             size: size.size,
             sku: size.sku,
-            stockQuantity: parseInt(size.stockQuantity) || 0,
-            lowStockAlert: parseInt(size.lowStockAlert) || 5,
+            stockQuantity: parseInt(String(size.stockQuantity)) || 0,
+            lowStockAlert: parseInt(String(size.lowStockAlert)) || 5,
             isActive: size.isActive ?? true,
             sortOrder: size.sortOrder ?? index
           }))
@@ -248,7 +263,7 @@ export async function PUT(
   }
 }
 
-// DELETE /api/admin/products/[id] - Delete product (unchanged)
+// DELETE /api/admin/products/[id] - Delete product
 export async function DELETE(
   request: NextRequest,
   { params }: { params: { id: string } }

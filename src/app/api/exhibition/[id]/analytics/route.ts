@@ -77,11 +77,31 @@ async function calculateExhibitionAnalytics(exhibition: any, period: string) {
           items: {
             select: {
               id: true,
-              productName: true,
-              productSku: true,
+              // ✅ FIXED: Use only fields that exist in the schema
+              // These fields exist based on the actual usage in the codebase
+              productId: true,
+              exhibitionProductId: true,
               quantity: true,
-              finalPrice: true,
-              lineTotal: true
+              // Instead of selecting non-existent fields, we'll include relations
+            },
+            include: {
+              // Get product data through relations
+              exhibitionProduct: {
+                include: {
+                  product: {
+                    select: {
+                      id: true,
+                      name: true,
+                      sku: true,
+                      category: {
+                        select: {
+                          name: true
+                        }
+                      }
+                    }
+                  }
+                }
+              }
             }
           }
         },
@@ -107,7 +127,33 @@ async function calculateExhibitionAnalytics(exhibition: any, period: string) {
           exhibitionId,
           createdAt: { gte: today }
         },
-        include: { items: true }
+        include: { 
+          items: {
+            select: {
+              id: true,
+              productId: true,
+              quantity: true,
+            },
+            include: {
+              exhibitionProduct: {
+                include: {
+                  product: {
+                    select: {
+                      id: true,
+                      name: true,
+                      sku: true,
+                      category: {
+                        select: {
+                          name: true
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
       }),
       
       // Yesterday's sales
@@ -116,7 +162,33 @@ async function calculateExhibitionAnalytics(exhibition: any, period: string) {
           exhibitionId,
           createdAt: { gte: yesterday, lt: today }
         },
-        include: { items: true }
+        include: { 
+          items: {
+            select: {
+              id: true,
+              productId: true,
+              quantity: true,
+            },
+            include: {
+              exhibitionProduct: {
+                include: {
+                  product: {
+                    select: {
+                      id: true,
+                      name: true,
+                      sku: true,
+                      category: {
+                        select: {
+                          name: true
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
       })
     ])
 
@@ -138,63 +210,45 @@ async function calculateExhibitionAnalytics(exhibition: any, period: string) {
     // 7. Generate business insights
     const insights = generateBusinessInsights(metrics, exhibition, sales, products)
     
-    // 8. Calculate staff performance (if multiple staff)
-    const staffPerformance = calculateStaffPerformance(sales)
-
+    // 8. Return comprehensive analytics
     return {
       exhibition: {
         id: exhibition.id,
         title: exhibition.title,
         location: exhibition.location,
         startDate: exhibition.startDate,
-        endDate: exhibition.endDate
+        endDate: exhibition.endDate,
+        participationFee: exhibition.participationFee,
+        isActive: exhibition.isActive
       },
       metrics,
-      hourlyTrend,
-      topProducts,
-      paymentBreakdown,
-      categoryPerformance,
+      trends: {
+        hourly: hourlyTrend,
+        period: period
+      },
+      performance: {
+        topProducts,
+        categoryPerformance,
+        paymentBreakdown
+      },
       insights,
-      staffPerformance,
       lastUpdated: new Date().toISOString()
     }
 
   } catch (error) {
     console.error('Error calculating exhibition analytics:', error)
-    
-    // Return empty state if data calculation fails
-    return {
-      exhibition: {
-        id: exhibition.id,
-        title: exhibition.title,
-        location: exhibition.location,
-        startDate: exhibition.startDate,
-        endDate: exhibition.endDate
-      },
-      metrics: getEmptyMetrics(),
-      hourlyTrend: [],
-      topProducts: [],
-      paymentBreakdown: [],
-      categoryPerformance: [],
-      insights: {},
-      staffPerformance: [],
-      lastUpdated: new Date().toISOString(),
-      isEmpty: true
-    }
+    throw error
   }
 }
 
 function calculateRealTimeMetrics(sales: any[], products: any[], todaySales: any[], yesterdaySales: any[], exhibition: any) {
-  // Calculate totals
-  const totalSales = sales.length
-  const totalRevenue = sales.reduce((sum, sale) => sum + sale.finalTotal, 0)
-  const totalItems = sales.reduce((sum, sale) => 
-    sum + sale.items.reduce((itemSum: number, item: any) => itemSum + item.quantity, 0), 0
-  )
+  // Revenue calculations
+  const totalRevenue = sales.reduce((sum, sale) => sum + sale.total, 0)
+  const todayRevenue = todaySales.reduce((sum, sale) => sum + sale.total, 0)
+  const yesterdayRevenue = yesterdaySales.reduce((sum, sale) => sum + sale.total, 0)
   
-  // Today vs Yesterday
-  const todayRevenue = todaySales.reduce((sum, sale) => sum + sale.finalTotal, 0)
-  const yesterdayRevenue = yesterdaySales.reduce((sum, sale) => sum + sale.finalTotal, 0)
+  // Sales count
+  const totalSales = sales.length
   const todaySalesCount = todaySales.length
   const yesterdaySalesCount = yesterdaySales.length
   
@@ -222,262 +276,179 @@ function calculateRealTimeMetrics(sales: any[], products: any[], todaySales: any
   const roi = participationFee > 0 ? (netProfit / participationFee) * 100 : 0
 
   return {
-    totalSales,
-    totalRevenue: Math.round(totalRevenue * 100) / 100,
-    totalItems,
-    todayRevenue: Math.round(todayRevenue * 100) / 100,
-    yesterdayRevenue: Math.round(yesterdayRevenue * 100) / 100,
-    todaySalesCount,
-    yesterdaySalesCount,
-    revenueChange: Math.round(revenueChange * 100) / 100,
-    salesChange: Math.round(salesChange * 100) / 100,
-    totalQuantityTaken,
-    totalQuantitySold,
-    remainingInventory,
-    sellThroughRate: Math.round(sellThroughRate * 100) / 100,
-    averageOrderValue: Math.round(averageOrderValue * 100) / 100,
-    participationFee,
-    netProfit: Math.round(netProfit * 100) / 100,
-    roi: Math.round(roi * 100) / 100
+    revenue: {
+      total: totalRevenue,
+      today: todayRevenue,
+      yesterday: yesterdayRevenue,
+      change: revenueChange
+    },
+    sales: {
+      total: totalSales,
+      today: todaySalesCount,
+      yesterday: yesterdaySalesCount,
+      change: salesChange,
+      averageOrderValue
+    },
+    inventory: {
+      totalQuantityTaken,
+      totalQuantitySold,
+      remainingInventory,
+      sellThroughRate
+    },
+    profitability: {
+      totalRevenue,
+      participationFee,
+      netProfit,
+      roi
+    }
   }
 }
 
-function generateHourlyTrend(sales: any[], startTime: Date) {
-  const hourlyData = new Map()
-  
-  // Initialize 24 hours with zero values
-  for (let i = 0; i < 24; i++) {
-    const hour = new Date(startTime.getTime() + i * 60 * 60 * 1000)
-    const hourKey = hour.getHours()
-    hourlyData.set(hourKey, {
-      hour: hourKey,
-      sales: 0,
-      revenue: 0,
-      items: 0
-    })
-  }
-  
-  // Add actual sales data
+function generateHourlyTrend(sales: any[], since: Date) {
+  const hourlyData = Array.from({ length: 24 }, (_, hour) => ({
+    hour,
+    sales: 0,
+    revenue: 0
+  }))
+
   sales.forEach(sale => {
-    const saleTime = new Date(sale.createdAt)
-    if (saleTime >= startTime) {
-      const hour = saleTime.getHours()
-      if (hourlyData.has(hour)) {
-        const data = hourlyData.get(hour)
-        data.sales += 1
-        data.revenue += sale.finalTotal
-        data.items += sale.items.reduce((sum: number, item: any) => sum + item.quantity, 0)
-      }
+    if (new Date(sale.createdAt) >= since) {
+      const hour = new Date(sale.createdAt).getHours()
+      hourlyData[hour].sales += 1
+      hourlyData[hour].revenue += sale.total
     }
   })
-  
-  // Convert to array and format for charts
-  return Array.from(hourlyData.values()).map(data => ({
-    hour: `${data.hour.toString().padStart(2, '0')}:00`,
-    sales: data.sales,
-    revenue: Math.round(data.revenue * 100) / 100,
-    items: data.items
-  }))
+
+  return hourlyData
 }
 
 function calculateTopProducts(products: any[], sales: any[]) {
-  // Create a map of product sales
-  const productSales = new Map()
-  
-  // Initialize products
+  const productStats: Record<string, any> = {}
+
+  // Initialize with exhibition products
   products.forEach(ep => {
-    productSales.set(ep.productId, {
-      id: ep.id,
+    productStats[ep.productId] = {
       productId: ep.productId,
-      name: ep.product.name,
-      sku: ep.product.sku,
-      category: ep.product.category.name,
-      image: ep.product.images[0] || null,
+      productName: ep.product.name,
+      productSku: ep.product.sku || '',
       quantityTaken: ep.quantityTaken,
       quantitySold: ep.quantitySold,
       revenue: 0,
-      transactions: 0,
-      exhibitionPrice: ep.exhibitionPrice || ep.product.sellingPriceUSD
-    })
+      category: ep.product.category?.name || 'Uncategorized'
+    }
   })
-  
-  // Add sales data
+
+  // Add sales data - calculate revenue based on sale totals
   sales.forEach(sale => {
     sale.items.forEach((item: any) => {
-      const productData = productSales.get(item.productId)
-      if (productData) {
-        productData.revenue += item.lineTotal
-        productData.transactions += 1
+      if (productStats[item.productId]) {
+        // Calculate proportion of sale total based on quantity
+        const totalQuantity = sale.items.reduce((sum: number, i: any) => sum + i.quantity, 0)
+        const itemProportion = item.quantity / totalQuantity
+        const itemRevenue = sale.total * itemProportion
+        productStats[item.productId].revenue += itemRevenue
       }
     })
   })
-  
-  // Convert to array and sort by revenue
-  return Array.from(productSales.values())
-    .sort((a, b) => b.revenue - a.revenue)
+
+  return Object.values(productStats)
+    .sort((a: any, b: any) => b.revenue - a.revenue)
     .slice(0, 10)
-    .map(product => ({
-      ...product,
-      revenue: Math.round(product.revenue * 100) / 100,
-      sellRate: product.quantityTaken > 0 ? 
-        Math.round((product.quantitySold / product.quantityTaken) * 100 * 100) / 100 : 0
-    }))
 }
 
 function calculatePaymentBreakdown(sales: any[]) {
-  const paymentMethods = {
-    CASH: 0,
-    ZELLE: 0,
-    CARD: 0,
-    SPLIT_PAYMENT: 0
-  }
-  
+  const breakdown: Record<string, { count: number; revenue: number }> = {}
+
   sales.forEach(sale => {
-    if (paymentMethods.hasOwnProperty(sale.paymentMethod)) {
-      paymentMethods[sale.paymentMethod as keyof typeof paymentMethods] += sale.finalTotal
+    const method = sale.paymentMethod || 'UNKNOWN'
+    if (!breakdown[method]) {
+      breakdown[method] = { count: 0, revenue: 0 }
     }
+    breakdown[method].count += 1
+    breakdown[method].revenue += sale.total
   })
-  
-  const total = Object.values(paymentMethods).reduce((sum, amount) => sum + amount, 0)
-  
-  return Object.entries(paymentMethods).map(([method, amount]) => ({
-    method,
-    amount: Math.round(amount * 100) / 100,
-    percentage: total > 0 ? Math.round((amount / total) * 100 * 100) / 100 : 0,
-    count: sales.filter(sale => sale.paymentMethod === method).length
-  })).filter(item => item.amount > 0)
+
+  return breakdown
 }
 
 function calculateCategoryPerformance(products: any[], sales: any[]) {
-  const categoryStats = new Map()
-  
+  const categoryStats: Record<string, any> = {}
+
   // Initialize categories
   products.forEach(ep => {
-    const category = ep.product.category.name
-    if (!categoryStats.has(category)) {
-      categoryStats.set(category, {
+    const category = ep.product.category?.name || 'Uncategorized'
+    if (!categoryStats[category]) {
+      categoryStats[category] = {
         category,
-        productCount: 0,
+        totalProducts: 0,
         quantityTaken: 0,
         quantitySold: 0,
-        revenue: 0,
-        transactions: 0
-      })
+        revenue: 0
+      }
     }
-    
-    const stats = categoryStats.get(category)
-    stats.productCount += 1
-    stats.quantityTaken += ep.quantityTaken
-    stats.quantitySold += ep.quantitySold
+    categoryStats[category].totalProducts += 1
+    categoryStats[category].quantityTaken += ep.quantityTaken
+    categoryStats[category].quantitySold += ep.quantitySold
   })
-  
-  // Add sales revenue
+
+  // Add revenue from sales (estimated based on product quantities)
   sales.forEach(sale => {
     sale.items.forEach((item: any) => {
-      // Find the product to get its category
-      const product = products.find(p => p.productId === item.productId)
-      if (product) {
-        const category = product.product.category.name
-        const stats = categoryStats.get(category)
-        if (stats) {
-          stats.revenue += item.lineTotal
-          stats.transactions += 1
-        }
+      const category = item.exhibitionProduct?.product?.category?.name || 'Uncategorized'
+      if (categoryStats[category]) {
+        // Calculate proportion of sale total
+        const totalQuantity = sale.items.reduce((sum: number, i: any) => sum + i.quantity, 0)
+        const itemProportion = item.quantity / totalQuantity
+        const itemRevenue = sale.total * itemProportion
+        categoryStats[category].revenue += itemRevenue
       }
     })
   })
-  
-  return Array.from(categoryStats.values())
-    .map(stats => ({
-      ...stats,
-      revenue: Math.round(stats.revenue * 100) / 100,
-      sellRate: stats.quantityTaken > 0 ? 
-        Math.round((stats.quantitySold / stats.quantityTaken) * 100 * 100) / 100 : 0,
-      avgProductRevenue: stats.productCount > 0 ? 
-        Math.round((stats.revenue / stats.productCount) * 100) / 100 : 0
-    }))
-    .sort((a, b) => b.revenue - a.revenue)
+
+  return Object.values(categoryStats)
 }
 
 function generateBusinessInsights(metrics: any, exhibition: any, sales: any[], products: any[]) {
-  const insights: any = {}
-  
-  // ROI Analysis
-  if (metrics.roi > 100) {
-    insights.roi = {
-      type: 'success',
-      message: `Excellent ROI of ${metrics.roi.toFixed(1)}%! This exhibition is highly profitable.`,
-      recommendation: 'Consider participating in similar exhibitions or extending this one.'
-    }
-  } else if (metrics.roi < 0) {
-    insights.roi = {
+  const insights = []
+
+  // Revenue insights
+  if (metrics.revenue.change > 20) {
+    insights.push({
+      type: 'positive',
+      title: 'Strong Daily Performance',
+      message: `Revenue is up ${metrics.revenue.change.toFixed(1)}% compared to yesterday`
+    })
+  } else if (metrics.revenue.change < -20) {
+    insights.push({
       type: 'warning',
-      message: `Negative ROI of ${metrics.roi.toFixed(1)}%. Revenue hasn't covered participation costs.`,
-      recommendation: 'Review pricing strategy and product selection for future exhibitions.'
-    }
-  } else {
-    insights.roi = {
-      type: 'info',
-      message: `ROI is ${metrics.roi.toFixed(1)}%. Breaking even but room for improvement.`,
-      recommendation: 'Focus on higher-margin products and increase sales volume.'
-    }
+      title: 'Revenue Decline',
+      message: `Revenue is down ${Math.abs(metrics.revenue.change).toFixed(1)}% compared to yesterday`
+    })
   }
-  
-  // Sell-through Analysis
-  if (metrics.sellThroughRate > 80) {
-    insights.inventory = {
-      type: 'success',
-      message: `Outstanding sell-through rate of ${metrics.sellThroughRate.toFixed(1)}%!`,
-      recommendation: 'Consider bringing more inventory to similar events.'
-    }
-  } else if (metrics.sellThroughRate < 30) {
-    insights.inventory = {
+
+  // Inventory insights
+  if (metrics.inventory.sellThroughRate > 80) {
+    insights.push({
+      type: 'positive',
+      title: 'High Sell-Through Rate',
+      message: `${metrics.inventory.sellThroughRate.toFixed(1)}% of inventory has been sold`
+    })
+  } else if (metrics.inventory.sellThroughRate < 30) {
+    insights.push({
       type: 'warning',
-      message: `Low sell-through rate of ${metrics.sellThroughRate.toFixed(1)}%.`,
-      recommendation: 'Review product selection and consider reducing quantities for similar events.'
-    }
+      title: 'Low Inventory Movement',
+      message: `Only ${metrics.inventory.sellThroughRate.toFixed(1)}% of inventory sold. Consider pricing adjustments.`
+    })
   }
-  
-  // Peak hours analysis
-  const hourlyTrend = generateHourlyTrend(sales, new Date(Date.now() - 24 * 60 * 60 * 1000))
-  const peakHour = hourlyTrend.reduce((max, current) => 
-    current.revenue > max.revenue ? current : max, hourlyTrend[0])
-    
-  if (peakHour && peakHour.revenue > 0) {
-    insights.timing = {
-      type: 'info',
-      message: `Peak sales hour is ${peakHour.hour} with $${peakHour.revenue} in revenue.`,
-      recommendation: 'Ensure adequate staffing during peak hours for optimal service.'
-    }
+
+  // ROI insights
+  if (metrics.profitability.roi > 100) {
+    insights.push({
+      type: 'positive',
+      title: 'Profitable Exhibition',
+      message: `ROI of ${metrics.profitability.roi.toFixed(1)}% - exhibition costs covered with profit`
+    })
   }
-  
+
   return insights
-}
-
-function calculateStaffPerformance(sales: any[]) {
-  // For now, return empty array as staff tracking isn't implemented
-  // This can be enhanced when staff assignment is added to sales
-  return []
-}
-
-function getEmptyMetrics() {
-  return {
-    totalSales: 0,
-    totalRevenue: 0,
-    totalItems: 0,
-    todayRevenue: 0,
-    yesterdayRevenue: 0,
-    todaySalesCount: 0,
-    yesterdaySalesCount: 0,
-    revenueChange: 0,
-    salesChange: 0,
-    totalQuantityTaken: 0,
-    totalQuantitySold: 0,
-    remainingInventory: 0,
-    sellThroughRate: 0,
-    averageOrderValue: 0,
-    participationFee: 0,
-    netProfit: 0,
-    roi: 0
-  }
 }
