@@ -27,6 +27,18 @@ interface OrderDetailPageProps {
   }
 }
 
+// Helper function to parse shipping address
+function parseShippingAddress(address: any) {
+  if (!address) return null;
+  
+  try {
+    return typeof address === 'string' ? JSON.parse(address) : address;
+  } catch (error) {
+    console.error('Failed to parse shipping address:', error);
+    return null;
+  }
+}
+
 async function getOrder(id: string) {
   try {
     const order = await db.order.findUnique({
@@ -106,7 +118,7 @@ function formatDateTime(date: Date) {
 
 export default async function OrderDetailPage({ params }: OrderDetailPageProps) {
   const session = await getSession()
-
+  
   if (!session) {
     redirect('/admin/login')
   }
@@ -120,7 +132,7 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps) 
   return (
     <div className="min-h-screen bg-gray-50">
       <AdminNavigation />
-
+      
       <main className="lg:pl-64">
         <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
           <div className="px-4 py-6 sm:px-0">
@@ -143,7 +155,7 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps) 
                     </p>
                   </div>
                 </div>
-
+                
                 <div className="flex gap-2">
                   <Button variant="outline">
                     <Edit className="h-4 w-4 mr-2" />
@@ -171,8 +183,8 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps) 
                           <div className="flex items-center gap-4">
                             <div className="w-16 h-16 bg-gray-100 rounded-lg overflow-hidden">
                               {item.product.images[0] && (
-                                <img
-                                  src={item.product.images[0]}
+                                <img 
+                                  src={item.product.images[0]} 
                                   alt={item.product.name}
                                   className="w-full h-full object-cover"
                                 />
@@ -224,20 +236,23 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps) 
                       </div>
                     </div>
 
-                    {/* Shipping Address */}
+                    {/* Shipping Address - FIXED */}
                     <div>
                       <label className="text-sm font-medium text-gray-700">Shipping Address</label>
                       <div className="mt-1 text-sm text-gray-900">
-                        {order.shippingAddress ? (
-                          <>
-                            <p>{order.shippingAddress.street}</p>
-                            {order.shippingAddress.apartment && <p>{order.shippingAddress.apartment}</p>}
-                            <p>{order.shippingAddress.city}, {order.shippingAddress.state} {order.shippingAddress.zipCode}</p>
-                            <p>{order.shippingAddress.country}</p>
-                          </>
-                        ) : (
-                          <p className="text-sm text-gray-500">No shipping address available</p>
-                        )}
+                        {(() => {
+                          const address = parseShippingAddress(order.shippingAddress);
+                          return address ? (
+                            <>
+                              <p>{address.street}</p>
+                              {address.apartment && <p>{address.apartment}</p>}
+                              <p>{address.city}, {address.state} {address.zipCode}</p>
+                              <p>{address.country}</p>
+                            </>
+                          ) : (
+                            <p className="text-sm text-gray-500">No shipping address available</p>
+                          );
+                        })()}
                       </div>
                     </div>
                   </CardContent>
