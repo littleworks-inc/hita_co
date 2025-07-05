@@ -15,7 +15,7 @@ export default async function AddProductPage() {
   }
 
   // Get categories, countries, and suppliers for the form
-  const [categories, countries, suppliers] = await Promise.all([
+  const [categories, countries, suppliersRaw] = await Promise.all([
     db.category.findMany({
       orderBy: { name: 'asc' }
     }),
@@ -24,16 +24,31 @@ export default async function AddProductPage() {
     }),
     db.supplier.findMany({
       where: { isActive: true },
-      orderBy: { name: 'asc' },
-      select: {
-        id: true,
-        name: true,
-        contactPerson: true,
-        phone: true,
-        email: true
-      }
+      orderBy: { name: 'asc' }
     })
   ])
+
+  // ✅ FIX: Convert null values to undefined for TypeScript compatibility
+  const suppliers = suppliersRaw.map(supplier => ({
+    ...supplier,
+    contactPerson: supplier.contactPerson ?? undefined,
+    email: supplier.email ?? undefined,
+    phone: supplier.phone ?? undefined,
+    whatsapp: supplier.whatsapp ?? undefined,
+    address: supplier.address ?? undefined,
+    city: supplier.city ?? undefined,
+    state: supplier.state ?? undefined,
+    country: supplier.country ?? undefined,
+    pincode: supplier.pincode ?? undefined,
+    businessType: supplier.businessType ?? undefined,
+    gstNumber: supplier.gstNumber ?? undefined,
+    panNumber: supplier.panNumber ?? undefined,
+    bankName: supplier.bankName ?? undefined,
+    accountNumber: supplier.accountNumber ?? undefined,
+    ifscCode: supplier.ifscCode ?? undefined,
+    notes: supplier.notes ?? undefined,
+    rating: supplier.rating ?? undefined,
+  }))
 
   return (
     <div className="min-h-screen bg-gray-50">

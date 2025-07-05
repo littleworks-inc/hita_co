@@ -22,26 +22,26 @@ export default async function EditProductPage({ params }: EditProductPageProps) 
 
   // Get product data
   const product = await db.product.findUnique({
-  where: { id: params.id },
-  include: {
-    category: true,
-    country: true,
-    supplier: true,
-    // ✅ ADD THIS: Include product sizes
-    productSizes: {
-      orderBy: {
-        sortOrder: 'asc'
+    where: { id: params.id },
+    include: {
+      category: true,
+      country: true,
+      supplier: true,
+      // ✅ ADD THIS: Include product sizes
+      productSizes: {
+        orderBy: {
+          sortOrder: 'asc'
+        }
       }
     }
-  }
-})
+  })
 
   if (!product) {
     notFound()
   }
 
   // Get categories, countries, and suppliers for the form
-  const [categories, countries, suppliers] = await Promise.all([
+  const [categories, countries, suppliersRaw] = await Promise.all([
     db.category.findMany({
       orderBy: { name: 'asc' }
     }),
@@ -53,6 +53,43 @@ export default async function EditProductPage({ params }: EditProductPageProps) 
       orderBy: { name: 'asc' }
     })
   ])
+
+  // ✅ FIX: Convert null values to undefined for TypeScript compatibility
+  const suppliers = suppliersRaw.map(supplier => ({
+    ...supplier,
+    contactPerson: supplier.contactPerson ?? undefined,
+    email: supplier.email ?? undefined,
+    phone: supplier.phone ?? undefined,
+    whatsapp: supplier.whatsapp ?? undefined,
+    address: supplier.address ?? undefined,
+    city: supplier.city ?? undefined,
+    state: supplier.state ?? undefined,
+    country: supplier.country ?? undefined,
+    pincode: supplier.pincode ?? undefined,
+    businessType: supplier.businessType ?? undefined,
+    gstNumber: supplier.gstNumber ?? undefined,
+    panNumber: supplier.panNumber ?? undefined,
+    bankName: supplier.bankName ?? undefined,
+    accountNumber: supplier.accountNumber ?? undefined,
+    ifscCode: supplier.ifscCode ?? undefined,
+    notes: supplier.notes ?? undefined,
+    rating: supplier.rating ?? undefined,
+  }))
+
+  // ✅ FIX: Convert product null values to strings for TypeScript compatibility
+  const productForForm = product ? {
+    ...product,
+    description: product.description || '',
+    shortDescription: product.shortDescription || '',
+    seoTitle: product.seoTitle || '',
+    seoDescription: product.seoDescription || '',
+    barcode: product.barcode || '',
+    barcodeType: product.barcodeType || 'CODE128',
+    invoiceNumber: product.invoiceNumber || '',
+    publishedAt: product.publishedAt?.toISOString() || null,
+    archivedAt: product.archivedAt?.toISOString() || null,
+    purchaseDate: product.purchaseDate?.toISOString().split('T')[0] || '',
+  } : undefined
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -86,7 +123,7 @@ export default async function EditProductPage({ params }: EditProductPageProps) 
               categories={categories}
               countries={countries}
               suppliers={suppliers}
-              product={product}
+              product={productForForm}
               mode="edit"
             />
           </div>

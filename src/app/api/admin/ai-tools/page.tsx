@@ -174,7 +174,7 @@ export default function AIToolsPage() {
     URL.revokeObjectURL(url)
   }
 
-  const categories = [...new Set(products.map(p => p.category?.name).filter(Boolean))]
+  const categories = Array.from(new Set(products.map(p => p.category?.name).filter(Boolean)))
 
   if (loading) {
     return (
@@ -396,13 +396,20 @@ export default function AIToolsPage() {
 
                   {selectedProducts.length > 0 && (
                     <AIBulkGenerateButton
-                      contentType={contentType}
-                      products={products.filter(p => selectedProducts.includes(p.id))}
-                      onSuccess={handleBulkGeneration}
-                      onError={(error) => {
-                        console.error('Bulk generation failed:', error)
-                        // You could add a toast notification here
+                      productIds={selectedProducts}
+                      type={contentType === 'seo_meta' ? 'seo_content' : 'product_description'}
+                      onComplete={(results) => {
+                        // Convert results to match the expected format
+                        const formattedResults = results.map((result: any) => ({
+                          productId: result.productId,
+                          productName: result.productName || 'Unknown',
+                          success: result.success,
+                          content: result.content,
+                          error: result.error
+                        }))
+                        handleBulkGeneration(formattedResults)
                       }}
+                      disabled={loading}
                     />
                   )}
                 </div>

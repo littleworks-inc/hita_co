@@ -32,7 +32,7 @@ interface ProductViewPageProps {
 
 export default async function ProductViewPage({ params }: ProductViewPageProps) {
   const session = await getSession()
-  
+
   if (!session) {
     redirect('/admin/login')
   }
@@ -64,7 +64,7 @@ export default async function ProductViewPage({ params }: ProductViewPageProps) 
   }
 
   // Calculate profit margin percentage
-  const profitMarginPercent = product.costPriceUSD > 0 
+  const profitMarginPercent = product.costPriceUSD > 0
     ? ((product.sellingPriceUSD - product.costPriceUSD) / product.costPriceUSD * 100)
     : 0
 
@@ -75,7 +75,7 @@ export default async function ProductViewPage({ params }: ProductViewPageProps) 
   return (
     <div className="min-h-screen bg-gray-50">
       <AdminNavigation />
-      
+
       <main className="lg:pl-64">
         <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
           <div className="px-4 py-6 sm:px-0">
@@ -98,7 +98,7 @@ export default async function ProductViewPage({ params }: ProductViewPageProps) 
                     </p>
                   </div>
                 </div>
-                
+
                 <div className="flex gap-2">
                   <Link href={`/admin/products/${product.id}/edit`}>
                     <Button>
@@ -150,11 +150,10 @@ export default async function ProductViewPage({ params }: ProductViewPageProps) 
                       <div>
                         <label className="text-sm font-medium text-gray-700">Status</label>
                         <div className="mt-1 flex items-center gap-2">
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                            product.isActive 
-                              ? 'bg-green-100 text-green-800' 
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${product.isActive
+                              ? 'bg-green-100 text-green-800'
                               : 'bg-red-100 text-red-800'
-                          }`}>
+                            }`}>
                             {product.isActive ? (
                               <>
                                 <CheckCircle className="mr-1 h-3 w-3" />
@@ -176,14 +175,14 @@ export default async function ProductViewPage({ params }: ProductViewPageProps) 
                         </div>
                       </div>
                     </div>
-                    
+
                     {product.description && (
                       <div>
                         <label className="text-sm font-medium text-gray-700">Description</label>
                         <p className="mt-1 text-sm text-gray-900 whitespace-pre-wrap">{product.description}</p>
                       </div>
                     )}
-                    
+
                     {product.shortDescription && (
                       <div>
                         <label className="text-sm font-medium text-gray-700">Short Description</label>
@@ -258,7 +257,7 @@ export default async function ProductViewPage({ params }: ProductViewPageProps) 
                         </p>
                       </div>
                     </div>
-                    
+
                     {/* Additional Costs */}
                     <div className="mt-4 pt-4 border-t border-gray-200">
                       <h4 className="text-sm font-medium text-gray-700 mb-3">Cost Breakdown</h4>
@@ -359,42 +358,46 @@ export default async function ProductViewPage({ params }: ProductViewPageProps) 
                     <div>
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-sm font-medium text-gray-700">Stock Level</span>
-                        <span className={`text-sm font-bold ${
-                          isOutOfStock ? 'text-red-600' :
-                          isLowStock ? 'text-orange-600' : 'text-green-600'
-                        }`}>
+                        <span className={`text-sm font-bold ${isOutOfStock ? 'text-red-600' :
+                            isLowStock ? 'text-orange-600' : 'text-green-600'
+                          }`}>
                           {product.stockQuantity} units
                         </span>
                       </div>
                       <div className="w-full bg-gray-200 rounded-full h-2">
-                        <div 
-                          className={`h-2 rounded-full ${
-                            isOutOfStock ? 'bg-red-500' :
-                            isLowStock ? 'bg-orange-500' : 'bg-green-500'
-                          }`}
-                          style={{ 
-                            width: `${Math.min(100, (product.stockQuantity / (product.lowStockAlert * 3)) * 100)}%` 
+                        <div
+                          className={`h-2 rounded-full ${isOutOfStock ? 'bg-red-500' :
+                              isLowStock ? 'bg-orange-500' : 'bg-green-500'
+                            }`}
+                          style={{
+                            width: `${Math.min(100, (product.stockQuantity / (product.lowStockAlert * 3)) * 100)}%`
                           }}
                         ></div>
                       </div>
                     </div>
-                    
+
                     <div className="grid gap-3">
                       <div className="flex justify-between">
                         <span className="text-sm text-gray-600">Low Stock Alert</span>
                         <span className="text-sm font-medium">{product.lowStockAlert}</span>
                       </div>
+                      {/* Removed weight and dimensions fields - not in database schema */}
                       <div className="flex justify-between">
-                        <span className="text-sm text-gray-600">Weight</span>
-                        <span className="text-sm font-medium">{product.weight || 'N/A'}</span>
+                        <span className="text-sm text-gray-600">SKU</span>
+                        <span className="text-sm font-medium font-mono">{product.sku}</span>
                       </div>
+                      {product.barcode && (
+                        <div className="flex justify-between">
+                          <span className="text-sm text-gray-600">Barcode</span>
+                          <span className="text-sm font-medium font-mono">{product.barcode}</span>
+                        </div>
+                      )}
                       <div className="flex justify-between">
-                        <span className="text-sm text-gray-600">Dimensions</span>
-                        <span className="text-sm font-medium">
-                          {product.length && product.width && product.height 
-                            ? `${product.length} × ${product.width} × ${product.height}`
-                            : 'N/A'
-                          }
+                        <span className="text-sm text-gray-600">Status</span>
+                        <span className={`text-sm font-medium ${product.status === 'PUBLISHED' ? 'text-green-600' :
+                            product.status === 'DRAFT' ? 'text-yellow-600' : 'text-gray-600'
+                          }`}>
+                          {product.status}
                         </span>
                       </div>
                     </div>
