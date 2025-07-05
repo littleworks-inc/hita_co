@@ -72,9 +72,12 @@ export default async function EditCategoryPage({ params }: EditCategoryPageProps
               </div>
             </div>
 
-            {/* Category Form */}
+            {/* Category Form - FIXED: Handle null description */}
             <CategoryForm 
-              category={category}
+              category={category ? {
+                ...category,
+                description: category.description || ''
+              } : undefined}
               parentCategories={parentCategories}
               mode="edit"
             />
