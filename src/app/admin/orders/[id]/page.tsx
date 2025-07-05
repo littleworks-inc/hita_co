@@ -188,10 +188,10 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps) 
                           </div>
                           <div className="text-right">
                             <p className="font-medium text-gray-900">
-                              {formatPrice(item.unitPrice)} × {item.quantity}
+                              {formatPrice(item.pricePerItem)} × {item.quantity}
                             </p>
                             <p className="text-sm text-gray-500">
-                              Total: {formatPrice(item.total)}
+                              Total: {formatPrice(item.totalPrice)}
                             </p>
                           </div>
                         </div>
