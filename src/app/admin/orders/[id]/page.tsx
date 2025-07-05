@@ -228,10 +228,16 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps) 
                     <div>
                       <label className="text-sm font-medium text-gray-700">Shipping Address</label>
                       <div className="mt-1 text-sm text-gray-900">
-                        <p>{order.shippingAddress.street}</p>
-                        {order.shippingAddress.apartment && <p>{order.shippingAddress.apartment}</p>}
-                        <p>{order.shippingAddress.city}, {order.shippingAddress.state} {order.shippingAddress.zipCode}</p>
-                        <p>{order.shippingAddress.country}</p>
+                        {order.shippingAddress ? (
+                          <>
+                            <p>{order.shippingAddress.street}</p>
+                            {order.shippingAddress.apartment && <p>{order.shippingAddress.apartment}</p>}
+                            <p>{order.shippingAddress.city}, {order.shippingAddress.state} {order.shippingAddress.zipCode}</p>
+                            <p>{order.shippingAddress.country}</p>
+                          </>
+                        ) : (
+                          <p className="text-sm text-gray-500">No shipping address available</p>
+                        )}
                       </div>
                     </div>
                   </CardContent>
