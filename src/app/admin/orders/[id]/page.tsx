@@ -291,23 +291,7 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps) 
                       </div>
                     </div>
 
-                    {order.trackingNumber && (
-                      <div>
-                        <label className="text-sm font-medium text-gray-700">Tracking Number</label>
-                        <p className="mt-1 text-sm text-gray-900 font-mono">
-                          {order.trackingNumber}
-                        </p>
-                      </div>
-                    )}
-
-                    {order.notes && (
-                      <div>
-                        <label className="text-sm font-medium text-gray-700">Notes</label>
-                        <p className="mt-1 text-sm text-gray-900">
-                          {order.notes}
-                        </p>
-                      </div>
-                    )}
+                    {/* Note: trackingNumber and notes fields don't exist in current schema */}
 
                     <div>
                       <label className="text-sm font-medium text-gray-700">Last Updated</label>
@@ -333,16 +317,16 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps) 
                     </div>
                     <div className="flex justify-between">
                       <span className="text-sm text-gray-600">Shipping</span>
-                      <span className="text-sm font-medium">{formatPrice(order.shippingCost)}</span>
+                      <span className="text-sm font-medium">{formatPrice(order.shipping)}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-sm text-gray-600">Tax</span>
-                      <span className="text-sm font-medium">{formatPrice(order.taxAmount)}</span>
+                      <span className="text-sm font-medium">{formatPrice(order.tax)}</span>
                     </div>
-                    {order.discountAmount > 0 && (
+                    {order.discount > 0 && (
                       <div className="flex justify-between text-green-600">
                         <span className="text-sm">Discount</span>
-                        <span className="text-sm font-medium">-{formatPrice(order.discountAmount)}</span>
+                        <span className="text-sm font-medium">-{formatPrice(order.discount)}</span>
                       </div>
                     )}
                     <div className="border-t pt-3">

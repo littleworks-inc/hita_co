@@ -55,8 +55,18 @@ async function OrdersData() {
 
     const [totalStats, statusBreakdown, totalCount] = stats
 
+    // Transform data to match OrdersTable interface
+    const transformedOrders = orders.map(order => ({
+      ...order,
+      createdAt: order.createdAt.toISOString(), // Convert Date to string
+      items: order.items.map(item => ({
+        ...item,
+        // Note: OrdersTable doesn't use item dates, so no conversion needed for items
+      }))
+    }))
+
     const initialData = {
-      orders,
+      orders: transformedOrders,
       pagination: {
         page: 1,
         limit: 10,
