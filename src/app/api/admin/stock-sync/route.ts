@@ -4,6 +4,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth'
+import { db } from '@/lib/db' // ✅ ADDED: Missing db import
 import { syncAllProductsStock, syncProductStock, syncMultipleProductsStock } from '@/lib/stock-sync'
 
 // POST /api/admin/stock-sync - Trigger stock synchronization
