@@ -1,5 +1,5 @@
 // ✅ FIXED: /src/app/categories/[slug]/page.tsx
-// Removed non-existent isActive field from Category queries
+// Permanent solution with data transformation following established patterns
 
 import { Suspense } from 'react'
 import { notFound } from 'next/navigation'
@@ -29,25 +29,50 @@ interface CategoryPageProps {
   }
 }
 
-// Get store settings - Required for catalog mode
+// ✅ FIXED: Get store settings with proper transformation
 async function getStoreSettings() {
   try {
-    return await db.storeSetting.findFirst({
+    const settings = await db.storeSetting.findFirst({
       where: { id: 'default' }
     })
+
+    if (!settings) {
+      return null // ✅ Return null to match SEO function signature
+    }
+
+    // ✅ Transform Prisma result to match ALL component interfaces
+    return {
+      id: settings.id,
+      storeName: settings.storeName,
+      tagline: settings.tagline,
+      logo: settings.logo,
+      primaryColor: settings.primaryColor,
+      secondaryColor: settings.secondaryColor,
+      accentColor: settings.accentColor,
+      // Required for SEO function
+      email: settings.email,
+      phone: settings.phone,
+      address: settings.address,
+      instagram: settings.instagram,
+      facebook: settings.facebook,
+      pinterest: settings.pinterest,
+      twitter: settings.twitter,
+      // Convert null to undefined for TypeScript compatibility
+      disableShoppingCart: settings.disableShoppingCart ?? undefined,
+      catalogModeSettings: settings.catalogModeSettings ?? undefined,
+    }
   } catch (error) {
     console.error('Error fetching store settings:', error)
-    return null
+    return null // ✅ Return null to match SEO function signature
   }
 }
 
-// ✅ FIXED: Get category by slug (removed isActive filter)
+// Get category by slug
 async function getCategory(slug: string) {
   try {
     return await db.category.findFirst({
       where: { 
         slug: slug
-        // ✅ REMOVED: isActive: true (field doesn't exist in Category model)
       },
       include: {
         _count: {
@@ -55,7 +80,7 @@ async function getCategory(slug: string) {
             products: {
               where: {
                 status: 'PUBLISHED',
-                isActive: true // ✅ This is valid - Product model HAS isActive field
+                isActive: true
               }
             }
           }
@@ -78,11 +103,11 @@ async function getCategoryProducts(
     const pageSize = 12
     const skip = (page - 1) * pageSize
 
-    // Build where clause for products (Product model HAS isActive field)
+    // Build where clause for products
     const where: any = {
       categoryId: categoryId,
       status: 'PUBLISHED',
-      isActive: true, // ✅ Valid - Product model has isActive field
+      isActive: true,
       stockQuantity: { gt: 0 }
     }
 
@@ -123,7 +148,7 @@ async function getCategoryProducts(
           category: true,
           country: true,
           productSizes: {
-            where: { isActive: true }, // ✅ Valid - ProductSize model has isActive field
+            where: { isActive: true },
             orderBy: { sortOrder: 'asc' }
           }
         },
@@ -151,9 +176,13 @@ async function getCategoryProducts(
   }
 }
 
-// Generate metadata for the category page
+// ✅ FIXED: Generate metadata with both required arguments
 export async function generateMetadata({ params }: CategoryPageProps) {
-  const category = await getCategory(params.slug)
+  // Fetch both category and storeSettings in parallel
+  const [category, storeSettings] = await Promise.all([
+    getCategory(params.slug),
+    getStoreSettings()
+  ])
   
   if (!category) {
     return {
@@ -162,7 +191,8 @@ export async function generateMetadata({ params }: CategoryPageProps) {
     }
   }
 
-  return generateCategoryMetadata(category)
+  // Pass both arguments as expected by the function
+  return generateCategoryMetadata(category, storeSettings)
 }
 
 export default async function CategoryPage({ params, searchParams }: CategoryPageProps) {
@@ -231,8 +261,9 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
         {/* Sort & Filter */}
         <div className="mb-8">
           <CategorySortFilter
-            currentSort={searchParams.sort}
+            currentSort={searchParams.sort || 'newest'}
             categorySlug={category.slug}
+            searchParams={searchParams}
           />
         </div>
 
@@ -269,13 +300,27 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
           <>
             {/* Products Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-12">
-              {products.map((product) => (
-                <ProductCard 
-                  key={product.id} 
-                  product={product} 
-                  storeSettings={storeSettings}
-                />
-              ))}
+              {products.map((product) => {
+                // ✅ Transform Prisma product to match component interface
+                const transformedProduct = {
+                  ...product,
+                  shortDescription: product.shortDescription ?? undefined, // Convert null to undefined
+                }
+                
+                // ✅ Transform storeSettings for ProductCard (it expects undefined, not null)
+                const productCardStoreSettings = storeSettings ? {
+                  disableShoppingCart: storeSettings.disableShoppingCart,
+                  catalogModeSettings: storeSettings.catalogModeSettings,
+                } : undefined
+                
+                return (
+                  <ProductCard 
+                    key={product.id} 
+                    product={transformedProduct} 
+                    storeSettings={productCardStoreSettings}
+                  />
+                )
+              })}
             </div>
 
             {/* Pagination */}
