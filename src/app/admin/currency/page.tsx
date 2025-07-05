@@ -1,3 +1,6 @@
+// ✅ FIXED: src/app/admin/currency/page.tsx
+// Updated to work with Country model instead of non-existent ExchangeRate model
+
 import { Suspense } from 'react'
 import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/auth'
@@ -14,27 +17,39 @@ import {
   Clock
 } from 'lucide-react'
 
-// Get exchange rates
+// ✅ FIXED: Get exchange rates from Country model
 async function getExchangeRates() {
-  return await db.exchangeRate.findMany({
-    where: { fromCurrency: 'USD' },
-    orderBy: { toCurrency: 'asc' }
+  return await db.country.findMany({
+    where: { 
+      exchangeRate: { not: null }
+    },
+    select: {
+      id: true,
+      name: true,
+      code: true,
+      currency: true,
+      currencySymbol: true,
+      exchangeRate: true,
+      updatedAt: true,
+      createdAt: true
+    },
+    orderBy: { name: 'asc' }
   })
 }
 
-// Exchange rates stats
+// ✅ FIXED: Exchange rates stats using Country model
 async function ExchangeRatesStats() {
-  const rates = await getExchangeRates()
+  const countries = await getExchangeRates()
   const now = new Date()
   const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000)
   
-  const recentUpdates = rates.filter(rate => rate.lastUpdated > oneHourAgo)
-  const oldRates = rates.filter(rate => rate.lastUpdated <= oneHourAgo)
+  const recentUpdates = countries.filter(country => country.updatedAt > oneHourAgo)
+  const oldRates = countries.filter(country => country.updatedAt <= oneHourAgo)
 
   const stats = [
     {
       title: 'Total Currencies',
-      value: rates.length + 1, // +1 for USD base
+      value: countries.length + 1, // +1 for USD base
       icon: Globe,
       color: 'blue'
     },
@@ -80,9 +95,23 @@ async function ExchangeRatesStats() {
   )
 }
 
-// Exchange rates data
+// ✅ FIXED: Exchange rates data using Country model
 async function ExchangeRatesData() {
-  const rates = await getExchangeRates()
+  const countries = await getExchangeRates()
+
+  // Transform country data to match the expected rate format
+  const rates = countries.map(country => ({
+    id: country.id,
+    fromCurrency: 'USD',
+    toCurrency: country.currency,
+    rate: country.exchangeRate || 1,
+    lastUpdated: country.updatedAt,
+    createdAt: country.createdAt,
+    updatedAt: country.updatedAt,
+    countryName: country.name,
+    countryCode: country.code,
+    currencySymbol: country.currencySymbol
+  }))
 
   return (
     <Card>
@@ -161,7 +190,7 @@ export default async function AdminCurrencyPage() {
                   <p>• All product prices are stored in USD as base currency</p>
                   <p>• Customer sees converted prices in their local currency</p>
                   <p>• Exchange rates are cached for performance</p>
-                  <p>• Free tier API has 1500 requests/month limit</p>
+                  <p>• Exchange rates are stored in Country settings</p>
                 </div>
               </CardContent>
             </Card>
