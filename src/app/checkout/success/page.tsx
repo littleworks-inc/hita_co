@@ -1,14 +1,40 @@
+// ✅ FIXED: /src/app/checkout/success/page.tsx
+// Fixed getStoreSettings transformation
+
 import { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { db } from '@/lib/db'
 import CustomerNavigation from '@/components/customer/CustomerNavigation'
 import OrderConfirmation from '@/components/checkout/OrderConfirmation'
 
-// Get store settings for branding
+// ✅ FIXED: Get store settings with proper transformation
 async function getStoreSettings() {
-  return await db.storeSetting.findFirst({
-    where: { id: 'default' }
-  })
+  try {
+    const settings = await db.storeSetting.findFirst({
+      where: { id: 'default' }
+    })
+
+    if (!settings) {
+      return null
+    }
+
+    // ✅ Transform Prisma result to match component interface
+    return {
+      id: settings.id,
+      storeName: settings.storeName,
+      tagline: settings.tagline,
+      logo: settings.logo,
+      primaryColor: settings.primaryColor,
+      secondaryColor: settings.secondaryColor,
+      accentColor: settings.accentColor,
+      // Convert null to undefined for TypeScript compatibility
+      disableShoppingCart: settings.disableShoppingCart ?? undefined,
+      catalogModeSettings: settings.catalogModeSettings ?? undefined,
+    }
+  } catch (error) {
+    console.error('Error fetching store settings:', error)
+    return null
+  }
 }
 
 // Get order details by order number
@@ -69,14 +95,20 @@ export default async function CheckoutSuccessPage({ searchParams }: CheckoutSucc
   const { orderNumber } = searchParams
   
   // Get store settings and order data
-  const [storeSettings, order] = await Promise.all([
+  const [storeSettings, orderRaw] = await Promise.all([
     getStoreSettings(),
     orderNumber ? getOrderByNumber(orderNumber) : null
   ])
 
   // If no order number provided or order not found, show 404
-  if (!orderNumber || !order) {
+  if (!orderNumber || !orderRaw) {
     notFound()
+  }
+
+  // ✅ Transform order data to match OrderConfirmation interface
+  const order = {
+    ...orderRaw,
+    createdAt: orderRaw.createdAt.toISOString(), // Convert Date to string
   }
 
   return (
