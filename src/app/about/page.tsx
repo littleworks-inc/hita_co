@@ -87,7 +87,7 @@ function DynamicNavigation({ storeSettings }: { storeSettings: any }) {
                     className="w-8 h-8 rounded flex items-center justify-center text-white font-bold text-sm"
                     style={{ backgroundColor: primaryColor }}
                   >
-                    {storeName.split(' ').map(word => word.charAt(0)).join('').substring(0, 2)}
+                    {storeName.split(' ').map((word: string) => word.charAt(0)).join('').substring(0, 2)}
                   </div>
                 )}
                 <div>
