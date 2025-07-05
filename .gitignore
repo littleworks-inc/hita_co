@@ -45,6 +45,8 @@ out/
 coverage/
 *.tsbuildinfo
 .nyc_output
+scripts/
+scripts_test/
 
 # Runtime & Process Files
 # ==========================================
