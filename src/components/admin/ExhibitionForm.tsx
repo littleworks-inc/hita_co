@@ -17,7 +17,7 @@ import {
 interface Exhibition {
   id?: string
   title: string
-  description: string
+  description: string | null
   location: string
   startDate: string
   endDate: string
