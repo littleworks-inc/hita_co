@@ -682,7 +682,7 @@ export const aiDebugUtils = {
 export const aiDebugging = new AIDebuggingUtils()
 
 // Export utility functions
-export { aiDebugUtils }
+// export { aiDebugUtils }
 
 /**
  * React Hook for AI debugging (to be used in components)

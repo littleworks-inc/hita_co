@@ -56,13 +56,26 @@ export interface AIResponse {
   model?: string
   usage?: UsageInfo
   metadata?: ResponseMetadata
+  timing?: DetailedTiming      // ✅ ADD: Optional detailed timing for debugging
 }
 
 export interface UsageInfo {
   tokens: number
   cost?: number
   model: string
+  // processingTime?: number  // ✅ REMOVE: Move to metadata for better organization
+  inputTokens?: number        // ✅ ADD: Separate input token count
+  outputTokens?: number       // ✅ ADD: Separate output token count
+}
+
+export interface DetailedTiming {
+  requestStart: number
+  requestEnd: number
+  totalTime: number
+  networkTime?: number
   processingTime?: number
+  cacheCheckTime?: number
+  retryTime?: number
 }
 
 export interface ResponseMetadata {
@@ -70,6 +83,10 @@ export interface ResponseMetadata {
   timestamp: Date
   retryCount?: number
   fallbackUsed?: boolean
+  processingTime?: number      // ✅ ADD: Processing time in milliseconds
+  cacheHit?: boolean          // ✅ ADD: Whether response came from cache
+  rateLimitHit?: boolean      // ✅ ADD: Whether rate limit was encountered
+  providerSwitched?: boolean  // ✅ ADD: Whether provider was switched due to failure
 }
 
 export interface SEOContent {

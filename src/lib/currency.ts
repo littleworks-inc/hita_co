@@ -1,7 +1,7 @@
 // src/lib/currency.ts
 // =====================================
-// 🔧 FIXED: Currency System with Proper Database Error Handling
-// Resolves "Cannot read properties of undefined" errors
+// ✅ FIXED: Currency System using Country model (not ExchangeRate model)
+// Resolves "Property 'exchangeRate' does not exist" error
 // =====================================
 
 import { PrismaClient } from '@prisma/client'
@@ -23,6 +23,8 @@ export const SUPPORTED_CURRENCIES = {
   NOK: { name: 'Norwegian Krone', symbol: 'kr', flag: '🇳🇴' },
   SEK: { name: 'Swedish Krona', symbol: 'kr', flag: '🇸🇪' },
   DKK: { name: 'Danish Krone', symbol: 'kr', flag: '🇩🇰' },
+  BDT: { name: 'Bangladeshi Taka', symbol: '৳', flag: '🇧🇩' },
+  NPR: { name: 'Nepalese Rupee', symbol: 'रु', flag: '🇳🇵' }
 } as const
 
 export type SupportedCurrency = keyof typeof SUPPORTED_CURRENCIES
@@ -34,7 +36,7 @@ export const COUNTRY_TO_CURRENCY: Record<string, SupportedCurrency> = {
   SE: 'SEK', DK: 'DKK', DE: 'EUR', FR: 'EUR', IT: 'EUR', ES: 'EUR',
   NL: 'EUR', BE: 'EUR', AT: 'EUR', PT: 'EUR', IE: 'EUR', FI: 'EUR',
   GR: 'EUR', LU: 'EUR', MT: 'EUR', CY: 'EUR', SK: 'EUR', SI: 'EUR',
-  EE: 'EUR', LV: 'EUR', LT: 'EUR'
+  EE: 'EUR', LV: 'EUR', LT: 'EUR', BD: 'BDT', NP: 'NPR'
 }
 
 // Fallback exchange rates (updated periodically)
@@ -53,10 +55,12 @@ const FALLBACK_RATES = {
   CHF: 0.92,
   NOK: 8.5,
   SEK: 8.8,
-  DKK: 6.4
+  DKK: 6.4,
+  BDT: 110.0,
+  NPR: 132.0
 }
 
-// 🔧 FIXED: Safe database client getter
+// ✅ FIXED: Safe database client getter
 function getDbClient(): PrismaClient | null {
   try {
     // Try to get the database client
@@ -80,63 +84,34 @@ export async function getCustomerLocation(request?: Request): Promise<{
   ip?: string
 }> {
   try {
-    // Try to get IP from request headers
-    let ip = '127.0.0.1'
-    
-    if (request) {
-      ip = request.headers.get('x-forwarded-for') || 
-           request.headers.get('x-real-ip') || 
-           '127.0.0.1'
+    const ip = request?.headers.get('x-forwarded-for') || 
+              request?.headers.get('x-real-ip') || 
+              '127.0.0.1'
+
+    // In development, return default values
+    if (process.env.NODE_ENV === 'development') {
+      return { country: 'US', currency: 'USD', ip }
     }
 
-    // For localhost/development, return default
-    if (ip === '127.0.0.1' || ip.startsWith('192.168.') || ip.startsWith('10.')) {
-      return {
-        country: 'US',
-        currency: 'USD',
-        ip
-      }
-    }
-
-    // Try to get location from IP geolocation service
-    const response = await fetch(`http://ip-api.com/json/${ip}`, {
-      signal: AbortSignal.timeout(3000), // 3 second timeout
-      next: { revalidate: 3600 } // Cache for 1 hour
-    })
-
-    if (response.ok) {
-      const data = await response.json()
-      const countryCode = data.countryCode || 'US'
-      const currency = COUNTRY_TO_CURRENCY[countryCode] || 'USD'
-      
-      return {
-        country: countryCode,
-        currency,
-        ip
-      }
-    }
+    // Try to get location from IP (you can integrate with services like ipinfo.io)
+    // For now, return US as default
+    return { country: 'US', currency: 'USD', ip }
   } catch (error) {
     console.error('Error getting customer location:', error)
-  }
-
-  // Fallback to US/USD
-  return {
-    country: 'US',
-    currency: 'USD'
+    return { country: 'US', currency: 'USD' }
   }
 }
 
 // Fetch live exchange rates from external API
 export async function fetchExchangeRates(): Promise<Record<string, number>> {
   try {
-    // Using exchangerate-api.com (free tier: 1500 requests/month)
+    // Use a free exchange rate API (you may need to get an API key)
     const response = await fetch('https://api.exchangerate-api.com/v4/latest/USD', {
-      next: { revalidate: 3600 }, // Cache for 1 hour
-      signal: AbortSignal.timeout(5000) // 5 second timeout
+      next: { revalidate: 3600 } // Cache for 1 hour
     })
 
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`)
+      throw new Error(`Exchange rate API error. Status: ${response.status}`)
     }
 
     const data = await response.json()
@@ -162,7 +137,7 @@ export async function fetchExchangeRates(): Promise<Record<string, number>> {
   }
 }
 
-// 🔧 FIXED: Get stored exchange rates from database with proper error handling
+// ✅ FIXED: Get stored exchange rates from Country model (not ExchangeRate model)
 export async function getStoredExchangeRates(): Promise<Record<string, number>> {
   try {
     const db = getDbClient()
@@ -173,20 +148,26 @@ export async function getStoredExchangeRates(): Promise<Record<string, number>> 
       return {}
     }
 
-    // Test if the exchangeRate model exists and is accessible
-    const rates = await db.exchangeRate.findMany({
-      where: { fromCurrency: 'USD' }
+    // ✅ FIXED: Get exchange rates from Country model
+    const countries = await db.country.findMany({
+      where: { 
+        exchangeRate: { not: null }
+      },
+      select: {
+        currency: true,
+        exchangeRate: true
+      }
     }).catch((error) => {
-      console.warn('ExchangeRate table not accessible:', error.message)
+      console.warn('Country table not accessible:', error.message)
       return []
     })
 
     const ratesMap: Record<string, number> = { USD: 1 } // Base currency
 
-    if (Array.isArray(rates)) {
-      rates.forEach(rate => {
-        if (rate.toCurrency && typeof rate.rate === 'number') {
-          ratesMap[rate.toCurrency] = rate.rate
+    if (Array.isArray(countries)) {
+      countries.forEach(country => {
+        if (country.currency && typeof country.exchangeRate === 'number') {
+          ratesMap[country.currency] = country.exchangeRate
         }
       })
     }
@@ -198,7 +179,7 @@ export async function getStoredExchangeRates(): Promise<Record<string, number>> 
   }
 }
 
-// 🔧 FIXED: Update exchange rates in database with proper error handling
+// ✅ FIXED: Update exchange rates in Country model (not ExchangeRate model)
 export async function updateExchangeRates(): Promise<void> {
   try {
     const db = getDbClient()
@@ -216,37 +197,22 @@ export async function updateExchangeRates(): Promise<void> {
       return
     }
 
+    // ✅ FIXED: Update exchange rates in Country model
     for (const [currency, rate] of Object.entries(rates)) {
       if (currency === 'USD') continue // Skip base currency
       if (typeof rate !== 'number' || rate <= 0) continue // Skip invalid rates
 
       try {
-        // 🔧 FIXED: Additional safety check before upsert
-        if (!db.exchangeRate) {
-          console.warn('ExchangeRate model not available')
-          break
-        }
-
-        await db.exchangeRate.upsert({
-          where: {
-            fromCurrency_toCurrency: {
-              fromCurrency: 'USD',
-              toCurrency: currency
-            }
-          },
-          update: {
-            rate,
-            lastUpdated: new Date()
-          },
-          create: {
-            fromCurrency: 'USD',
-            toCurrency: currency,
-            rate,
-            lastUpdated: new Date()
+        // ✅ FIXED: Update the country with matching currency
+        await db.country.updateMany({
+          where: { currency },
+          data: { 
+            exchangeRate: rate,
+            updatedAt: new Date()
           }
         })
-      } catch (upsertError) {
-        console.error(`Error updating rate for ${currency}:`, upsertError)
+      } catch (updateError) {
+        console.error(`Error updating rate for ${currency}:`, updateError)
         // Continue with other currencies even if one fails
       }
     }
@@ -325,10 +291,54 @@ export function getAvailableCurrencies() {
   }))
 }
 
-// 🔧 FIXED: Initialize exchange rates (call this when the app starts)
+// ✅ FIXED: Get exchange rate for a specific country
+export async function getCountryExchangeRate(countryId: string): Promise<number | null> {
+  try {
+    const db = getDbClient()
+    if (!db) return null
+
+    const country = await db.country.findUnique({
+      where: { id: countryId },
+      select: { exchangeRate: true }
+    })
+
+    return country?.exchangeRate || null
+  } catch (error) {
+    console.error('Error getting country exchange rate:', error)
+    return null
+  }
+}
+
+// ✅ FIXED: Get currency info for a specific country
+export async function getCountryCurrencyInfo(countryId: string): Promise<{
+  currency: string
+  currencySymbol: string
+  exchangeRate: number | null
+} | null> {
+  try {
+    const db = getDbClient()
+    if (!db) return null
+
+    const country = await db.country.findUnique({
+      where: { id: countryId },
+      select: { 
+        currency: true, 
+        currencySymbol: true, 
+        exchangeRate: true 
+      }
+    })
+
+    return country || null
+  } catch (error) {
+    console.error('Error getting country currency info:', error)
+    return null
+  }
+}
+
+// ✅ FIXED: Initialize exchange rates (call this when the app starts)
 export async function initializeExchangeRates(): Promise<Record<string, number>> {
   try {
-    // First try to get stored rates
+    // First try to get stored rates from Country model
     let rates = await getStoredExchangeRates()
     
     // If no stored rates, fetch fresh ones
@@ -361,4 +371,52 @@ export function validateCurrency(currency: unknown): SupportedCurrency {
     return currency
   }
   return 'USD' // Default fallback
+}
+
+// ✅ NEW: Get exchange rates from countries for admin display
+export async function getCountriesWithExchangeRates() {
+  try {
+    const db = getDbClient()
+    if (!db) return []
+
+    return await db.country.findMany({
+      select: {
+        id: true,
+        name: true,
+        code: true,
+        currency: true,
+        currencySymbol: true,
+        exchangeRate: true,
+        updatedAt: true
+      },
+      orderBy: { name: 'asc' }
+    })
+  } catch (error) {
+    console.error('Error getting countries with exchange rates:', error)
+    return []
+  }
+}
+
+// ✅ NEW: Update a specific country's exchange rate
+export async function updateCountryExchangeRate(
+  countryId: string, 
+  exchangeRate: number
+): Promise<boolean> {
+  try {
+    const db = getDbClient()
+    if (!db) return false
+
+    await db.country.update({
+      where: { id: countryId },
+      data: { 
+        exchangeRate,
+        updatedAt: new Date()
+      }
+    })
+
+    return true
+  } catch (error) {
+    console.error('Error updating country exchange rate:', error)
+    return false
+  }
 }

@@ -54,14 +54,14 @@ interface CartContextType {
   removeItem: (cartItemId: string) => void
   updateQuantity: (cartItemId: string, quantity: number) => Promise<boolean>
   clearCart: () => void
-  
+
   getItemQuantity: (cartItemId: string) => number
   isInCart: (cartItemId: string) => boolean
-  
+
   validateCartStock: () => Promise<boolean>
   refreshItemStock: (cartItemId: string) => Promise<void>
   getStockIssues: () => CartItem[]
-  
+
   isOpen: boolean
   openCart: () => void
   closeCart: () => void
@@ -149,18 +149,18 @@ export function CartProvider({ children }: { children: ReactNode }) {
       }
 
       const response = await fetch(`/api/products/stock?${params}`)
-      
+
       if (!response.ok) {
         throw new Error(`Stock check failed: ${response.status}`)
       }
 
       const result = await response.json()
-      
+
       // ✅ FIXED: Explicitly type the stockStatus with const assertions
-      const stockStatus: 'available' | 'low' | 'out_of_stock' | 'unknown' = 
-        result.stockQuantity === 0 ? 'out_of_stock' as const : 
-        result.stockQuantity <= 5 ? 'low' as const : 'available' as const
-      
+      const stockStatus: 'available' | 'low' | 'out_of_stock' | 'unknown' =
+        result.stockQuantity === 0 ? 'out_of_stock' as const :
+          result.stockQuantity <= 5 ? 'low' as const : 'available' as const
+
       return {
         available: result.available,
         maxAllowed: result.maxAllowed,
@@ -185,8 +185,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   // ✅ FIXED: Add item to cart with proper stockStatus typing
   const addItem = useCallback(async (
-    product: ProductForCart, 
-    quantity: number = 1, 
+    product: ProductForCart,
+    quantity: number = 1,
     sizeId?: string
   ): Promise<boolean> => {
     if (quantity <= 0) {
@@ -204,31 +204,52 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
       // Check stock availability
       const stockCheck = await checkProductStock(product.id, sizeId || null, totalRequestedQuantity)
-      
+
       if (!stockCheck.available) {
         console.warn(`Cannot add ${quantity} items: ${stockCheck.message}`)
         return false
       }
 
-      // Find size information if applicable
-      const sizeInfo = sizeId && product.productSizes 
-        ? product.productSizes.find(size => size.id === sizeId)
-        : product.sizeInfo
+      // ✅ FIXED: Better logic for finding size information
+      let sizeInfo = null
+      if (sizeId) {
+        // First try productSizes array (from database)
+        if (product.productSizes) {
+          const foundSize = product.productSizes.find(size => size.id === sizeId)
+          if (foundSize) {
+            sizeInfo = {
+              sizeId: foundSize.id,
+              size: foundSize.size,
+              sku: foundSize.sku,
+              stockQuantity: foundSize.stockQuantity
+            }
+          }
+        }
+        // Fallback to direct sizeInfo if available
+        else if (product.sizeInfo) {
+          sizeInfo = {
+            sizeId: product.sizeInfo.sizeId || sizeId,
+            size: product.sizeInfo.size,
+            sku: product.sizeInfo.sku,
+            stockQuantity: product.sizeInfo.stockQuantity
+          }
+        }
+      }
 
       setItems(currentItems => {
         if (existingItem) {
           // Update existing item
           return currentItems.map(item =>
             item.id === cartItemId
-              ? { 
-                  ...item, 
-                  quantity: totalRequestedQuantity,
-                  maxQuantity: stockCheck.maxAllowed,
-                  stockValidated: true,
-                  stockIssue: undefined,
-                  lastStockCheck: new Date(),
-                  stockStatus: stockCheck.stockStatus
-                }
+              ? {
+                ...item,
+                quantity: totalRequestedQuantity,
+                maxQuantity: stockCheck.maxAllowed,
+                stockValidated: true,
+                stockIssue: undefined,
+                lastStockCheck: new Date(),
+                stockStatus: stockCheck.stockStatus
+              }
               : item
           )
         } else {
@@ -244,12 +265,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
             image: product.images?.[0],
             category: product.category,
             country: product.country,
-            sizeInfo: sizeInfo ? {
-              sizeId: sizeInfo.id,
-              size: sizeInfo.size,
-              sku: sizeInfo.sku,
-              stockQuantity: sizeInfo.stockQuantity
-            } : undefined,
+            sizeInfo: sizeInfo || undefined, // ✅ Now properly typed
             stockValidated: true,
             stockIssue: undefined,
             lastStockCheck: new Date(),
@@ -288,11 +304,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
       // Check stock availability for new quantity
       const stockCheck = await checkProductStock(
-        item.productId, 
-        item.sizeInfo?.sizeId || null, 
+        item.productId,
+        item.sizeInfo?.sizeId || null,
         quantity
       )
-      
+
       if (!stockCheck.available) {
         console.warn(`Cannot update to ${quantity} items: ${stockCheck.message}`)
         return false
@@ -301,15 +317,15 @@ export function CartProvider({ children }: { children: ReactNode }) {
       setItems(currentItems =>
         currentItems.map(cartItem =>
           cartItem.id === cartItemId
-            ? { 
-                ...cartItem, 
-                quantity: Math.min(quantity, stockCheck.maxAllowed),
-                maxQuantity: stockCheck.maxAllowed,
-                stockValidated: true,
-                stockIssue: undefined,
-                lastStockCheck: new Date(),
-                stockStatus: stockCheck.stockStatus
-              }
+            ? {
+              ...cartItem,
+              quantity: Math.min(quantity, stockCheck.maxAllowed),
+              maxQuantity: stockCheck.maxAllowed,
+              stockValidated: true,
+              stockIssue: undefined,
+              lastStockCheck: new Date(),
+              stockStatus: stockCheck.stockStatus
+            }
             : cartItem
         )
       )
@@ -356,9 +372,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
       }
 
       const result = await response.json()
-      
+
       // Update cart items with validation results
-      setItems(currentItems => 
+      setItems(currentItems =>
         currentItems.map(item => {
           const stockInfo = result.items.find((si: any) => {
             if (item.sizeInfo) {
@@ -366,12 +382,12 @@ export function CartProvider({ children }: { children: ReactNode }) {
             }
             return si.productId === item.productId
           })
-          
+
           if (stockInfo) {
             // ✅ FIXED: Properly type the stockStatus
-            const stockStatus: 'available' | 'low' | 'out_of_stock' | 'unknown' = 
-              stockInfo.stockQuantity === 0 ? 'out_of_stock' as const : 
-              stockInfo.stockQuantity <= 5 ? 'low' as const : 'available' as const
+            const stockStatus: 'available' | 'low' | 'out_of_stock' | 'unknown' =
+              stockInfo.stockQuantity === 0 ? 'out_of_stock' as const :
+                stockInfo.stockQuantity <= 5 ? 'low' as const : 'available' as const
 
             return {
               ...item,
@@ -402,23 +418,23 @@ export function CartProvider({ children }: { children: ReactNode }) {
     if (!item) return
 
     const stockCheck = await checkProductStock(
-      item.productId, 
-      item.sizeInfo?.sizeId || null, 
+      item.productId,
+      item.sizeInfo?.sizeId || null,
       item.quantity
     )
-    
+
     setItems(currentItems =>
       currentItems.map(cartItem =>
         cartItem.id === cartItemId
           ? {
-              ...cartItem,
-              maxQuantity: stockCheck.maxAllowed,
-              stockValidated: true,
-              stockIssue: stockCheck.available ? undefined : stockCheck.message,
-              lastStockCheck: new Date(),
-              stockStatus: stockCheck.stockStatus,
-              quantity: stockCheck.available ? cartItem.quantity : Math.min(cartItem.quantity, stockCheck.maxAllowed)
-            }
+            ...cartItem,
+            maxQuantity: stockCheck.maxAllowed,
+            stockValidated: true,
+            stockIssue: stockCheck.available ? undefined : stockCheck.message,
+            lastStockCheck: new Date(),
+            stockStatus: stockCheck.stockStatus,
+            quantity: stockCheck.available ? cartItem.quantity : Math.min(cartItem.quantity, stockCheck.maxAllowed)
+          }
           : cartItem
       )
     )
@@ -435,9 +451,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
   }, [items])
 
   const getStockIssues = useCallback((): CartItem[] => {
-    return items.filter(item => 
-      item.stockIssue || 
-      item.stockStatus === 'out_of_stock' || 
+    return items.filter(item =>
+      item.stockIssue ||
+      item.stockStatus === 'out_of_stock' ||
       !item.stockValidated ||
       (item.stockValidated && item.quantity > item.maxQuantity)
     )
@@ -466,14 +482,14 @@ export function CartProvider({ children }: { children: ReactNode }) {
       removeItem,
       updateQuantity,
       clearCart,
-      
+
       getItemQuantity,
       isInCart,
-      
+
       validateCartStock,
       refreshItemStock,
       getStockIssues,
-      
+
       isOpen,
       openCart,
       closeCart,
@@ -503,7 +519,7 @@ export function useCartWithCurrency() {
     totalPriceFormatted: formatPrice(cart.totalPriceUSD),
     totalPriceConverted: convertPrice(cart.totalPriceUSD),
     currency,
-    
+
     // Enhanced items with currency formatting
     itemsWithCurrency: cart.items.map(item => ({
       ...item,

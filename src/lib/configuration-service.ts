@@ -1,6 +1,7 @@
 // =====================================
 // src/lib/configuration-service.ts
 // Configuration Service - Dynamic Configuration Management
+// ✅ MINIMAL FIXES for type errors only
 // =====================================
 
 import { db } from '@/lib/db'
@@ -8,7 +9,7 @@ import { db } from '@/lib/db'
 export interface ConfigurationValue {
   value: any
   source: 'user' | 'category' | 'country' | 'system'
-  description?: string
+  description?: string | null  // ✅ FIXED: Allow null from database
 }
 
 export interface ProductDefaults {
@@ -68,8 +69,8 @@ class ConfigurationService {
         where: {
           category,
           key,
-          countryId: context?.countryId,
-          categoryId: context?.categoryId,
+          countryId: context?.countryId === undefined ? null : context.countryId,  // ✅ FIXED: Explicit conversion
+          categoryId: context?.categoryId === undefined ? null : context.categoryId, // ✅ FIXED: Explicit conversion
           isActive: true
         }
       })
@@ -79,7 +80,7 @@ class ConfigurationService {
         const result = {
           value,
           source: 'user' as const,
-          description: userConfig.description
+          description: userConfig.description  // ✅ FIXED: Now compatible with string | null
         }
         this.configCache.set(cacheKey, result)
         return result
@@ -247,6 +248,7 @@ class ConfigurationService {
 
   /**
    * Set configuration value
+   * ✅ FIXED: Handle Prisma's compound unique constraint with nullable fields correctly
    */
   async setConfigurationValue(
     key: string,
@@ -261,34 +263,57 @@ class ConfigurationService {
   ): Promise<void> {
     const serializedValue = this.serializeConfigValue(value, dataType)
 
-    await db.configurationSetting.upsert({
-      where: {
-        category_key_countryId_categoryId: {
+    // ✅ FIXED: Use explicit approach for nullable unique constraints
+    // Convert undefined to null properly
+    const countryId = context?.countryId === undefined ? null : context.countryId
+    const categoryId = context?.categoryId === undefined ? null : context.categoryId
+    const description = context?.description === undefined ? null : context.description
+
+    try {
+      // Try to find existing record first
+      const existingRecord = await db.configurationSetting.findFirst({
+        where: {
           category,
           key,
-          countryId: context?.countryId || null,
-          categoryId: context?.categoryId || null
+          countryId,
+          categoryId,
+          isActive: true
         }
-      },
-      update: {
-        value: serializedValue,
-        dataType,
-        description: context?.description,
-        updatedAt: new Date()
-      },
-      create: {
-        category,
-        key,
-        value: serializedValue,
-        dataType,
-        description: context?.description,
-        countryId: context?.countryId,
-        categoryId: context?.categoryId
-      }
-    })
+      })
 
-    // Clear cache
-    this.clearCache()
+      if (existingRecord) {
+        // Update existing record
+        await db.configurationSetting.update({
+          where: { id: existingRecord.id },
+          data: {
+            value: serializedValue,
+            dataType,
+            description,
+            updatedAt: new Date()
+          }
+        })
+      } else {
+        // Create new record
+        await db.configurationSetting.create({
+          data: {
+            category,
+            key,
+            value: serializedValue,
+            dataType,
+            description,
+            countryId,
+            categoryId,
+            isActive: true
+          }
+        })
+      }
+
+      // Clear cache
+      this.clearCache()
+    } catch (error) {
+      console.error('Error setting configuration value:', error)
+      throw new Error(`Failed to set configuration: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    }
   }
 
   /**
@@ -372,4 +397,9 @@ export const useConfiguration = () => {
     getPlaceholderText: configurationService.getPlaceholderText.bind(configurationService),
     setConfigurationValue: configurationService.setConfigurationValue.bind(configurationService)
   }
+}
+
+// ✅ UTILITY: Convert null to undefined for components that need it
+export const safeDescription = (description: string | null | undefined): string | undefined => {
+  return description === null ? undefined : description
 }
