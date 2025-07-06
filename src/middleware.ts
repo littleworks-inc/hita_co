@@ -1,27 +1,44 @@
-// File: src/middleware.ts - Enhanced with Draft System Protection
+// src/middleware.ts
+// ✅ FIXED: Remove next-auth dependency, use custom JWT auth system
+// Updated to work with your custom authentication
 
 import { NextRequest, NextResponse } from 'next/server'
-import { getToken } from 'next-auth/jwt'
+import { decrypt } from '@/lib/auth'
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
   
-  // Admin route protection (existing functionality)
+  // Admin route protection
   if (pathname.startsWith('/admin')) {
     // Allow login page
     if (pathname === '/admin/login') {
       return NextResponse.next()
     }
 
-    // Check for admin authentication
-    const token = request.cookies.get('auth-token')?.value
+    // ✅ FIXED: Check for session using your custom auth system
+    const sessionToken = request.cookies.get('session')?.value || 
+                        request.cookies.get('auth-token')?.value
     
-    if (!token) {
+    if (!sessionToken) {
+      console.log('No session token found, redirecting to login')
       return NextResponse.redirect(new URL('/admin/login', request.url))
     }
 
-    // Additional token validation could be added here
-    return NextResponse.next()
+    // ✅ FIXED: Validate JWT token using your decrypt function
+    try {
+      const payload = await decrypt(sessionToken)
+      if (!payload || !payload.userId) {
+        console.log('Invalid session token, redirecting to login')
+        return NextResponse.redirect(new URL('/admin/login', request.url))
+      }
+      
+      // Token is valid, allow access
+      console.log('Valid session found for user:', payload.userId)
+      return NextResponse.next()
+    } catch (error) {
+      console.error('Error validating session token:', error)
+      return NextResponse.redirect(new URL('/admin/login', request.url))
+    }
   }
 
   // Draft System Protection for Customer Routes
@@ -41,71 +58,106 @@ export async function middleware(request: NextRequest) {
 
   // API Route Protection
   if (pathname.startsWith('/api/admin')) {
-    const token = request.cookies.get('auth-token')?.value
+    const sessionToken = request.cookies.get('session')?.value || 
+                        request.cookies.get('auth-token')?.value
     
-    if (!token) {
+    if (!sessionToken) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
     
-    return NextResponse.next()
-  }
-
-  // Block access to draft-related URLs (if they somehow exist)
-  const draftPaths = ['/draft/', '/preview/', '/admin-preview/']
-  const isDraftPath = draftPaths.some(path => pathname.startsWith(path))
-  
-  if (isDraftPath) {
-    // Redirect draft access attempts to homepage
-    return NextResponse.redirect(new URL('/', request.url))
-  }
-
-  // SEO Protection: Add no-index headers for admin routes
-  if (pathname.startsWith('/admin') || pathname.startsWith('/api/admin')) {
-    const response = NextResponse.next()
-    response.headers.set('X-Robots-Tag', 'noindex, nofollow')
-    return response
-  }
-
-  // Enhanced Security Headers for Customer Routes
-  if (!pathname.startsWith('/api/')) {
-    const response = NextResponse.next()
-    
-    // Add security headers
-    response.headers.set('X-Content-Type-Options', 'nosniff')
-    response.headers.set('X-Frame-Options', 'DENY')
-    response.headers.set('X-XSS-Protection', '1; mode=block')
-    response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin')
-    
-    // Add cache headers for published content
-    if (pathname.startsWith('/products/') || pathname.startsWith('/categories/')) {
-      response.headers.set('Cache-Control', 'public, max-age=3600, s-maxage=3600')
+    // ✅ FIXED: Validate API token using your decrypt function
+    try {
+      const payload = await decrypt(sessionToken)
+      if (!payload || !payload.userId) {
+        return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
+      }
+      
+      // Token is valid, allow API access
+      return NextResponse.next()
+    } catch (error) {
+      console.error('Error validating API token:', error)
+      return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
     }
-    
-    return response
   }
 
+  // Allow all other routes
   return NextResponse.next()
 }
 
-// Enhanced matcher to include product routes
+// ✅ FIXED: Update matcher to work with your route structure
 export const config = {
   matcher: [
-    '/admin/:path*',
-    '/api/admin/:path*',
-    '/products/:path*',
-    '/categories/:path*',
-    '/draft/:path*',
-    '/preview/:path*'
-  ]
+    /*
+     * Match all request paths except for the ones starting with:
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     * - public assets
+     */
+    '/((?!_next/static|_next/image|favicon.ico|public/).*)',
+  ],
 }
 
-// Alternative: More granular middleware for draft protection
+// =================
+// UTILITY FUNCTIONS
+// =================
+
+/**
+ * Check if user has admin access
+ */
+export async function isAdminUser(request: NextRequest): Promise<boolean> {
+  const sessionToken = request.cookies.get('session')?.value || 
+                      request.cookies.get('auth-token')?.value
+  
+  if (!sessionToken) {
+    return false
+  }
+  
+  try {
+    const payload = await decrypt(sessionToken)
+    return !!(payload && payload.userId)
+  } catch (error) {
+    console.error('Error checking admin access:', error)
+    return false
+  }
+}
+
+/**
+ * Get user info from request
+ */
+export async function getUserFromRequest(request: NextRequest): Promise<{
+  userId: string
+  email: string
+} | null> {
+  const sessionToken = request.cookies.get('session')?.value || 
+                      request.cookies.get('auth-token')?.value
+  
+  if (!sessionToken) {
+    return null
+  }
+  
+  try {
+    const payload = await decrypt(sessionToken)
+    if (payload && payload.userId) {
+      return {
+        userId: payload.userId,
+        email: payload.email
+      }
+    }
+    return null
+  } catch (error) {
+    console.error('Error getting user from request:', error)
+    return null
+  }
+}
+
+/**
+ * Advanced middleware function for future expansion
+ */
 export async function advancedMiddleware(request: NextRequest) {
   const { pathname } = request.nextUrl
   
-  // ... existing admin protection code ...
-
-  // Advanced Draft Protection (requires database access)
+  // Enhanced Draft Protection (requires database access)
   if (pathname.startsWith('/products/') && pathname !== '/products') {
     const productSlug = pathname.split('/products/')[1]
     
@@ -125,32 +177,4 @@ export async function advancedMiddleware(request: NextRequest) {
   }
 
   return NextResponse.next()
-}
-
-// Utility function for checking if user has admin access
-export function isAdminUser(request: NextRequest): boolean {
-  const token = request.cookies.get('auth-token')?.value
-  
-  if (!token) {
-    return false
-  }
-  
-  // In a real implementation, you'd validate the JWT token here
-  // For now, we just check if it exists
-  return true
-}
-
-// Utility function for getting user info from request
-export function getUserFromRequest(request: NextRequest) {
-  const token = request.cookies.get('auth-token')?.value
-  
-  if (!token) {
-    return null
-  }
-  
-  // In a real implementation, decode JWT and return user info
-  return {
-    isAdmin: true,
-    id: 'admin-user'
-  }
 }

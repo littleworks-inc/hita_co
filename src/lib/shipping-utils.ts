@@ -1,13 +1,37 @@
 // COMPLETE FIXED src/lib/shipping-utils.ts
-// Updated to work with new explicit many-to-many relationship
+// ✅ ALL TYPESCRIPT ERRORS RESOLVED
+// Updated to work with Country model for exchange rates and fixed Prisma include issues
 
 import { db } from '@/lib/db'
 import { Prisma } from '@prisma/client'
 
+// =================
+// TYPES AND INTERFACES
+// =================
 
-// =================
-// INTERFACES
-// =================
+// Import currency types from currency module
+export type SupportedCurrency = 'USD' | 'EUR' | 'GBP' | 'CAD' | 'AUD' | 'JPY' | 'CNY' | 'INR' | 'SGD' | 'HKD' | 'AED' | 'CHF' | 'NOK' | 'SEK' | 'DKK' | 'BDT' | 'NPR'
+
+// Fallback exchange rates for offline/error scenarios
+const FALLBACK_RATES: Record<SupportedCurrency, number> = {
+  USD: 1,
+  EUR: 0.85,
+  GBP: 0.73,
+  CAD: 1.25,
+  AUD: 1.35,
+  JPY: 110,
+  CNY: 6.45,
+  INR: 83.0,
+  SGD: 1.35,
+  HKD: 7.8,
+  AED: 3.67,
+  CHF: 0.92,
+  NOK: 8.5,
+  SEK: 8.8,
+  DKK: 6.4,
+  BDT: 110.0,
+  NPR: 132.0
+}
 
 export interface ShippingCalculationRequest {
   countryCode: string // 2-letter country code (US, CA, etc.)
@@ -57,6 +81,10 @@ export interface ShippingZoneWithRates {
     isActive: boolean
   }>
 }
+
+// =================
+// UTILITY FUNCTIONS
+// =================
 
 /**
  * Safely parse shipping address from Prisma JsonValue
@@ -148,16 +176,89 @@ export function validateShippingAddress(address: any): {
     errors
   }
 }
+
+/**
+ * Format currency amount
+ */
+export function formatCurrency(amount: number, currency: string = 'USD'): string {
+  try {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: currency,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    }).format(amount)
+  } catch (error) {
+    // Fallback formatting
+    return `$${amount.toFixed(2)}`
+  }
+}
+
+/**
+ * ✅ FIXED: Convert USD amount to another currency using Country model
+ */
+export async function convertCurrency(
+  amountUSD: number, 
+  targetCurrency: string
+): Promise<number> {
+  if (targetCurrency === 'USD') {
+    return amountUSD
+  }
+
+  try {
+    // ✅ FIXED: Get exchange rate from Country model (not exchangeRate model)
+    const country = await db.country.findFirst({
+      where: {
+        currency: targetCurrency
+      },
+      select: {
+        exchangeRate: true,
+        currency: true
+      }
+    })
+
+    // Use the exchange rate if found and valid
+    if (country?.exchangeRate && country.exchangeRate > 0) {
+      return amountUSD * country.exchangeRate
+    }
+
+    // ✅ FALLBACK: Use static fallback rates if no database rate found
+    const fallbackRate = FALLBACK_RATES[targetCurrency as SupportedCurrency]
+    if (fallbackRate && fallbackRate > 0) {
+      console.warn(`Using fallback exchange rate for ${targetCurrency}`)
+      return amountUSD * fallbackRate
+    }
+
+    // ✅ ULTIMATE FALLBACK: Return USD amount if no rate available
+    console.warn(`No exchange rate found for ${targetCurrency}, returning USD amount`)
+    return amountUSD
+
+  } catch (error) {
+    console.error('Error converting currency:', error)
+    
+    // ✅ ERROR FALLBACK: Try static rates
+    const fallbackRate = FALLBACK_RATES[targetCurrency as SupportedCurrency]
+    if (fallbackRate && fallbackRate > 0) {
+      console.warn(`Using fallback rate due to error for ${targetCurrency}`)
+      return amountUSD * fallbackRate
+    }
+    
+    // Return original amount if all else fails
+    return amountUSD
+  }
+}
+
 // =================
 // CORE FUNCTIONS (FIXED)
 // =================
 
 /**
- * Get shipping zone for a specific country (FIXED)
+ * ✅ FIXED: Get shipping zone for a specific country 
+ * Resolves Prisma include where clause error
  */
 export async function getShippingZoneForCountry(countryCode: string): Promise<ShippingZoneWithRates | null> {
   try {
-    // Find country and its shipping zones (FIXED)
+    // ✅ FIXED: First get country with all zones, then filter active zones in code
     const country = await db.country.findFirst({
       where: { 
         code: {
@@ -169,7 +270,7 @@ export async function getShippingZoneForCountry(countryCode: string): Promise<Sh
         countryZones: {
           include: {
             shippingZone: {
-              where: { isActive: true },
+              // ✅ REMOVED: where clause - can't filter singular relations
               include: {
                 shippingRates: {
                   where: { isActive: true },
@@ -188,8 +289,19 @@ export async function getShippingZoneForCountry(countryCode: string): Promise<Sh
       return defaultZone
     }
 
-    // Return the first active shipping zone for this country (FIXED)
-    const zoneRelation = country.countryZones[0]
+    // ✅ FIXED: Filter active zones in JavaScript after database query
+    const activeZones = country.countryZones.filter(
+      zoneRelation => zoneRelation.shippingZone.isActive
+    )
+
+    if (activeZones.length === 0) {
+      // No active zones found, fall back to default
+      const defaultZone = await getDefaultShippingZone()
+      return defaultZone
+    }
+
+    // Return the first active shipping zone for this country
+    const zoneRelation = activeZones[0]
     const zone = zoneRelation.shippingZone
     
     return {
@@ -286,7 +398,8 @@ export async function getDefaultShippingZone(): Promise<ShippingZoneWithRates | 
 }
 
 /**
- * Calculate shipping cost for an order
+ * ✅ FIXED: Calculate shipping cost for an order
+ * Resolves undefined remainingForFreeShipping error
  */
 export async function calculateShipping(request: ShippingCalculationRequest): Promise<ShippingCalculationResult> {
   try {
@@ -336,7 +449,7 @@ export async function calculateShipping(request: ShippingCalculationRequest): Pr
 
     const shippingCost = isEligibleForFreeShipping ? 0 : shippingRate.flatRate
     
-    // Calculate remaining amount for free shipping
+    // ✅ FIXED: Calculate remaining amount for free shipping with proper undefined handling
     const remainingForFreeShipping = freeShippingThreshold && !isEligibleForFreeShipping
       ? freeShippingThreshold - request.subtotalUSD
       : undefined
@@ -346,7 +459,10 @@ export async function calculateShipping(request: ShippingCalculationRequest): Pr
       shippingCostFormatted: formatCurrency(shippingCost, 'USD'),
       isEligibleForFreeShipping,
       freeShippingThreshold: freeShippingThreshold || undefined,
-      remainingForFreeShipping: remainingForFreeShipping > 0 ? remainingForFreeShipping : undefined,
+      // ✅ FIXED: Check for undefined before comparison
+      remainingForFreeShipping: remainingForFreeShipping !== undefined && remainingForFreeShipping > 0 
+        ? remainingForFreeShipping 
+        : undefined,
       shippingZoneName: shippingZone.name,
       estimatedDays: shippingRate.estimatedDays || undefined
     }
@@ -461,83 +577,6 @@ export async function getAllShippingZones(): Promise<ShippingZoneWithRates[]> {
 }
 
 /**
- * Detect country from IP address (placeholder for future implementation)
- */
-export function detectCountryFromIP(ipAddress?: string): string {
-  // Placeholder implementation - returns US as default
-  // In a real implementation, you might use a service like:
-  // - MaxMind GeoIP
-  // - ipapi.co
-  // - Cloudflare CF-IPCountry header
-  
-  if (!ipAddress) {
-    return 'US' // Default to US
-  }
-  
-  // Simple detection based on common patterns (very basic)
-  if (ipAddress.startsWith('192.168.') || ipAddress.startsWith('10.') || ipAddress.startsWith('127.')) {
-    return 'US' // Local/development
-  }
-  
-  return 'US' // Default fallback
-}
-
-// =================
-// UTILITY FUNCTIONS
-// =================
-
-/**
- * Format currency amount
- */
-export function formatCurrency(amount: number, currency: string = 'USD'): string {
-  try {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: currency,
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    }).format(amount)
-  } catch (error) {
-    // Fallback formatting
-    return `$${amount.toFixed(2)}`
-  }
-}
-
-/**
- * Convert USD amount to another currency (placeholder)
- */
-export async function convertCurrency(
-  amountUSD: number, 
-  targetCurrency: string
-): Promise<number> {
-  if (targetCurrency === 'USD') {
-    return amountUSD
-  }
-
-  try {
-    // Get exchange rate from database
-    const exchangeRate = await db.exchangeRate.findFirst({
-      where: {
-        fromCurrency: 'USD',
-        toCurrency: targetCurrency
-      },
-      orderBy: { lastUpdated: 'desc' }
-    })
-
-    if (!exchangeRate) {
-      console.warn(`No exchange rate found for USD to ${targetCurrency}`)
-      return amountUSD // Return USD amount as fallback
-    }
-
-    return amountUSD * exchangeRate.rate
-
-  } catch (error) {
-    console.error('Error converting currency:', error)
-    return amountUSD
-  }
-}
-
-/**
  * Get supported countries for shipping (FIXED)
  */
 export async function getSupportedShippingCountries(): Promise<Array<{
@@ -589,6 +628,28 @@ export async function getSupportedShippingCountries(): Promise<Array<{
     console.error('Error getting supported shipping countries:', error)
     return []
   }
+}
+
+/**
+ * Detect country from IP address (placeholder for future implementation)
+ */
+export function detectCountryFromIP(ipAddress?: string): string {
+  // Placeholder implementation - returns US as default
+  // In a real implementation, you might use a service like:
+  // - MaxMind GeoIP
+  // - ipapi.co
+  // - Cloudflare CF-IPCountry header
+  
+  if (!ipAddress) {
+    return 'US' // Default to US
+  }
+  
+  // Simple detection based on common patterns (very basic)
+  if (ipAddress.startsWith('192.168.') || ipAddress.startsWith('10.') || ipAddress.startsWith('127.')) {
+    return 'US' // Local/development
+  }
+  
+  return 'US' // Default fallback
 }
 
 // =================
