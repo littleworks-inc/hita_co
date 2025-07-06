@@ -341,33 +341,41 @@ Format as JSON:
   }
 
   async generateContent(request: AIGenerationRequest): Promise<AIGenerationResponse> {
-    try {
-      const settings = await this.getAISettings()
-      const prompt = this.buildPrompt(request)
+  try {
+    const settings = await this.getAISettings()
+    const prompt = this.buildPrompt(request)
 
-      switch (settings.aiProvider) {
-        case 'openai':
-          return await this.callOpenAI(prompt, settings.aiApiKey)
-        
-        case 'gemini':
-          return await this.callGemini(prompt, settings.aiApiKey)
-        
-        case 'claude':
-          return await this.callClaude(prompt, settings.aiApiKey)
-        
-        default:
-          return {
-            success: false,
-            error: `Unsupported AI provider: ${settings.aiProvider}`
-          }
-      }
-    } catch (error) {
+    // ✅ FIXED: Explicit runtime check for type safety
+    if (!settings.aiApiKey) {
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Failed to generate content'
+        error: 'API key not configured. Please add your API key in store settings.'
       }
     }
+
+    switch (settings.aiProvider) {
+      case 'openai':
+        return await this.callOpenAI(prompt, settings.aiApiKey) // ✅ TypeScript knows it's string now
+      
+      case 'gemini':
+        return await this.callGemini(prompt, settings.aiApiKey) // ✅ TypeScript knows it's string now
+      
+      case 'claude':
+        return await this.callClaude(prompt, settings.aiApiKey) // ✅ TypeScript knows it's string now
+      
+      default:
+        return {
+          success: false,
+          error: `Unsupported AI provider: ${settings.aiProvider}`
+        }
+    }
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to generate content'
+    }
   }
+}
 
   // Bulk generation for multiple products
   async bulkGenerateProductContent(productIds: string[], type: AIGenerationRequest['type']): Promise<{

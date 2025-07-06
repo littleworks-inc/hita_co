@@ -1,5 +1,10 @@
 // lib/lightweight-config.ts
+// ✅ FIXED: Configuration system with alternative context approach
 // Configuration system to make your existing components lightweight without breaking them
+
+'use client'
+
+import React, { createContext, useContext, ReactNode } from 'react'
 
 interface LightweightConfig {
   // Navigation optimizations
@@ -134,10 +139,11 @@ export const NORMAL_CONFIG: LightweightConfig = {
   }
 }
 
-// Configuration context for React components
-import { createContext, useContext, ReactNode } from 'react'
+// ✅ ALTERNATIVE APPROACH: Use React.createContext to avoid namespace issues
+const LightweightContext = React.createContext<LightweightConfig>(NORMAL_CONFIG)
 
-const LightweightContext = createContext<LightweightConfig>(NORMAL_CONFIG)
+// Export the context for debugging if needed
+export { LightweightContext }
 
 interface LightweightProviderProps {
   children: ReactNode
@@ -153,15 +159,19 @@ export function LightweightProvider({
   const baseConfig = mode === 'lightweight' ? LIGHTWEIGHT_CONFIG : NORMAL_CONFIG
   const mergedConfig = { ...baseConfig, ...config }
   
-  return (
-    <LightweightContext.Provider value={mergedConfig}>
-      {children}
-    </LightweightContext.Provider>
+  return React.createElement(
+    LightweightContext.Provider,
+    { value: mergedConfig },
+    children
   )
 }
 
-export function useLightweight() {
-  return useContext(LightweightContext)
+export function useLightweight(): LightweightConfig {
+  const context = React.useContext(LightweightContext)
+  if (!context) {
+    throw new Error('useLightweight must be used within a LightweightProvider')
+  }
+  return context
 }
 
 // Utility functions to generate classes based on config
@@ -217,6 +227,37 @@ export function getGridClasses(config: LightweightConfig['layout']) {
   return classes.join(' ')
 }
 
+// ✅ NEW: Performance utility classes
+export function getPerformanceClasses(config: LightweightConfig['performance']) {
+  const classes = []
+  
+  if (config.animationSpeed === 'fast') {
+    classes.push('[&_.animated]:duration-150')
+  } else {
+    classes.push('[&_.animated]:duration-300')
+  }
+  
+  if (!config.enableComplexAnimations) {
+    classes.push('[&_.complex-animation]:transform-none [&_.complex-animation]:scale-100')
+  }
+  
+  return classes.join(' ')
+}
+
+// ✅ NEW: Feature utility functions
+export function shouldShowFeature(config: LightweightConfig, feature: keyof LightweightConfig['features']): boolean {
+  return config.features[feature]
+}
+
+export function getImageLoadingStrategy(config: LightweightConfig): 'lazy' | 'eager' {
+  return config.productCards.imageLoading
+}
+
+// ✅ NEW: Conditional class helper
+export function cn(...classes: (string | undefined | null | false)[]): string {
+  return classes.filter(Boolean).join(' ')
+}
+
 // HOW TO USE THIS SYSTEM:
 
 // 1. Wrap your app with the provider:
@@ -261,6 +302,45 @@ export default function CustomerNavigation() {
     features: { currencySelector: true } 
   }}
 >
+*/
+
+// 4. Use feature flags:
+/*
+import { useLightweight, shouldShowFeature } from '@/lib/lightweight-config'
+
+export default function MyComponent() {
+  const config = useLightweight()
+  
+  return (
+    <div>
+      {shouldShowFeature(config, 'wishlist') && <WishlistButton />}
+      {shouldShowFeature(config, 'themeToggle') && <ThemeToggle />}
+    </div>
+  )
+}
+*/
+
+// 5. Conditional styling:
+/*
+import { useLightweight, getProductCardClasses, cn } from '@/lib/lightweight-config'
+
+export default function ProductCard() {
+  const config = useLightweight()
+  const cardClasses = getProductCardClasses(config.productCards)
+  
+  return (
+    <div className={cn(
+      'border rounded-lg',
+      cardClasses,
+      config.performance.enableComplexAnimations && 'hover:rotate-1'
+    )}>
+      <img 
+        loading={getImageLoadingStrategy(config)}
+        // ...
+      />
+    </div>
+  )
+}
 */
 
 export default LightweightConfig
