@@ -246,7 +246,7 @@ export default function ExhibitionForm({ exhibition, mode }: ExhibitionFormProps
             <Label htmlFor="description">Description</Label>
             <textarea
               id="description"
-              value={formData.description}
+              value={formData.description || ''}
               onChange={(e) => handleInputChange('description', e.target.value)}
               placeholder="Describe the exhibition, target audience, expected visitors, etc."
               rows={4}
