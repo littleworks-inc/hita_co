@@ -1,3 +1,6 @@
+// src/components/admin/EnhancedAIInputForm.tsx
+// Enhanced AI Input Form with proper TypeScript types
+
 import React, { useState } from 'react';
 import { 
   Brain, 
@@ -12,343 +15,350 @@ import {
   ChevronDown,
   ChevronUp,
   Camera,
-  Wand2
+  Wand2,
+  Settings,
+  RefreshCw
 } from 'lucide-react';
 
-const EnhancedAIInputForm = () => {
-  const [expanded, setExpanded] = useState(false);
-  const [analyzing, setAnalyzing] = useState(false);
-  const [formData, setFormData] = useState({
+// ✅ FIXED: TypeScript interfaces
+interface FormData {
+  // Material Details
+  primaryMaterial: string
+  secondaryMaterials: string
+  fabricWeight: string
+  fabricTexture: string
+  
+  // Design & Style
+  designStyle: string
+  patterns: string
+  embellishments: string
+  colorScheme: string
+  dominantColors: string
+  
+  // Cultural Context
+  culturalOrigin: string
+  traditionalName: string
+  occasions: string[]
+  significance: string
+  
+  // Target Audience
+  targetAge: string
+  targetGender: string
+  targetOccasion: string
+  priceRange: string
+  
+  // Unique Features
+  uniqueFeatures: string
+  craftmanship: string
+  careInstructions: string
+  
+  // AI Preferences
+  tone: string
+  length: string
+  keywords: string
+  includeHistory: boolean
+  includeCare: boolean
+}
+
+interface EnhancedAIInputFormProps {
+  onDataChange?: (data: FormData) => void
+  initialData?: Partial<FormData>
+}
+
+const EnhancedAIInputForm: React.FC<EnhancedAIInputFormProps> = ({ 
+  onDataChange, 
+  initialData = {} 
+}) => {
+  const [expanded, setExpanded] = useState<boolean>(false);
+  const [analyzing, setAnalyzing] = useState<boolean>(false);
+  const [formData, setFormData] = useState<FormData>({
     // Material Details
-    primaryMaterial: '',
-    secondaryMaterials: '',
-    fabricWeight: '',
-    fabricTexture: '',
+    primaryMaterial: initialData.primaryMaterial || '',
+    secondaryMaterials: initialData.secondaryMaterials || '',
+    fabricWeight: initialData.fabricWeight || '',
+    fabricTexture: initialData.fabricTexture || '',
     
     // Design & Style
-    designStyle: '',
-    patterns: '',
-    embellishments: '',
-    colorScheme: '',
-    dominantColors: '',
+    designStyle: initialData.designStyle || '',
+    patterns: initialData.patterns || '',
+    embellishments: initialData.embellishments || '',
+    colorScheme: initialData.colorScheme || '',
+    dominantColors: initialData.dominantColors || '',
     
     // Cultural Context
-    culturalOrigin: '',
-    traditionalName: '',
-    occasions: [],
-    significance: '',
+    culturalOrigin: initialData.culturalOrigin || '',
+    traditionalName: initialData.traditionalName || '',
+    occasions: initialData.occasions || [],
+    significance: initialData.significance || '',
     
     // Target Audience
-    targetAge: '',
-    targetGender: '',
-    targetOccasion: '',
-    priceRange: '',
+    targetAge: initialData.targetAge || '',
+    targetGender: initialData.targetGender || '',
+    targetOccasion: initialData.targetOccasion || '',
+    priceRange: initialData.priceRange || '',
     
     // Unique Features
-    uniqueFeatures: '',
-    craftmanship: '',
-    careInstructions: '',
+    uniqueFeatures: initialData.uniqueFeatures || '',
+    craftmanship: initialData.craftmanship || '',
+    careInstructions: initialData.careInstructions || '',
     
     // AI Preferences
-    tone: 'elegant',
-    length: 'medium',
-    keywords: '',
-    includeHistory: true,
-    includeCare: true
+    tone: initialData.tone || 'elegant',
+    length: initialData.length || 'medium',
+    keywords: initialData.keywords || '',
+    includeHistory: initialData.includeHistory ?? true,
+    includeCare: initialData.includeCare ?? true
   });
 
-  const handleInputChange = (field, value) => {
+  // ✅ FIXED: Properly typed function parameters
+  const handleInputChange = (field: keyof FormData, value: string | boolean | string[]): void => {
     setFormData(prev => ({ ...prev, [field]: value }));
+    
+    // Notify parent component of changes
+    if (onDataChange) {
+      const updatedData = { ...formData, [field]: value };
+      onDataChange(updatedData);
+    }
   };
 
-  const handleArrayChange = (field, value) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: prev[field].includes(value) 
-        ? prev[field].filter(item => item !== value)
-        : [...prev[field], value]
-    }));
+  // ✅ FIXED: Properly typed array change handler
+  const handleArrayChange = (field: keyof FormData, value: string): void => {
+    const currentArray = formData[field] as string[];
+    const newArray = currentArray.includes(value) 
+      ? currentArray.filter(item => item !== value)
+      : [...currentArray, value];
+    
+    handleInputChange(field, newArray);
   };
 
-  const analyzeImages = async () => {
+  // ✅ FIXED: Properly typed generate function
+  const handleGenerateAI = async (): Promise<void> => {
     setAnalyzing(true);
-    // Simulate image analysis
-    setTimeout(() => {
-      setFormData(prev => ({
-        ...prev,
-        primaryMaterial: 'Silk',
-        secondaryMaterials: 'Gold thread, Cotton lining',
-        designStyle: 'Traditional',
-        patterns: 'Paisley, Floral motifs',
-        dominantColors: 'Deep red, Gold, Ivory',
-        colorScheme: 'Rich and warm'
-      }));
+    try {
+      // Simulate AI generation - replace with actual API call
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Add your AI generation logic here
+    } catch (error) {
+      console.error('AI generation failed:', error);
+    } finally {
       setAnalyzing(false);
-    }, 2000);
+    }
   };
 
-  const occasions = [
-    'Wedding', 'Festival', 'Formal Event', 'Casual Wear', 
-    'Party', 'Religious Ceremony', 'Cultural Event'
-  ];
-
+  // Predefined options
   const tones = [
     { value: 'elegant', label: 'Elegant & Sophisticated' },
     { value: 'casual', label: 'Casual & Friendly' },
-    { value: 'professional', label: 'Professional & Informative' },
-    { value: 'romantic', label: 'Romantic & Dreamy' },
-    { value: 'modern', label: 'Modern & Trendy' }
+    { value: 'luxury', label: 'Luxury & Premium' },
+    { value: 'traditional', label: 'Traditional & Cultural' },
+    { value: 'modern', label: 'Modern & Contemporary' }
+  ];
+
+  const occasions = [
+    'Wedding', 'Festival', 'Party', 'Casual', 'Office', 'Religious', 
+    'Traditional', 'Modern', 'Special Events', 'Daily Wear'
+  ];
+
+  const designStyles = [
+    'Traditional', 'Contemporary', 'Fusion', 'Vintage', 'Modern', 
+    'Ethnic', 'Bohemian', 'Minimalist', 'Ornate', 'Classic'
+  ];
+
+  const materials = [
+    'Cotton', 'Silk', 'Chiffon', 'Georgette', 'Velvet', 'Linen', 
+    'Wool', 'Crepe', 'Satin', 'Brocade', 'Net', 'Organza'
   ];
 
   return (
-    <div className="max-w-4xl mx-auto p-6 bg-white">
+    <div className="bg-gradient-to-br from-purple-50 to-blue-50 rounded-xl p-6 border border-purple-200">
       {/* Header */}
-      <div className="bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-lg p-6 mb-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Brain className="h-6 w-6 text-purple-600" />
-            <div>
-              <h2 className="text-xl font-semibold text-purple-900">
-                Enhanced AI Product Description Generator
-              </h2>
-              <p className="text-purple-700 text-sm mt-1">
-                Provide detailed information for highly accurate, personalized product descriptions
-              </p>
-            </div>
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-gradient-to-r from-purple-600 to-blue-600 rounded-lg">
+            <Brain className="h-6 w-6 text-white" />
           </div>
-          <button
-            onClick={() => setExpanded(!expanded)}
-            className="flex items-center gap-2 px-4 py-2 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition-colors"
-          >
-            {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-            {expanded ? 'Simple Mode' : 'Detailed Mode'}
-          </button>
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900">Enhanced AI Content Generator</h3>
+            <p className="text-sm text-gray-600">Provide detailed information for AI-powered descriptions</p>
+          </div>
         </div>
-      </div>
-
-      {/* Image Analysis Section */}
-      <div className="bg-gray-50 border-2 border-dashed border-gray-300 rounded-lg p-6 mb-6">
-        <div className="text-center">
-          <Camera className="h-8 w-8 text-gray-400 mx-auto mb-3" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">
-            Step 1: Upload Product Images
-          </h3>
-          <p className="text-gray-600 mb-4">
-            AI will analyze your images to automatically detect materials, colors, and design elements
-          </p>
-          <button
-            onClick={analyzeImages}
-            disabled={analyzing}
-            className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 mx-auto"
-          >
-            {analyzing ? (
-              <>
-                <Wand2 className="h-4 w-4 animate-spin" />
-                Analyzing Images...
-              </>
-            ) : (
-              <>
-                <Eye className="h-4 w-4" />
-                Analyze Images with AI
-              </>
-            )}
-          </button>
-        </div>
+        
+        <button
+          onClick={() => setExpanded(!expanded)}
+          className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+        >
+          {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+          {expanded ? 'Collapse' : 'Expand'}
+        </button>
       </div>
 
       {/* Basic Information - Always Visible */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-        {/* Material Information */}
-        <div className="space-y-4">
-          <h3 className="flex items-center gap-2 text-lg font-medium text-gray-900">
-            <Scissors className="h-5 w-5" />
-            Material & Fabric
-          </h3>
-          
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Primary Material *
-            </label>
-            <input
-              type="text"
-              value={formData.primaryMaterial}
-              onChange={(e) => handleInputChange('primaryMaterial', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-              placeholder="e.g., Silk, Cotton, Georgette"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Secondary Materials
-            </label>
-            <input
-              type="text"
-              value={formData.secondaryMaterials}
-              onChange={(e) => handleInputChange('secondaryMaterials', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-              placeholder="e.g., Gold thread, Cotton lining, Beads"
-            />
-          </div>
+      <div className="grid gap-4 md:grid-cols-2 mb-6">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            <Scissors className="inline h-4 w-4 mr-1" />
+            Primary Material
+          </label>
+          <select
+            value={formData.primaryMaterial}
+            onChange={(e) => handleInputChange('primaryMaterial', e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+          >
+            <option value="">Select material...</option>
+            {materials.map(material => (
+              <option key={material} value={material}>{material}</option>
+            ))}
+          </select>
         </div>
 
-        {/* Color & Design */}
-        <div className="space-y-4">
-          <h3 className="flex items-center gap-2 text-lg font-medium text-gray-900">
-            <Palette className="h-5 w-5" />
-            Colors & Design
-          </h3>
-          
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Dominant Colors *
-            </label>
-            <input
-              type="text"
-              value={formData.dominantColors}
-              onChange={(e) => handleInputChange('dominantColors', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-              placeholder="e.g., Deep red, Gold, Ivory"
-            />
-          </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            <Palette className="inline h-4 w-4 mr-1" />
+            Dominant Colors
+          </label>
+          <input
+            type="text"
+            value={formData.dominantColors}
+            onChange={(e) => handleInputChange('dominantColors', e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+            placeholder="e.g., Deep red, golden yellow"
+          />
+        </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Patterns & Motifs
-            </label>
-            <input
-              type="text"
-              value={formData.patterns}
-              onChange={(e) => handleInputChange('patterns', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-              placeholder="e.g., Paisley, Floral, Geometric, Traditional motifs"
-            />
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            <Eye className="inline h-4 w-4 mr-1" />
+            Design Style
+          </label>
+          <select
+            value={formData.designStyle}
+            onChange={(e) => handleInputChange('designStyle', e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+          >
+            <option value="">Select style...</option>
+            {designStyles.map(style => (
+              <option key={style} value={style}>{style}</option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            <Users className="inline h-4 w-4 mr-1" />
+            Target Occasions
+          </label>
+          <div className="flex flex-wrap gap-2 max-h-24 overflow-y-auto">
+            {occasions.map(occasion => (
+              <button
+                key={occasion}
+                type="button"
+                onClick={() => handleArrayChange('occasions', occasion)}
+                className={`px-2 py-1 text-xs rounded-md border transition-colors ${
+                  formData.occasions.includes(occasion)
+                    ? 'bg-purple-100 border-purple-300 text-purple-700'
+                    : 'bg-gray-100 border-gray-300 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                {occasion}
+              </button>
+            ))}
           </div>
         </div>
       </div>
 
-      {/* Detailed Information - Expandable */}
+      {/* Expanded Content */}
       {expanded && (
-        <div className="space-y-6 border-t border-gray-200 pt-6">
-          {/* Target Audience */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-4">
-              <h3 className="flex items-center gap-2 text-lg font-medium text-gray-900">
-                <Users className="h-5 w-5" />
-                Target Audience
-              </h3>
-              
+        <div className="space-y-6 border-t pt-6">
+          {/* Material Details */}
+          <div>
+            <h4 className="font-medium text-gray-900 mb-3 flex items-center gap-2">
+              <Scissors className="h-4 w-4" />
+              Material & Fabric Details
+            </h4>
+            <div className="grid gap-4 md:grid-cols-2">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Target Age Group
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Secondary Materials</label>
+                <input
+                  type="text"
+                  value={formData.secondaryMaterials}
+                  onChange={(e) => handleInputChange('secondaryMaterials', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500"
+                  placeholder="e.g., Cotton lining, silk borders"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Fabric Weight</label>
                 <select
-                  value={formData.targetAge}
-                  onChange={(e) => handleInputChange('targetAge', e.target.value)}
+                  value={formData.fabricWeight}
+                  onChange={(e) => handleInputChange('fabricWeight', e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500"
                 >
-                  <option value="">Select age group</option>
-                  <option value="teens">Teens (13-19)</option>
-                  <option value="young-adults">Young Adults (20-30)</option>
-                  <option value="adults">Adults (30-50)</option>
-                  <option value="mature">Mature (50+)</option>
-                  <option value="all-ages">All Ages</option>
+                  <option value="">Select weight...</option>
+                  <option value="light">Light</option>
+                  <option value="medium">Medium</option>
+                  <option value="heavy">Heavy</option>
                 </select>
               </div>
-
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Target Gender
-                </label>
-                <select
-                  value={formData.targetGender}
-                  onChange={(e) => handleInputChange('targetGender', e.target.value)}
+                <label className="block text-sm font-medium text-gray-700 mb-2">Fabric Texture</label>
+                <input
+                  type="text"
+                  value={formData.fabricTexture}
+                  onChange={(e) => handleInputChange('fabricTexture', e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500"
-                >
-                  <option value="">Select gender</option>
-                  <option value="women">Women</option>
-                  <option value="men">Men</option>
-                  <option value="girls">Girls</option>
-                  <option value="boys">Boys</option>
-                  <option value="unisex">Unisex</option>
-                </select>
-              </div>
-            </div>
-
-            {/* Occasions */}
-            <div className="space-y-4">
-              <h3 className="flex items-center gap-2 text-lg font-medium text-gray-900">
-                <Heart className="h-5 w-5" />
-                Suitable Occasions
-              </h3>
-              
-              <div className="grid grid-cols-2 gap-2">
-                {occasions.map(occasion => (
-                  <label key={occasion} className="flex items-center space-x-2">
-                    <input
-                      type="checkbox"
-                      checked={formData.occasions.includes(occasion)}
-                      onChange={() => handleArrayChange('occasions', occasion)}
-                      className="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
-                    />
-                    <span className="text-sm text-gray-700">{occasion}</span>
-                  </label>
-                ))}
+                  placeholder="e.g., Smooth, textured, embossed"
+                />
               </div>
             </div>
           </div>
 
           {/* Cultural Context */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Cultural Origin/Region
-              </label>
-              <input
-                type="text"
-                value={formData.culturalOrigin}
-                onChange={(e) => handleInputChange('culturalOrigin', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                placeholder="e.g., Rajasthani, Bengali, South Indian"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Traditional Name (if any)
-              </label>
-              <input
-                type="text"
-                value={formData.traditionalName}
-                onChange={(e) => handleInputChange('traditionalName', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                placeholder="e.g., Bandhani, Kalamkari, Chikankari"
-              />
-            </div>
-          </div>
-
-          {/* Unique Features */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Unique Features & Craftsmanship
-            </label>
-            <textarea
-              value={formData.uniqueFeatures}
-              onChange={(e) => handleInputChange('uniqueFeatures', e.target.value)}
-              rows={3}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-              placeholder="e.g., Hand-embroidered details, Mirror work, Block printing, Artisan crafted..."
-            />
+            <h4 className="font-medium text-gray-900 mb-3 flex items-center gap-2">
+              <Heart className="h-4 w-4" />
+              Cultural Context
+            </h4>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Cultural Origin</label>
+                <input
+                  type="text"
+                  value={formData.culturalOrigin}
+                  onChange={(e) => handleInputChange('culturalOrigin', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500"
+                  placeholder="e.g., Rajasthani, Bengali, South Indian"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Traditional Name</label>
+                <input
+                  type="text"
+                  value={formData.traditionalName}
+                  onChange={(e) => handleInputChange('traditionalName', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500"
+                  placeholder="e.g., Banarasi Saree, Lehenga Choli"
+                />
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Cultural Significance</label>
+                <textarea
+                  value={formData.significance}
+                  onChange={(e) => handleInputChange('significance', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500"
+                  rows={3}
+                  placeholder="Describe the cultural significance, history, or traditional use..."
+                />
+              </div>
+            </div>
           </div>
 
-          {/* AI Generation Preferences */}
-          <div className="bg-gray-50 rounded-lg p-4">
-            <h3 className="flex items-center gap-2 text-lg font-medium text-gray-900 mb-4">
-              <Star className="h-5 w-5" />
+          {/* AI Preferences */}
+          <div>
+            <h4 className="font-medium text-gray-900 mb-3 flex items-center gap-2">
+              <Settings className="h-4 w-4" />
               AI Generation Preferences
-            </h3>
-            
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            </h4>
+            <div className="grid gap-4 md:grid-cols-3">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Writing Tone
@@ -389,7 +399,7 @@ const EnhancedAIInputForm = () => {
                   type="text"
                   value={formData.keywords}
                   onChange={(e) => handleInputChange('keywords', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500"
                   placeholder="e.g., ethnic wear, traditional, handmade"
                 />
               </div>
@@ -422,9 +432,17 @@ const EnhancedAIInputForm = () => {
 
       {/* Action Buttons */}
       <div className="flex gap-4 mt-8 pt-6 border-t border-gray-200">
-        <button className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg hover:from-purple-700 hover:to-blue-700 transition-all">
-          <Sparkles className="h-5 w-5" />
-          Generate AI Description
+        <button 
+          onClick={handleGenerateAI}
+          disabled={analyzing}
+          className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg hover:from-purple-700 hover:to-blue-700 transition-all disabled:opacity-50"
+        >
+          {analyzing ? (
+            <RefreshCw className="h-5 w-5 animate-spin" />
+          ) : (
+            <Sparkles className="h-5 w-5" />
+          )}
+          {analyzing ? 'Generating...' : 'Generate AI Description'}
         </button>
         
         <button className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">

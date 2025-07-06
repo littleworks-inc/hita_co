@@ -304,7 +304,7 @@ export default function EnhancedAISettings({ formData, onInputChange, loading, e
       if (response.ok) {
         const data = await response.json()
         const models = data.models || []
-        
+
         // Enhance models with vision capabilities info
         const enhancedModels = models.map((model: AIModel) => {
           const staticModel = STATIC_MODELS[provider]?.find(m => m.value === model.value)
@@ -317,15 +317,15 @@ export default function EnhancedAISettings({ formData, onInputChange, loading, e
             quality: staticModel?.quality || 'good'
           }
         })
-        
+
         setAvailableModels(enhancedModels)
-        
+
         // Auto-select recommended vision model if none selected
         if (!formData.aiModel && enhancedModels.length > 0) {
           const visionModel = enhancedModels.find((m: AIModel) => m.hasVision && m.recommended)
           const recommendedModel = visionModel || enhancedModels.find((m: AIModel) => m.recommended)
           const defaultModel = recommendedModel || enhancedModels[0]
-          
+
           if (defaultModel) {
             onInputChange('aiModel', defaultModel.value)
           }
@@ -367,7 +367,7 @@ export default function EnhancedAISettings({ formData, onInputChange, loading, e
       const data = await response.json()
       setConnectionStatus({
         success: data.success,
-        message: data.success 
+        message: data.success
           ? '✅ Connection successful! AI is ready to generate content.'
           : `❌ Connection failed: ${data.error}`
       })
@@ -423,16 +423,15 @@ export default function EnhancedAISettings({ formData, onInputChange, loading, e
           <Zap className="inline h-4 w-4 mr-2" />
           Choose AI Provider *
         </label>
-        
+
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {AI_PROVIDERS.map((provider) => (
             <div
               key={provider.id}
-              className={`relative p-4 border-2 rounded-lg cursor-pointer transition-all ${
-                formData.aiProvider === provider.id
+              className={`relative p-4 border-2 rounded-lg cursor-pointer transition-all ${formData.aiProvider === provider.id
                   ? 'border-blue-500 bg-blue-50'
                   : 'border-gray-200 hover:border-gray-300'
-              }`}
+                }`}
               onClick={() => onInputChange('aiProvider', provider.id)}
             >
               <div className="flex items-start justify-between mb-2">
@@ -440,23 +439,21 @@ export default function EnhancedAISettings({ formData, onInputChange, loading, e
                 <div className="flex gap-1">
                   {provider.hasVisionModels && (
                     <div className="bg-green-100 p-1 rounded">
-                      <Eye className="h-3 w-3 text-green-600" title="Supports image analysis" />
+                      <Eye className="h-3 w-3 text-green-600" />
                     </div>
                   )}
-                  <div className={`p-1 rounded ${
-                    provider.reliability === 'excellent' ? 'bg-green-100' :
-                    provider.reliability === 'good' ? 'bg-yellow-100' : 'bg-gray-100'
-                  }`}>
-                    <CheckCircle className={`h-3 w-3 ${
-                      provider.reliability === 'excellent' ? 'text-green-600' :
-                      provider.reliability === 'good' ? 'text-yellow-600' : 'text-gray-600'
-                    }`} title={`Reliability: ${provider.reliability}`} />
+                  <div className={`p-1 rounded ${provider.reliability === 'excellent' ? 'bg-green-100' :
+                      provider.reliability === 'good' ? 'bg-yellow-100' : 'bg-gray-100'
+                    }`} title={`Reliability: ${provider.reliability}`}>
+                    <CheckCircle className={`h-3 w-3 ${provider.reliability === 'excellent' ? 'text-green-600' :
+                        provider.reliability === 'good' ? 'text-yellow-600' : 'text-gray-600'
+                      }`} />
                   </div>
                 </div>
               </div>
-              
+
               <p className="text-xs text-gray-600 mb-2">{provider.description}</p>
-              
+
               <div className="space-y-1">
                 <div className="text-xs text-gray-500">
                   <strong>Pricing:</strong> {provider.pricing}
@@ -480,7 +477,7 @@ export default function EnhancedAISettings({ formData, onInputChange, loading, e
             </div>
           ))}
         </div>
-        
+
         {errors.aiProvider && (
           <p className="text-sm text-red-600">{errors.aiProvider}</p>
         )}
@@ -499,9 +496,8 @@ export default function EnhancedAISettings({ formData, onInputChange, loading, e
               onChange={(e) => onInputChange('aiApiKey', e.target.value)}
               placeholder="Enter your API key"
               disabled={loading}
-              className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 ${
-                errors.aiApiKey ? 'border-red-500' : 'border-gray-300'
-              }`}
+              className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 ${errors.aiApiKey ? 'border-red-500' : 'border-gray-300'
+                }`}
             />
             {currentProvider && (
               <div className="flex items-center gap-2 text-sm text-gray-600">
@@ -555,11 +551,10 @@ export default function EnhancedAISettings({ formData, onInputChange, loading, e
             {availableModels.map((model) => (
               <div
                 key={model.value}
-                className={`relative p-4 border-2 rounded-lg cursor-pointer transition-all ${
-                  formData.aiModel === model.value
+                className={`relative p-4 border-2 rounded-lg cursor-pointer transition-all ${formData.aiModel === model.value
                     ? 'border-blue-500 bg-blue-50'
                     : 'border-gray-200 hover:border-gray-300'
-                } ${model.hasVision ? 'border-l-4 border-l-green-500' : ''}`}
+                  } ${model.hasVision ? 'border-l-4 border-l-green-500' : ''}`}
                 onClick={() => onInputChange('aiModel', model.value)}
               >
                 <div className="flex items-start justify-between">
@@ -574,25 +569,24 @@ export default function EnhancedAISettings({ formData, onInputChange, loading, e
                           Recommended
                         </span>
                       )}
-                      <span className={`text-xs px-2 py-1 rounded-full ${
-                        model.pricing === 'free' ? 'bg-green-100 text-green-800' :
-                        model.pricing === 'paid' ? 'bg-orange-100 text-orange-800' :
-                        'bg-gray-100 text-gray-800'
-                      }`}>
+                      <span className={`text-xs px-2 py-1 rounded-full ${model.pricing === 'free' ? 'bg-green-100 text-green-800' :
+                          model.pricing === 'paid' ? 'bg-orange-100 text-orange-800' :
+                            'bg-gray-100 text-gray-800'
+                        }`}>
                         {model.pricing === 'free' ? 'Free' : 'Paid'}
                       </span>
                     </div>
-                    
+
                     {model.description && (
                       <p className="text-sm text-gray-600 mb-2">{model.description}</p>
                     )}
-                    
+
                     <div className="flex gap-4 text-xs text-gray-500">
                       <span>Speed: {model.speed}</span>
                       <span>Quality: {model.quality}</span>
                     </div>
                   </div>
-                  
+
                   {formData.aiModel === model.value && (
                     <CheckCircle className="h-5 w-5 text-blue-600" />
                   )}
@@ -630,7 +624,7 @@ export default function EnhancedAISettings({ formData, onInputChange, loading, e
               <span className="ml-2 font-medium">{selectedModel.quality}</span>
             </div>
           </div>
-          
+
           {selectedModel.hasVision && (
             <div className="mt-3 bg-green-50 border border-green-200 rounded p-3">
               <div className="flex items-center gap-2 text-green-800 text-sm font-medium">
@@ -661,13 +655,12 @@ export default function EnhancedAISettings({ formData, onInputChange, loading, e
             )}
             {testingConnection ? 'Testing Connection...' : 'Test AI Connection'}
           </button>
-          
+
           {connectionStatus && (
-            <div className={`p-3 rounded-md ${
-              connectionStatus.success 
+            <div className={`p-3 rounded-md ${connectionStatus.success
                 ? 'bg-green-50 border border-green-200 text-green-800'
                 : 'bg-red-50 border border-red-200 text-red-800'
-            }`}>
+              }`}>
               {connectionStatus.message}
             </div>
           )}
