@@ -1,210 +1,167 @@
-// =====================================
-// src/app/api/products/route.ts - FIXED Customer Products API
-// =====================================
+// src/app/api/products/route.ts
+// ✅ FIXED: Properly handle dynamic server usage for query parameters
 
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
-import { Prisma } from '@prisma/client' // ✅ FIXED: Add Prisma import for types
+import { db, buildSafeDb } from '@/lib/db'
 
-// GET /api/products - Fetch published products for customers with proper stock filtering
+// ✅ IMPORTANT: Mark as dynamic since we use request.url for query params
+export const dynamic = 'force-dynamic'
+
 export async function GET(request: NextRequest) {
   try {
+    // ✅ SAFE: Access URL after marking as dynamic
     const { searchParams } = new URL(request.url)
+    
+    // Extract query parameters
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '12')
     const category = searchParams.get('category')
     const search = searchParams.get('search')
-    const minPrice = searchParams.get('minPrice')
-    const maxPrice = searchParams.get('maxPrice')
-    const sortBy = searchParams.get('sortBy') || 'createdAt'
-    const sortOrder = searchParams.get('sortOrder') || 'desc'
+    const sort = searchParams.get('sort') || 'newest'
     const featured = searchParams.get('featured') === 'true'
-    const inStock = searchParams.get('inStock') === 'true'
 
-    // ✅ FIXED: Ensure sortOrder is properly typed as SortOrder
-    const validSortOrder: Prisma.SortOrder = (sortOrder === 'asc' || sortOrder === 'desc') ? sortOrder : 'desc'
+    // Validate parameters
+    const validatedPage = Math.max(1, page)
+    const validatedLimit = Math.min(Math.max(1, limit), 50) // Max 50 items per page
+    const skip = (validatedPage - 1) * validatedLimit
 
-    // Build where clause for customer products
-    const where: any = {
-      status: 'PUBLISHED',
-      isActive: true
+    // Build where clause
+    const whereConditions: any = {
+      status: 'PUBLISHED'
     }
 
-    // Filter by category
     if (category) {
-      where.categoryId = category
+      whereConditions.category = {
+        slug: category
+      }
     }
 
-    // Search functionality
     if (search) {
-      where.OR = [
+      whereConditions.OR = [
         { name: { contains: search, mode: 'insensitive' } },
         { description: { contains: search, mode: 'insensitive' } },
-        { shortDescription: { contains: search, mode: 'insensitive' } },
         { tags: { has: search } }
       ]
     }
 
-    // Price range filter
-    if (minPrice || maxPrice) {
-      where.sellingPriceUSD = {}
-      if (minPrice) where.sellingPriceUSD.gte = parseFloat(minPrice)
-      if (maxPrice) where.sellingPriceUSD.lte = parseFloat(maxPrice)
-    }
-
-    // Featured products filter
     if (featured) {
-      where.isFeatured = true
+      whereConditions.isFeatured = true
     }
 
-    // ✅ ENHANCED: Smart stock filtering
-    if (inStock) {
-      // Show products that have stock > 0
-      // This now works correctly because main stockQuantity is synced with size totals
-      where.stockQuantity = {
-        gt: 0
-      }
+    // Build order by clause
+    let orderBy: any = { createdAt: 'desc' } // Default: newest first
+
+    switch (sort) {
+      case 'price-low':
+        orderBy = { sellingPriceUSD: 'asc' }
+        break
+      case 'price-high':
+        orderBy = { sellingPriceUSD: 'desc' }
+        break
+      case 'name':
+        orderBy = { name: 'asc' }
+        break
+      case 'featured':
+        orderBy = [{ isFeatured: 'desc' }, { createdAt: 'desc' }]
+        break
+      case 'oldest':
+        orderBy = { createdAt: 'asc' }
+        break
+      default:
+        orderBy = { createdAt: 'desc' }
     }
 
-    // Count total products matching criteria
-    const totalCount = await db.product.count({ where })
-
-    // ✅ FIXED: Properly typed orderBy array
-    let orderByArray: Prisma.ProductOrderByWithRelationInput[] = []
-
-    // Build dynamic sorting based on sortBy parameter
-    if (sortBy === 'price') {
-      orderByArray.push({ sellingPriceUSD: validSortOrder })
-    } else if (sortBy === 'name') {
-      orderByArray.push({ name: validSortOrder })
-    } else if (sortBy === 'featured') {
-      orderByArray.push({ isFeatured: 'desc' }, { createdAt: 'desc' })
-    } else {
-      // Default: sort by creation date
-      orderByArray.push({ createdAt: validSortOrder })
-    }
-
-    // Add secondary sorts
-    orderByArray.push(
-      { isFeatured: 'desc' },      // Secondary sort by featured status
-      { stockQuantity: 'desc' }     // Tertiary sort by stock status (in-stock first)
-    )
-
-    // Fetch products with all necessary data
-    const products = await db.product.findMany({
-      where,
-      select: {
-        id: true,
-        name: true,
-        shortDescription: true,
-        description: true,
-        sellingPriceUSD: true,
-        // ✅ Include discount fields for customer display
-        discountPercentage: true,
-        showDiscountToCustomers: true,
-        images: true,
-        tags: true,
-        stockQuantity: true, // ✅ Now properly synced for all products
-        lowStockAlert: true,
-        isFeatured: true,
-        publishedAt: true,
-        // ✅ Include size information for customer selection
-        requiresSizes: true,
-        productSizes: {
+    // ✅ SAFE: Use build-safe database operations
+    const [products, totalCount] = await Promise.all([
+      buildSafeDb.execute(
+        () => db.product.findMany({
+          where: whereConditions,
           select: {
             id: true,
-            size: true,
+            name: true,
             sku: true,
+            sellingPriceUSD: true,
+            images: true,
+            isFeatured: true,
             stockQuantity: true,
-            isActive: true,
-            sortOrder: true
+            category: {
+              select: {
+                id: true,
+                name: true,
+                slug: true
+              }
+            }
           },
-          where: {
-            isActive: true // Only show active sizes to customers
-          },
-          orderBy: {
-            sortOrder: 'asc'
-          }
-        },
-        category: {
-          select: {
-            id: true,
-            name: true,
-            slug: true
-          }
-        },
-        country: {
-          select: {
-            id: true,
-            name: true,
-            currency: true,
-            currencySymbol: true
-          }
-        }
-      },
-      orderBy: orderByArray, // ✅ FIXED: Use properly typed array
-      skip: (page - 1) * limit,
-      take: limit
-    })
+          orderBy,
+          skip,
+          take: validatedLimit
+        }),
+        [] // Fallback to empty array
+      ),
+      buildSafeDb.execute(
+        () => db.product.count({ where: whereConditions }),
+        0 // Fallback to 0
+      )
+    ])
 
-    // ✅ ENHANCED: Enrich products with calculated stock information
-    const enrichedProducts = products.map(product => {
-      // Calculate stock status for display
-      const isOutOfStock = product.stockQuantity === 0
-      const isLowStock = product.stockQuantity > 0 && product.stockQuantity <= product.lowStockAlert
-      
-      // For sized products, provide additional size information
-      const sizeInfo = product.requiresSizes ? {
-        totalSizes: product.productSizes?.length || 0,
-        availableSizes: product.productSizes?.filter(size => size.stockQuantity > 0).length || 0,
-        sizesOutOfStock: product.productSizes?.filter(size => size.stockQuantity === 0).length || 0
-      } : null
-
-      return {
-        ...product,
-        stockInfo: {
-          isOutOfStock,
-          isLowStock,
-          isInStock: product.stockQuantity > 0,
-          stockLevel: product.stockQuantity,
-          stockStatus: isOutOfStock ? 'out_of_stock' : isLowStock ? 'low_stock' : 'in_stock'
-        },
-        sizeInfo
-      }
-    })
-
-    // ✅ Filter out completely out-of-stock products if inStock filter is applied
-    const finalProducts = inStock 
-      ? enrichedProducts.filter(product => !product.stockInfo.isOutOfStock)
-      : enrichedProducts
+    // Calculate pagination info
+    const totalPages = Math.ceil((totalCount || 0) / validatedLimit)
+    const hasNextPage = validatedPage < totalPages
+    const hasPrevPage = validatedPage > 1
 
     return NextResponse.json({
-      products: finalProducts,
+      success: true,
+      products: products || [],
       pagination: {
-        page,
-        limit,
-        totalCount,
-        totalPages: Math.ceil(totalCount / limit),
-        hasNextPage: page < Math.ceil(totalCount / limit),
-        hasPreviousPage: page > 1
+        currentPage: validatedPage,
+        totalPages,
+        totalCount: totalCount || 0,
+        hasNextPage,
+        hasPrevPage,
+        limit: validatedLimit
       },
       filters: {
         category,
         search,
-        minPrice,
-        maxPrice,
-        featured,
-        inStock,
-        sortBy,
-        sortOrder
+        sort,
+        featured
       }
     })
 
   } catch (error) {
-    console.error('Error fetching customer products:', error)
-    return NextResponse.json(
-      { error: 'Failed to fetch products' },
-      { status: 500 }
-    )
+    console.error('Products API error:', error)
+
+    return NextResponse.json({
+      success: false,
+      error: 'Failed to fetch products',
+      products: [],
+      pagination: {
+        currentPage: 1,
+        totalPages: 0,
+        totalCount: 0,
+        hasNextPage: false,
+        hasPrevPage: false,
+        limit: 12
+      }
+    }, { status: 500 })
+  }
+}
+
+// ✅ Also handle POST requests for creating products (admin only)
+export async function POST(request: NextRequest) {
+  try {
+    // This would handle product creation
+    // For now, return method not allowed for public API
+    return NextResponse.json({
+      success: false,
+      error: 'Method not allowed for public API'
+    }, { status: 405 })
+
+  } catch (error) {
+    console.error('Products POST error:', error)
+    return NextResponse.json({
+      success: false,
+      error: 'Internal server error'
+    }, { status: 500 })
   }
 }

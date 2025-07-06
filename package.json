@@ -3,15 +3,26 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --port 3001",
+    "dev": "next dev",
     "build": "next build",
-    "start": "next start --port 3001",
+    "build:optimized": "next build",
+    "build:next": "next build",
+    "build:force": "next build --debug",
+    "start": "next start",
     "lint": "next lint",
+    
+    "db:generate": "prisma generate",
     "db:push": "prisma db push",
     "db:studio": "prisma studio",
-    "db:seed": "tsx prisma/seed.ts",
-    "db:generate": "prisma generate",
-    "db:migrate-status": "tsx scripts/migrate-product-status.ts"
+    "db:seed": "npx tsx prisma/seed.ts",
+    "db:migrate": "prisma migrate dev",
+    "db:reset": "prisma migrate reset",
+    
+    "build:static": "NEXT_TELEMETRY_DISABLED=1 next build",
+    "build:debug": "DEBUG=prisma* next build",
+    
+    "test:db": "node -e \"require('./src/lib/db').dbUtils.testConnection().then(r => console.log('DB Test:', r))\"",
+    "check:connections": "node -e \"require('./src/lib/db').dbUtils.getConnectionStatus().then(r => console.log('DB Status:', r))\""
   },
   "dependencies": {
     "@prisma/client": "^5.7.0",
