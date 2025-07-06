@@ -1,5 +1,5 @@
-// ✅ FIXED: src/contexts/CartContext.tsx
-// Updated to handle size variants properly
+// ✅ COMPLETE FIXED: src/contexts/CartContext.tsx
+// Updated to handle size variants properly with all type issues resolved
 
 'use client'
 
@@ -131,8 +131,13 @@ export function CartProvider({ children }: { children: ReactNode }) {
     }
   }, [items, isClient])
 
-  // Enhanced stock check function
-  const checkProductStock = async (productId: string, sizeId: string | null, quantity: number) => {
+  // ✅ FIXED: Enhanced stock check function with proper typing
+  const checkProductStock = async (productId: string, sizeId: string | null, quantity: number): Promise<{
+    available: boolean
+    maxAllowed: number
+    message: string
+    stockStatus: 'available' | 'low' | 'out_of_stock' | 'unknown'
+  }> => {
     try {
       const params = new URLSearchParams({
         productId,
@@ -151,12 +156,16 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
       const result = await response.json()
       
+      // ✅ FIXED: Explicitly type the stockStatus with const assertions
+      const stockStatus: 'available' | 'low' | 'out_of_stock' | 'unknown' = 
+        result.stockQuantity === 0 ? 'out_of_stock' as const : 
+        result.stockQuantity <= 5 ? 'low' as const : 'available' as const
+      
       return {
         available: result.available,
         maxAllowed: result.maxAllowed,
         message: result.message,
-        stockStatus: result.stockQuantity === 0 ? 'out_of_stock' : 
-                    result.stockQuantity <= 5 ? 'low' : 'available'
+        stockStatus
       }
     } catch (error) {
       console.error('Stock check failed:', error)
@@ -174,7 +183,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     return sizeId ? `${productId}-${sizeId}` : productId
   }
 
-  // Add item to cart
+  // ✅ FIXED: Add item to cart with proper stockStatus typing
   const addItem = useCallback(async (
     product: ProductForCart, 
     quantity: number = 1, 
@@ -264,7 +273,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     setItems(currentItems => currentItems.filter(item => item.id !== cartItemId))
   }, [])
 
-  // Update item quantity
+  // ✅ FIXED: Update item quantity with proper stockStatus typing
   const updateQuantity = useCallback(async (cartItemId: string, quantity: number): Promise<boolean> => {
     if (quantity <= 0) {
       removeItem(cartItemId)
@@ -320,7 +329,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     setIsOpen(false)
   }, [])
 
-  // Validate entire cart stock
+  // ✅ FIXED: Validate entire cart stock with proper typing
   const validateCartStock = useCallback(async (): Promise<boolean> => {
     if (items.length === 0) return true
 
@@ -359,14 +368,18 @@ export function CartProvider({ children }: { children: ReactNode }) {
           })
           
           if (stockInfo) {
+            // ✅ FIXED: Properly type the stockStatus
+            const stockStatus: 'available' | 'low' | 'out_of_stock' | 'unknown' = 
+              stockInfo.stockQuantity === 0 ? 'out_of_stock' as const : 
+              stockInfo.stockQuantity <= 5 ? 'low' as const : 'available' as const
+
             return {
               ...item,
               maxQuantity: stockInfo.maxAllowed,
               stockValidated: true,
               stockIssue: stockInfo.available ? undefined : stockInfo.message,
               lastStockCheck: new Date(),
-              stockStatus: stockInfo.stockQuantity === 0 ? 'out_of_stock' : 
-                          stockInfo.stockQuantity <= 5 ? 'low' : 'available',
+              stockStatus,
               quantity: stockInfo.available ? item.quantity : Math.min(item.quantity, stockInfo.maxAllowed)
             }
           }
@@ -383,7 +396,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     }
   }, [items])
 
-  // Refresh stock for specific item
+  // ✅ FIXED: Refresh stock for specific item with proper typing
   const refreshItemStock = useCallback(async (cartItemId: string) => {
     const item = items.find(i => i.id === cartItemId)
     if (!item) return

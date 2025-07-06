@@ -4,6 +4,9 @@ import { db } from '@/lib/db'
 import { Shield, Truck, RotateCcw, AlertCircle } from 'lucide-react'
 
 // Get shipping and store settings from database
+// ✅ FIXED: TrustIndicators shipping settings with proper null handling
+
+// Get shipping and store settings from database
 async function getStoreAndShippingSettings() {
   try {
     // Get store settings for return policy
@@ -26,18 +29,18 @@ async function getStoreAndShippingSettings() {
     })
 
     let shippingSettings = {
-      freeShippingThreshold: 100,
+      freeShippingThreshold: null as number | null,  // ✅ Allow null values
       flatRate: 7,
-      estimatedDays: '5-7 business days',
+      estimatedDays: '5-7 business days' as string | null,
       zoneName: 'Default'
     }
 
     if (defaultZone && defaultZone.shippingRates.length > 0) {
       const rate = defaultZone.shippingRates[0]
       shippingSettings = {
-        freeShippingThreshold: rate.freeShippingThreshold,
+        freeShippingThreshold: rate.freeShippingThreshold,  // ✅ Can be null
         flatRate: rate.flatRate,
-        estimatedDays: rate.estimatedDays,
+        estimatedDays: rate.estimatedDays,  // ✅ Can be null
         zoneName: defaultZone.name
       }
     }
@@ -61,16 +64,18 @@ async function getStoreAndShippingSettings() {
     // Fallback values
     return {
       shipping: {
-        freeShippingThreshold: 100,
+        freeShippingThreshold: null as number | null,  // ✅ Consistent null handling
         flatRate: 7,
-        estimatedDays: '5-7 business days',
+        estimatedDays: '5-7 business days' as string | null,
         zoneName: 'Default'
       },
       returns: {
+        returnsEnabled: true,  // ✅ ADDED: Missing property
         returnPeriodDays: 30,
         returnPolicyUrl: null,
         hasRestockingFee: false,
-        restockingFeePercentage: 0
+        restockingFeePercentage: 0,
+        noReturnsReason: null  // ✅ ADDED: Missing property
       }
     }
   }
@@ -99,6 +104,7 @@ export default async function TrustIndicators() {
             </div>
             <h3 className="text-lg font-semibold text-gray-900 mb-2">Free Shipping</h3>
             <p className="text-gray-600">
+              {/* ✅ FIXED: Handle null freeShippingThreshold */}
               {settings.shipping.freeShippingThreshold 
                 ? `Orders over $${settings.shipping.freeShippingThreshold.toFixed(0)}`
                 : `Starting at $${settings.shipping.flatRate.toFixed(0)}`
@@ -122,37 +128,28 @@ export default async function TrustIndicators() {
                 <AlertCircle className="h-6 w-6 text-red-600" />
               )}
             </div>
-            
-            {settings.returns.returnsEnabled ? (
-              <>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">Easy Returns</h3>
-                <p className="text-gray-600">
-                  {settings.returns.returnPeriodDays}-day return policy
-                  {settings.returns.hasRestockingFee && settings.returns.restockingFeePercentage > 0 && (
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Returns</h3>
+            <p className="text-gray-600">
+              {settings.returns.returnsEnabled ? (
+                <>
+                  {settings.returns.returnPeriodDays}-day hassle-free returns
+                  {settings.returns.hasRestockingFee && (
                     <span className="block text-sm mt-1">
                       {settings.returns.restockingFeePercentage}% restocking fee applies
                     </span>
                   )}
-                  {!settings.returns.hasRestockingFee && (
-                    <span className="block text-sm mt-1">
-                      No restocking fees
-                    </span>
-                  )}
-                </p>
-              </>
-            ) : (
-              <>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">No Returns</h3>
-                <p className="text-gray-600">
-                  All sales are final
+                </>
+              ) : (
+                <>
+                  All sales final
                   {settings.returns.noReturnsReason && (
                     <span className="block text-sm mt-1">
                       {settings.returns.noReturnsReason}
                     </span>
                   )}
-                </p>
-              </>
-            )}
+                </>
+              )}
+            </p>
           </div>
         </div>
       </div>

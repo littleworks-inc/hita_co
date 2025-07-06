@@ -92,7 +92,7 @@ export default function AddToCartButton({
   const availableToAdd = Math.max(0, availableStock - currentQuantity)
 
   // Check if product requires size selection
-  const requiresSizeSelection = product.requiresSizes && product.productSizes?.length > 0
+  const requiresSizeSelection = product.requiresSizes && (product.productSizes?.length ?? 0) > 0
   const canAddToCart = !requiresSizeSelection || (requiresSizeSelection && selectedSize)
 
   // Validate stock with API

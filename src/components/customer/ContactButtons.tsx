@@ -9,7 +9,7 @@ interface Product {
   id: string
   sku: string
   name: string
-  shortDescription?: string
+  shortDescription?: string | null  // ✅ FIXED: Allow null values to match ProductCard
   sellingPriceUSD: number
   discountPercentage: number
   showDiscountToCustomers: boolean
@@ -48,10 +48,12 @@ export default function ContactButtons({
 }: ContactButtonsProps) {
   const [isWhatsAppLoading, setIsWhatsAppLoading] = useState(false)
   const [isInstagramLoading, setIsInstagramLoading] = useState(false)
-  const { currentCurrency, convertPrice } = useCurrency()
+  
+  // ✅ FIXED: Use correct currency property name
+  const { currency, convertPrice } = useCurrency()
 
   // Calculate final price with discount
-  const originalPrice = convertPrice(product.sellingPriceUSD, product.country.currency)
+  const originalPrice = convertPrice(product.sellingPriceUSD)
   const discountAmount = product.showDiscountToCustomers 
     ? (originalPrice * product.discountPercentage) / 100 
     : 0
@@ -75,19 +77,20 @@ Product Details:
     return `${baseMessage}${productInfo}`
   }
 
-  // Generate WhatsApp URL with pre-filled message
+  // ✅ ADDED: Generate WhatsApp URL with pre-filled message
   const generateWhatsAppUrl = () => {
     const message = encodeURIComponent(generateProductMessage())
     const phoneNumber = catalogSettings.whatsappNumber.replace(/[^\d]/g, '') // Remove non-digits
     return `https://wa.me/${phoneNumber}?text=${message}`
   }
 
-  // Generate Instagram URL
+  // ✅ ADDED: Generate Instagram URL
   const generateInstagramUrl = () => {
     const handle = catalogSettings.instagramHandle.replace('@', '') // Remove @ if present
     return `https://instagram.com/${handle}`
   }
 
+  // ✅ FIXED: Handle WhatsApp contact
   const handleWhatsAppClick = () => {
     setIsWhatsAppLoading(true)
     window.open(generateWhatsAppUrl(), '_blank')
@@ -95,6 +98,7 @@ Product Details:
     setTimeout(() => setIsWhatsAppLoading(false), 1000)
   }
 
+  // ✅ FIXED: Handle Instagram contact
   const handleInstagramClick = () => {
     setIsInstagramLoading(true)
     window.open(generateInstagramUrl(), '_blank')

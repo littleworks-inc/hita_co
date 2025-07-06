@@ -35,13 +35,25 @@ interface CartItemProps {
       currencySymbol: string
     }
   }
+  // ✅ ADDED: Optional external handlers for CartDrawer
+  onUpdateQuantity?: (newQuantity: number) => Promise<void>
+  onRemove?: () => void
+  isUpdating?: boolean
 }
 
-export default function CartItem({ item }: CartItemProps) {
+export default function CartItem({ 
+  item, 
+  onUpdateQuantity: externalOnUpdateQuantity,
+  onRemove: externalOnRemove,
+  isUpdating: externalIsUpdating 
+}: CartItemProps) {
   const { updateQuantity, removeItem } = useCart()
   const { formatPrice } = useCurrency()
-  const [isUpdating, setIsUpdating] = useState(false)
+  const [internalIsUpdating, setInternalIsUpdating] = useState(false)
   const [isRemoving, setIsRemoving] = useState(false)
+
+  // Use external isUpdating if provided, otherwise use internal state
+  const isUpdating = externalIsUpdating ?? internalIsUpdating
 
   const productSlug = `${item.name.toLowerCase().replace(/\s+/g, '-')}-${item.sku}`
   const itemTotal = item.priceUSD * item.quantity
@@ -50,19 +62,32 @@ export default function CartItem({ item }: CartItemProps) {
   const handleUpdateQuantity = async (newQuantity: number) => {
     if (newQuantity < 1 || newQuantity > item.maxQuantity) return
     
-    setIsUpdating(true)
-    updateQuantity(item.id, newQuantity)
-    
-    // Small delay for user feedback
-    setTimeout(() => setIsUpdating(false), 500)
+    // Use external handler if provided, otherwise use internal cart context
+    if (externalOnUpdateQuantity) {
+      await externalOnUpdateQuantity(newQuantity)
+    } else {
+      setInternalIsUpdating(true)
+      await updateQuantity(item.id, newQuantity)
+      // Small delay for user feedback
+      setTimeout(() => setInternalIsUpdating(false), 500)
+    }
   }
 
   const handleRemoveItem = () => {
     setIsRemoving(true)
-    // Small delay for animation
-    setTimeout(() => {
-      removeItem(item.id)
-    }, 200)
+    
+    // Use external handler if provided, otherwise use internal cart context
+    if (externalOnRemove) {
+      // Small delay for animation
+      setTimeout(() => {
+        externalOnRemove()
+      }, 200)
+    } else {
+      // Small delay for animation
+      setTimeout(() => {
+        removeItem(item.id)
+      }, 200)
+    }
   }
 
   return (
