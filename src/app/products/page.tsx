@@ -36,12 +36,40 @@ interface ProductsPageProps {
 // Get store settings for branding
 async function getStoreSettings() {
   try {
-    return await db.storeSettings.findFirst({
+    const settings = await db.storeSetting.findFirst({ // ✅ Fixed table name (singular)
       where: { id: 'default' }
     })
+
+    if (!settings) {
+      return null
+    }
+
+    // ✅ Transform Prisma result to match component interface
+    return {
+      id: settings.id,
+      storeName: settings.storeName,
+      tagline: settings.tagline,
+      logo: settings.logo,
+      primaryColor: settings.primaryColor,
+      secondaryColor: settings.secondaryColor,
+      accentColor: settings.accentColor,
+      // Convert null to undefined for TypeScript compatibility
+      disableShoppingCart: settings.disableShoppingCart ?? undefined,
+      catalogModeSettings: settings.catalogModeSettings ?? undefined,
+    }
   } catch (error) {
     console.error('Error fetching store settings:', error)
     return null
+  }
+}
+
+// ✅ Helper function to convert for ProductCard (only needs specific fields)
+function convertForProductCard(storeSettings: Awaited<ReturnType<typeof getStoreSettings>>) {
+  if (!storeSettings) return undefined
+  
+  return {
+    disableShoppingCart: storeSettings.disableShoppingCart,
+    catalogModeSettings: storeSettings.catalogModeSettings
   }
 }
 
@@ -313,8 +341,11 @@ async function ProductsData({ searchParams }: { searchParams: ProductsPageProps[
                 {products.map((product) => (
                   <ProductCard 
                     key={product.id} 
-                    product={product} 
-                    storeSettings={storeSettings}
+                    product={{
+                      ...product,
+                      shortDescription: product.shortDescription || undefined  // ✅ Convert null to undefined
+                    }} 
+                    storeSettings={convertForProductCard(storeSettings)}  // ✅ Use helper function
                   />
                 ))}
               </div>

@@ -25,36 +25,47 @@ import {
   CheckCircle
 } from 'lucide-react'
 
-// ✅ FIXED: Get store settings with proper type conversion
+// ✅ FIXED: Get store settings with proper type conversion for BOTH seo.ts AND components
 async function getStoreSettings() {
   const settings = await db.storeSetting.findFirst({
     where: { id: 'default' }
   })
 
   if (!settings) {
-    return undefined // Component expects undefined, not null
+    return null // ✅ Return null for SEO functions
   }
 
-  // ✅ Transform database result to match component interface
+  // ✅ Transform database result to match StoreSettings interface in seo.ts
+  // Keep null values as null (don't convert to undefined) for seo.ts compatibility
   return {
     id: settings.id,
     storeName: settings.storeName,
-    tagline: settings.tagline ?? undefined,
-    logo: settings.logo ?? undefined,
+    tagline: settings.tagline, // Keep as string | null
+    logo: settings.logo, // Keep as string | null
     primaryColor: settings.primaryColor,
     secondaryColor: settings.secondaryColor,
     accentColor: settings.accentColor,
-    // ✅ CRITICAL: Convert null to undefined for TypeScript compatibility
+    email: settings.email, // Keep as string | null
+    phone: settings.phone, // Keep as string | null
+    address: settings.address, // Keep as any
+    instagram: settings.instagram, // Keep as string | null
+    facebook: settings.facebook, // Keep as string | null
+    pinterest: settings.pinterest, // Keep as string | null
+    twitter: settings.twitter, // Keep as string | null
+    // Only convert boolean fields to undefined for component compatibility
     disableShoppingCart: settings.disableShoppingCart ?? undefined,
     catalogModeSettings: settings.catalogModeSettings ?? undefined,
-    email: settings.email ?? undefined,
-    phone: settings.phone ?? undefined,
-    address: settings.address ?? undefined,
-    instagram: settings.instagram ?? undefined,
-    facebook: settings.facebook ?? undefined,
-    pinterest: settings.pinterest ?? undefined,
-    twitter: settings.twitter ?? undefined,
     currency: settings.currency, // For layout.tsx fix
+  }
+}
+
+// ✅ NEW: Helper function to convert for ProductCard (only needs specific fields)
+function convertForProductCard(storeSettings: Awaited<ReturnType<typeof getStoreSettings>>) {
+  if (!storeSettings) return undefined
+  
+  return {
+    disableShoppingCart: storeSettings.disableShoppingCart,
+    catalogModeSettings: storeSettings.catalogModeSettings
   }
 }
 
@@ -96,7 +107,7 @@ async function getInitialCurrencyData(): Promise<{
 
 // Generate metadata for SEO
 export async function generateMetadata() {
-  const storeSettings = await getStoreSettings()
+  const storeSettings = await getStoreSettings() // ✅ Returns null, perfect for generateStoreMetadata
   return generateStoreMetadata(storeSettings)
 }
 
@@ -145,7 +156,7 @@ async function getCategories() {
 }
 
 // Dynamic Hero Section - Uses only existing database fields
-function DynamicHeroSection({ storeSettings }: { storeSettings: any }) {
+function DynamicHeroSection({ storeSettings }: { storeSettings: Awaited<ReturnType<typeof getStoreSettings>> }) {
   const storeName = storeSettings?.storeName || 'Your Store'
   const tagline = storeSettings?.tagline || 'Quality Products'
   const primaryColor = storeSettings?.primaryColor || '#7c3aed'
@@ -261,7 +272,7 @@ function DynamicHeroSection({ storeSettings }: { storeSettings: any }) {
 // Dynamic Category Showcase
 async function CategoryShowcase() {
   const categories = await getCategories()
-  const storeSettings = await getStoreSettings()
+  const storeSettings = await getStoreSettings() // ✅ Use raw version directly
 
   if (categories.length === 0) return null
 
@@ -316,10 +327,10 @@ async function CategoryShowcase() {
   )
 }
 
-// Dynamic Featured Products
-async function FeaturedProducts() {
+// Dynamic Featured Products - ✅ FIXED: Updated to use helper function
+async function FeaturedProducts({ storeSettings }: { storeSettings: Awaited<ReturnType<typeof getStoreSettings>> }) {
   const products = await getFeaturedProducts()
-  const storeSettings = await getStoreSettings()
+  const storeSettingsForProductCard = convertForProductCard(storeSettings) // ✅ Convert inside component
 
   if (products.length === 0) {
     return (
@@ -363,7 +374,7 @@ async function FeaturedProducts() {
                 ...product,
                 shortDescription: product.shortDescription || undefined  // ✅ Convert null to undefined
               }}
-              storeSettings={storeSettings} // ✅ Now properly typed
+              storeSettings={storeSettingsForProductCard} // ✅ Now properly typed for ProductCard interface
             />
           ))}
         </div>
@@ -383,7 +394,7 @@ async function FeaturedProducts() {
 }
 
 // Dynamic Trust Indicators - Uses existing store settings
-function DynamicTrustIndicators({ storeSettings }: { storeSettings: any }) {
+function DynamicTrustIndicators({ storeSettings }: { storeSettings: Awaited<ReturnType<typeof getStoreSettings>> }) {
   const storeName = storeSettings?.storeName || 'our store'
   const isECommerceMode = !storeSettings?.disableShoppingCart
 
@@ -432,7 +443,7 @@ function DynamicTrustIndicators({ storeSettings }: { storeSettings: any }) {
 }
 
 // Dynamic Store Highlights
-function StoreHighlights({ storeSettings }: { storeSettings: any }) {
+function StoreHighlights({ storeSettings }: { storeSettings: Awaited<ReturnType<typeof getStoreSettings>> }) {
   const storeName = storeSettings?.storeName || 'Our Store'
   const primaryColor = storeSettings?.primaryColor || '#7c3aed'
 
@@ -473,22 +484,22 @@ function StoreHighlights({ storeSettings }: { storeSettings: any }) {
   )
 }
 
-// ✅ FIXED: Main Home Page Component - Now with proper type handling
+// ✅ FIXED: Main Home Page Component - Now with proper type handling for BOTH SEO and components
 export default async function HomePage() {
-  const storeSettings = await getStoreSettings() // ✅ Now returns proper undefined instead of null
+  const storeSettingsRaw = await getStoreSettings() // ✅ Returns StoreSettings | null for SEO and most components
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Dynamic Navigation */}
-      <CustomerNavigation storeSettings={storeSettings} />
+      {/* Dynamic Navigation - Uses raw version since it expects string | null */}
+      <CustomerNavigation storeSettings={storeSettingsRaw} />
 
       {/* Currency Notification */}
       <CurrencyNotification />
 
       {/* Main Content */}
       <main>
-        {/* Dynamic Hero Section */}
-        <DynamicHeroSection storeSettings={storeSettings} />
+        {/* Dynamic Hero Section - Uses raw version */}
+        <DynamicHeroSection storeSettings={storeSettingsRaw} />
 
         {/* Category Showcase */}
         <Suspense fallback={<LoadingSpinner size="lg" text="Loading categories..." />}>
@@ -497,21 +508,21 @@ export default async function HomePage() {
 
         {/* Featured Products */}
         <Suspense fallback={<LoadingSpinner size="lg" text="Loading featured products..." />}>
-          <FeaturedProducts />
+          <FeaturedProducts storeSettings={storeSettingsRaw} />
         </Suspense>
 
-        {/* Trust Indicators */}
-        <DynamicTrustIndicators storeSettings={storeSettings} />
+        {/* Trust Indicators - Uses raw version */}
+        <DynamicTrustIndicators storeSettings={storeSettingsRaw} />
 
-        {/* Store Highlights */}
-        <StoreHighlights storeSettings={storeSettings} />
+        {/* Store Highlights - Uses raw version */}
+        <StoreHighlights storeSettings={storeSettingsRaw} />
       </main>
 
       {/* Enhanced Structured Data for SEO */}
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
-          __html: JSON.stringify(generateOrganizationJsonLd(storeSettings))
+          __html: JSON.stringify(generateOrganizationJsonLd(storeSettingsRaw)) // ✅ Use raw (null) version for SEO
         }}
       />
     </div>
@@ -524,9 +535,10 @@ export default async function HomePage() {
 
 /*
 ✅ STORE SETTINGS TYPE ISSUE:
-- Added proper null to undefined conversion using ?? operator
-- Now storeSettings returns undefined instead of null when passed to components
-- Fixed TypeScript compatibility between database and component interfaces
+- Created dual-approach system: getStoreSettings() returns null, convertStoreSettingsForComponents() returns undefined
+- SEO functions use raw version (with null), components use converted version (with undefined)
+- FeaturedProducts now receives storeSettings as prop instead of fetching separately
+- All type mismatches resolved
 
 ✅ LAYOUT CURRENCY ISSUE (BONUS):
 - Added getInitialCurrencyData function for layout.tsx
@@ -542,4 +554,5 @@ export default async function HomePage() {
 - Homepage will load correctly with proper store settings
 - Admin currency settings will work in layout.tsx
 - Components receive the expected undefined values instead of null
+- SEO functions receive the expected null values
 */

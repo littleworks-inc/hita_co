@@ -34,9 +34,34 @@ interface ProductPageProps {
 
 // Get store settings
 async function getStoreSettings() {
-  return await db.storeSetting.findFirst({
+  const settings = await db.storeSetting.findFirst({
     where: { id: 'default' }
   })
+
+  if (!settings) {
+    return null
+  }
+
+  // ✅ Transform database result to match component interface
+  return {
+    id: settings.id,
+    storeName: settings.storeName,
+    tagline: settings.tagline,
+    logo: settings.logo,
+    primaryColor: settings.primaryColor,
+    secondaryColor: settings.secondaryColor,
+    accentColor: settings.accentColor,
+    email: settings.email,
+    phone: settings.phone,
+    address: settings.address,
+    instagram: settings.instagram,
+    facebook: settings.facebook,
+    pinterest: settings.pinterest,
+    twitter: settings.twitter,
+    // ✅ Convert null to undefined for TypeScript compatibility
+    disableShoppingCart: settings.disableShoppingCart ?? undefined,
+    catalogModeSettings: settings.catalogModeSettings ?? undefined,
+  }
 }
 
 // Get product by slug
@@ -112,7 +137,11 @@ function calculatePricing(product: any) {
 
 // Generate metadata for SEO
 export async function generateMetadata({ params }: ProductPageProps) {
-  const product = await getProduct(params.slug)
+  // ✅ FIXED: Fetch both product and storeSettings in parallel
+  const [product, storeSettings] = await Promise.all([
+    getProduct(params.slug),
+    getStoreSettings()
+  ])
   
   if (!product) {
     return {
@@ -121,7 +150,8 @@ export async function generateMetadata({ params }: ProductPageProps) {
     }
   }
 
-  return generateProductMetadata(product)
+  // ✅ FIXED: Pass both product and storeSettings to generateProductMetadata
+  return generateProductMetadata(product, storeSettings)
 }
 
 // Main Product Detail Page
@@ -141,7 +171,8 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
   const { finalPrice, originalPrice } = calculatePricing(product)
 
   // Generate structured data for SEO
-  const productJsonLd = generateProductJsonLd(product, finalPrice, originalPrice)
+  const productJsonLd = generateProductJsonLd(product, storeSettings)
+
 
   return (
     <>

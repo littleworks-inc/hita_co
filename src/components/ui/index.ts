@@ -27,3 +27,6 @@ export {
   CardContent, 
   CardFooter 
 } from './card'
+
+
+ export { Tabs, TabsList, TabsTrigger, TabsContent } from './tabs'
