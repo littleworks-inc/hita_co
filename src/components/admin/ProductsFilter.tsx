@@ -1,3 +1,6 @@
+// src/components/admin/ProductsFilter.tsx
+// ✅ FIXED: Client component with proper event handler structure
+
 'use client'
 
 import { useState } from 'react'
@@ -79,7 +82,7 @@ export default function ProductsFilter({
     { value: 'out-of-stock', label: 'Out of Stock' }
   ]
 
-  // Update URL with new filters
+  // ✅ FIXED: Update URL with new filters
   const updateFilters = (updates: Record<string, string>) => {
     const params = new URLSearchParams(searchParams.toString())
     
@@ -94,16 +97,21 @@ export default function ProductsFilter({
     router.push(`/admin/products?${params.toString()}`)
   }
 
-  // Handle search submit
+  // ✅ FIXED: Handle search submit
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     updateFilters({ search: searchInput })
   }
 
-  // Clear all filters
+  // ✅ FIXED: Clear all filters
   const clearFilters = () => {
     setSearchInput('')
     router.push('/admin/products')
+  }
+
+  // ✅ FIXED: Handle status filter click
+  const handleStatusFilter = (statusValue: string) => {
+    updateFilters({ status: statusValue })
   }
 
   // Check if any filters are active
@@ -149,7 +157,8 @@ export default function ProductsFilter({
             return (
               <button
                 key={filter.value}
-                onClick={() => updateFilters({ status: filter.value })}
+                onClick={() => handleStatusFilter(filter.value)}
+                type="button"
                 className={cn(
                   'flex items-center justify-between p-3 text-left rounded-lg border transition-all',
                   isActive
@@ -247,6 +256,7 @@ export default function ProductsFilter({
             variant="outline" 
             size="sm" 
             onClick={clearFilters}
+            type="button"
             className="text-gray-600 hover:text-gray-800"
           >
             <X className="h-4 w-4 mr-1" />
@@ -256,17 +266,4 @@ export default function ProductsFilter({
       )}
     </div>
   )
-}
-
-// Hook to get filter counts (to be used in the parent component)
-export function useProductFilterCounts() {
-  // This would fetch actual counts from the API
-  // For now, return placeholder structure
-  return {
-    all: 0,
-    draft: 0,
-    published: 0,
-    archived: 0,
-    featured: 0
-  }
 }

@@ -1,110 +1,90 @@
-import { Suspense } from 'react'
+// src/app/admin/products/page.tsx
+// ✅ FIXED: Removed redundant top "Add Product" button
+
 import { redirect } from 'next/navigation'
+import { Suspense } from 'react'
 import { getSession } from '@/lib/auth'
 import { db } from '@/lib/db'
 import AdminNavigation from '@/components/admin/AdminNavigation'
 import ProductsFilter from '@/components/admin/ProductsFilter'
 import ProductsData from '@/components/admin/ProductsData'
-import { Card, CardContent, CardHeader, CardTitle, Button } from '@/components/ui'
-import { Plus, Package, AlertTriangle, FileText, Eye, Archive, Star } from 'lucide-react'
-import Link from 'next/link'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui'
+import { 
+  FileText, 
+  AlertTriangle, 
+  Package, 
+  ShoppingCart, 
+  TrendingUp, 
+  Star,
+  Eye,
+  Archive
+} from 'lucide-react'
 
-// Enhanced Product Stats with Draft System
+// Product Stats Component with Enhanced Metrics
 async function ProductStats() {
   try {
-    // Get comprehensive product statistics
     const [
       totalProducts,
-      statusStats,
-      stockStats,
-      featuredCount
+      draftProducts,
+      publishedProducts,
+      archivedProducts,
+      featuredProducts,
+      lowStockProducts
     ] = await Promise.all([
-      // Total product count
       db.product.count(),
-      
-      // Status distribution
-      db.product.groupBy({
-        by: ['status'],
-        _count: {
-          status: true
-        }
-      }),
-      
-      // Stock statistics
+      db.product.count({ where: { status: 'DRAFT' } }),
+      db.product.count({ where: { status: 'PUBLISHED' } }),
+      db.product.count({ where: { status: 'ARCHIVED' } }),
+      db.product.count({ where: { isFeatured: true } }),
       db.$queryRaw`
-        SELECT 
-          COUNT(CASE WHEN "stockQuantity" > "lowStockAlert" THEN 1 END) as in_stock,
-          COUNT(CASE WHEN "stockQuantity" <= "lowStockAlert" AND "stockQuantity" > 0 THEN 1 END) as low_stock,
-          COUNT(CASE WHEN "stockQuantity" = 0 THEN 1 END) as out_of_stock
+        SELECT COUNT(*) as count 
         FROM products 
-        WHERE status = 'PUBLISHED'
-      `,
-      
-      // Featured products count
-      db.product.count({
-        where: {
-          status: 'PUBLISHED',
-          isFeatured: true
-        }
-      })
+        WHERE "stockQuantity" <= "lowStockAlert" 
+        AND "stockQuantity" > 0
+      `
     ])
 
-    // Process status stats
-    const statusCounts = {
-      DRAFT: 0,
-      PUBLISHED: 0,
-      ARCHIVED: 0
-    }
-
-    statusStats.forEach((stat: any) => {
-      statusCounts[stat.status as keyof typeof statusCounts] = stat._count.status
-    })
-
-    // Process stock stats
-    const stockData: any = Array.isArray(stockStats) ? stockStats[0] : stockStats
-    const inStock = Number(stockData?.in_stock || 0)
-    const lowStock = Number(stockData?.low_stock || 0)
-    const outOfStock = Number(stockData?.out_of_stock || 0)
+    const lowStockCount = (lowStockProducts as any)[0]?.count || 0
 
     const stats = [
       {
         title: 'Total Products',
-        value: totalProducts.toLocaleString(),
+        value: totalProducts,
         description: 'All products in system',
         icon: Package,
         color: 'blue'
       },
       {
         title: 'Draft Products',
-        value: statusCounts.DRAFT.toLocaleString(),
+        value: draftProducts,
         description: 'Being created or edited',
         icon: FileText,
-        color: 'gray'
+        color: 'orange'
       },
       {
         title: 'Published Products',
-        value: statusCounts.PUBLISHED.toLocaleString(),
+        value: publishedProducts,
         description: 'Live and visible to customers',
         icon: Eye,
         color: 'green'
       },
       {
         title: 'Archived Products',
-        value: statusCounts.ARCHIVED.toLocaleString(),
+        value: archivedProducts,
         description: 'Hidden but preserved',
         icon: Archive,
-        color: 'orange'
+        color: 'gray'
       },
       {
         title: 'Featured Products',
-        value: featuredCount.toLocaleString(),
+        value: featuredProducts,
         description: 'Promoted on homepage',
         icon: Star,
         color: 'purple'
       },
       {
         title: 'Low Stock Alert',
-        value: lowStock.toLocaleString(),
+        value: lowStockCount,
         description: 'Needs restocking soon',
         icon: AlertTriangle,
         color: 'red'
@@ -113,15 +93,15 @@ async function ProductStats() {
 
     return (
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 mb-6">
-        {stats.map((stat) => {
+        {stats.map((stat, index) => {
           const Icon = stat.icon
           return (
-            <Card key={stat.title}>
+            <Card key={index}>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium text-gray-600">
                   {stat.title}
                 </CardTitle>
-                <div className={`p-2 rounded-md ${
+                <div className={`p-2 rounded-lg ${
                   stat.color === 'blue' ? 'bg-blue-50' :
                   stat.color === 'green' ? 'bg-green-50' :
                   stat.color === 'purple' ? 'bg-purple-50' :
@@ -201,7 +181,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
       <main className="lg:pl-64">
         <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
           <div className="px-4 py-6 sm:px-0">
-            {/* Header with Draft System Info */}
+            {/* ✅ FIXED: Header without redundant Add Product button */}
             <div className="border-b border-gray-200 pb-5 mb-6">
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
@@ -213,15 +193,8 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                   </p>
                 </div>
                 
+                {/* ✅ REMOVED: Top Add Product button - keeping only the contextual one */}
                 <div className="flex items-center gap-3">
-                  {/* Quick Action Buttons */}
-                  <Link href="/admin/products/new">
-                    <Button className="flex items-center gap-2">
-                      <Plus className="h-4 w-4" />
-                      Add Product
-                    </Button>
-                  </Link>
-                  
                   {/* Draft Info Tooltip */}
                   <div className="hidden lg:flex items-center gap-2 text-xs text-gray-500 bg-gray-100 px-3 py-2 rounded-lg">
                     <FileText className="h-3 w-3" />
