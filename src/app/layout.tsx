@@ -5,6 +5,9 @@ import { CartProvider } from '@/contexts/CartContext'
 import { ThemeProvider } from '@/contexts/ThemeContext' // ✅ NEW - Theme system
 import CartDrawer from '@/components/cart/CartDrawer'
 import './globals.css'
+import { db } from '@/lib/db'  // ✅ ADD THIS
+import { isValidCurrency, SupportedCurrency } from '@/lib/currency'  // ✅ ADD THIS
+
 
 const inter = Inter({ 
   subsets: ['latin'],
@@ -82,22 +85,25 @@ export const metadata: Metadata = {
 // Get initial currency and exchange rates (server-side)
 async function getInitialCurrencyData() {
   try {
-    // In a real app, you might detect user's location and set initial currency
-    // For now, we'll use USD as default
-    const initialCurrency = 'USD'
-    
-    // Fetch initial exchange rates (you might want to cache these)
-    const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/currency/rates`, {
-      next: { revalidate: 3600 } // Cache for 1 hour
+    // 🎯 Read from admin settings (database)
+    const storeSettings = await db.storeSetting.findFirst({
+      where: { id: 'default' },
+      select: { currency: true }
     })
     
-    const initialRates = response.ok ? 
-      await response.json() : {}
+    // ✅ Use admin currency with validation
+    const adminCurrency = storeSettings?.currency || 'USD'
+    const initialCurrency = isValidCurrency(adminCurrency) 
+      ? adminCurrency as SupportedCurrency 
+      : 'USD'
+    
+    // Fetch rates
+    const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/currency/rates`)
+    const initialRates = response.ok ? await response.json() : {}
     
     return { initialCurrency, initialRates }
   } catch (error) {
-    console.warn('Failed to fetch initial currency data:', error)
-    return { initialCurrency: 'USD', initialRates: {} }
+    return { initialCurrency: 'USD' as SupportedCurrency, initialRates: {} }
   }
 }
 

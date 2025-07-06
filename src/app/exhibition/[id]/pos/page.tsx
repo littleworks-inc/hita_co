@@ -133,7 +133,7 @@ export default function ExhibitionPOS({ params }: POSProps) {
       try {
         const response = await fetch(`/api/exhibition/${params.id}/inventory`)
         if (!response.ok) throw new Error('Failed to load exhibition data')
-        
+
         const data = await response.json()
         setExhibition(data.exhibition)
         setProducts(data.products)
@@ -144,7 +144,7 @@ export default function ExhibitionPOS({ params }: POSProps) {
         setLoading(false)
       }
     }
-    
+
     loadData()
   }, [params.id])
 
@@ -155,7 +155,7 @@ export default function ExhibitionPOS({ params }: POSProps) {
     setCustomDiscount(0) // Clear manual discount
     setBargainReason(`${percentage}% Quick Discount`)
     setActiveDiscountMode('percentage')
-    
+
     // Show success feedback
     setShowDiscountSuccess(true)
     setTimeout(() => setShowDiscountSuccess(false), 2000)
@@ -183,25 +183,25 @@ export default function ExhibitionPOS({ params }: POSProps) {
   // Calculate pricing for each product (existing logic preserved)
   const calculateProductPricing = (exhibitionProduct: ExhibitionProduct) => {
     const product = exhibitionProduct.product
-    
-    const originalStorePrice = product.discountPercentage > 0 
+
+    const originalStorePrice = product.discountPercentage > 0
       ? product.sellingPriceUSD / (1 - product.discountPercentage / 100)
       : product.sellingPriceUSD
-    
+
     const currentStorePrice = product.sellingPriceUSD
     const exhibitionPrice = exhibitionProduct.exhibitionPrice || currentStorePrice
-    
+
     const finalPrice = exhibitionProduct.isClearance && exhibitionProduct.discountPercentage
       ? exhibitionPrice * (1 - exhibitionProduct.discountPercentage / 100)
       : exhibitionPrice
-    
+
     return {
       originalPrice: originalStorePrice,
       exhibitionPrice,
       finalPrice,
       hasStoreDiscount: product.discountPercentage > 0,
       hasExhibitionPrice: !!exhibitionProduct.exhibitionPrice,
-      hasExhibitionDiscount: exhibitionProduct.isClearance && exhibitionProduct.discountPercentage > 0,
+      hasExhibitionDiscount: exhibitionProduct.isClearance && (exhibitionProduct.discountPercentage || 0) > 0, // ✅ FIXED
       storeDiscountPercent: product.discountPercentage || 0,
       exhibitionDiscountPercent: exhibitionProduct.discountPercentage || 0
     }
@@ -211,14 +211,14 @@ export default function ExhibitionPOS({ params }: POSProps) {
   const addToCart = (exhibitionProduct: ExhibitionProduct, quantity: number = 1) => {
     const pricing = calculateProductPricing(exhibitionProduct)
     const availableStock = exhibitionProduct.quantityTaken - exhibitionProduct.quantitySold
-    
+
     const existingItem = cart.find(item => item.exhibitionProductId === exhibitionProduct.id)
-    
+
     if (existingItem) {
       const newQuantity = existingItem.quantity + quantity
       if (newQuantity <= availableStock) {
-        setCart(cart.map(item => 
-          item.exhibitionProductId === exhibitionProduct.id 
+        setCart(cart.map(item =>
+          item.exhibitionProductId === exhibitionProduct.id
             ? { ...item, quantity: newQuantity }
             : item
         ))
@@ -260,7 +260,7 @@ export default function ExhibitionPOS({ params }: POSProps) {
       removeFromCart(exhibitionProductId)
       return
     }
-    
+
     setCart(cart.map(item => {
       if (item.exhibitionProductId === exhibitionProductId) {
         return { ...item, quantity: Math.min(newQuantity, item.availableStock) }
@@ -274,7 +274,7 @@ export default function ExhibitionPOS({ params }: POSProps) {
     const subtotal = cart.reduce((sum, item) => sum + (item.finalPrice * item.quantity), 0)
     const totalDiscount = customDiscount + bundleDiscount
     const finalTotal = Math.max(0, subtotal - totalDiscount)
-    
+
     return { subtotal, totalDiscount, finalTotal }
   }, [cart, customDiscount, bundleDiscount])
 
@@ -307,7 +307,7 @@ export default function ExhibitionPOS({ params }: POSProps) {
         bundleDiscount,
         finalTotal: cartTotals.finalTotal,
         paymentMethod,
-        cashAmount: paymentMethod === 'CASH' || paymentMethod === 'SPLIT_PAYMENT' ? 
+        cashAmount: paymentMethod === 'CASH' || paymentMethod === 'SPLIT_PAYMENT' ?
           (paymentMethod === 'CASH' ? cartTotals.finalTotal : cashAmount) : null,
         zelleAmount: paymentMethod === 'ZELLE' || paymentMethod === 'SPLIT_PAYMENT' ? zelleAmount : null,
         cardAmount: paymentMethod === 'CARD' || paymentMethod === 'SPLIT_PAYMENT' ? cardAmount : null,
@@ -340,10 +340,10 @@ export default function ExhibitionPOS({ params }: POSProps) {
       }
 
       const result = await response.json()
-      
+
       // Success - show receipt and reset
       alert(`Sale completed! Sale #${result.saleNumber}`)
-      
+
       // Reset form
       setCart([])
       setCustomerName('')
@@ -355,10 +355,10 @@ export default function ExhibitionPOS({ params }: POSProps) {
       setSalesNotes('')
       setShowCustomerForm(false)
       setShowPaymentForm(false)
-      
+
       // Refresh product data
       window.location.reload()
-      
+
     } catch (err: any) {
       setError(err.message)
     } finally {
@@ -368,15 +368,15 @@ export default function ExhibitionPOS({ params }: POSProps) {
 
   // Filter products for display
   const filteredProducts = products.filter(product => {
-    const matchesSearch = searchQuery === '' || 
+    const matchesSearch = searchQuery === '' ||
       product.product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       product.product.sku.toLowerCase().includes(searchQuery.toLowerCase())
-    
-    const matchesCategory = selectedCategory === '' || 
+
+    const matchesCategory = selectedCategory === '' ||
       product.product.category.name === selectedCategory
-    
+
     const hasStock = (product.quantityTaken - product.quantitySold) > 0
-    
+
     return matchesSearch && matchesCategory && hasStock
   })
 
@@ -430,7 +430,7 @@ export default function ExhibitionPOS({ params }: POSProps) {
                 <p className="text-sm text-gray-600">{exhibition.title}</p>
               </div>
             </div>
-            
+
             {/* Cart Items Count */}
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2">
@@ -471,7 +471,7 @@ export default function ExhibitionPOS({ params }: POSProps) {
                       className="pl-10 h-12"
                     />
                   </div>
-                  
+
                   <div className="flex gap-2 overflow-x-auto pb-2">
                     <Button
                       variant={selectedCategory === '' ? 'default' : 'outline'}
@@ -502,7 +502,7 @@ export default function ExhibitionPOS({ params }: POSProps) {
                 const pricing = calculateProductPricing(exhibitionProduct)
                 const availableStock = exhibitionProduct.quantityTaken - exhibitionProduct.quantitySold
                 const cartItem = cart.find(item => item.exhibitionProductId === exhibitionProduct.id)
-                
+
                 return (
                   <Card key={exhibitionProduct.id} className="hover:shadow-md transition-shadow">
                     <CardContent className="p-4">
@@ -517,7 +517,7 @@ export default function ExhibitionPOS({ params }: POSProps) {
                             />
                           </div>
                         )}
-                        
+
                         {/* Product Info */}
                         <div>
                           <h3 className="font-semibold text-gray-900 line-clamp-2">
@@ -530,7 +530,7 @@ export default function ExhibitionPOS({ params }: POSProps) {
                             {exhibitionProduct.product.category.name}
                           </p>
                         </div>
-                        
+
                         {/* Pricing */}
                         <div className="space-y-1">
                           <div className="flex items-center justify-between">
@@ -543,14 +543,14 @@ export default function ExhibitionPOS({ params }: POSProps) {
                               </Badge>
                             )}
                           </div>
-                          
+
                           {pricing.originalPrice !== pricing.finalPrice && (
                             <p className="text-sm text-gray-500 line-through">
                               {formatPrice(pricing.originalPrice, 'USD')}
                             </p>
                           )}
                         </div>
-                        
+
                         {/* Stock Info */}
                         <div className="flex items-center justify-between text-sm">
                           <span className="text-gray-600">
@@ -562,7 +562,7 @@ export default function ExhibitionPOS({ params }: POSProps) {
                             </Badge>
                           )}
                         </div>
-                        
+
                         {/* Add to Cart */}
                         {cartItem ? (
                           <div className="flex items-center gap-2">
@@ -608,7 +608,7 @@ export default function ExhibitionPOS({ params }: POSProps) {
                 )
               })}
             </div>
-            
+
             {filteredProducts.length === 0 && (
               <div className="text-center py-12">
                 <Search className="w-12 h-12 text-gray-400 mx-auto mb-4" />
@@ -691,7 +691,7 @@ export default function ExhibitionPOS({ params }: POSProps) {
                             {formatPrice(cartTotals.subtotal * 0.05, 'USD')}
                           </span>
                         </Button>
-                        
+
                         <Button
                           variant="outline"
                           size="sm"
@@ -706,7 +706,7 @@ export default function ExhibitionPOS({ params }: POSProps) {
                             {formatPrice(cartTotals.subtotal * 0.10, 'USD')}
                           </span>
                         </Button>
-                        
+
                         <Button
                           variant="outline"
                           size="sm"
@@ -807,7 +807,7 @@ export default function ExhibitionPOS({ params }: POSProps) {
                         <Label htmlFor="bargainReason" className="text-sm font-medium">
                           Discount Reason
                         </Label>
-                        
+
                         {/* Quick Reason Buttons */}
                         <div className="grid grid-cols-2 gap-2">
                           {[
@@ -822,18 +822,17 @@ export default function ExhibitionPOS({ params }: POSProps) {
                               key={reason}
                               variant="outline"
                               size="sm"
-                              className={`h-8 text-xs transition-all ${
-                                bargainReason === reason 
-                                  ? 'bg-blue-100 border-blue-300 text-blue-700' 
+                              className={`h-8 text-xs transition-all ${bargainReason === reason
+                                  ? 'bg-blue-100 border-blue-300 text-blue-700'
                                   : 'hover:bg-gray-50'
-                              }`}
+                                }`}
                               onClick={() => setBargainReason(reason)}
                             >
                               {reason}
                             </Button>
                           ))}
                         </div>
-                        
+
                         {/* Custom Reason Input */}
                         <Input
                           id="bargainReason"
@@ -865,7 +864,7 @@ export default function ExhibitionPOS({ params }: POSProps) {
                         <div className="flex items-center justify-center gap-2">
                           <CheckCircle className="w-4 h-4" />
                           <span>
-                            🎉 Customer saves {formatPrice(cartTotals.totalDiscount, 'USD')} • 
+                            🎉 Customer saves {formatPrice(cartTotals.totalDiscount, 'USD')} •
                             {((cartTotals.totalDiscount / cartTotals.subtotal) * 100).toFixed(1)}% off!
                           </span>
                         </div>
@@ -1004,7 +1003,7 @@ export default function ExhibitionPOS({ params }: POSProps) {
                             />
                           </div>
                           <div className="text-sm text-gray-600">
-                            Total: {formatPrice(cashAmount + zelleAmount + cardAmount, 'USD')} / 
+                            Total: {formatPrice(cashAmount + zelleAmount + cardAmount, 'USD')} /
                             {formatPrice(cartTotals.finalTotal, 'USD')}
                           </div>
                         </div>

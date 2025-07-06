@@ -41,12 +41,42 @@ export async function GET(
 
     // Get sale with all related data
     const sale = await db.exhibitionSale.findUnique({
-      where: { 
+      where: {
         id: saleId,
         exhibitionId: exhibitionId // Ensure sale belongs to this exhibition
       },
       include: {
         items: {
+          include: {
+            // ✅ Include related product data to get name, sku, category
+            product: {
+              include: {
+                category: {
+                  select: {
+                    name: true
+                  }
+                }
+              }
+            },
+            // ✅ Include exhibition product for pricing context
+            exhibitionProduct: {
+              include: {
+                product: {
+                  select: {
+                    name: true,
+                    sku: true
+                  }
+                }
+              }
+            },
+            // ✅ Include product size if present
+            productSize: {
+              select: {
+                size: true,
+                sku: true
+              }
+            }
+          },
           orderBy: {
             createdAt: 'asc'
           }
@@ -55,8 +85,8 @@ export async function GET(
     })
 
     if (!sale) {
-      return NextResponse.json({ 
-        error: 'Receipt not found or does not belong to this exhibition' 
+      return NextResponse.json({
+        error: 'Receipt not found or does not belong to this exhibition'
       }, { status: 404 })
     }
 
@@ -80,6 +110,14 @@ export async function GET(
         }
       })
     }
+    interface PaymentDetails {
+      cashAmount?: number | null
+      zelleAmount?: number | null
+      cardAmount?: number | null
+      bargainApplied?: boolean
+      bargainReason?: string | null
+      [key: string]: any // Allow other properties
+    }
 
     // Format the response data
     const receiptData = {
@@ -90,43 +128,70 @@ export async function GET(
         customerPhone: sale.customerPhone,
         customerEmail: sale.customerEmail,
         subtotal: sale.subtotal,
-        customDiscount: sale.customDiscount,
-        bundleDiscount: sale.bundleDiscount,
-        finalTotal: sale.finalTotal,
+        tax: sale.tax,
+
+        // ✅ Map database fields to frontend expected fields
+        customDiscount: 0,                       // Not stored separately
+        bundleDiscount: sale.discount || 0,      // Map 'discount' to bundleDiscount
+        finalTotal: sale.total,                  // Map 'total' to finalTotal
+
+        // ✅ Payment information
         paymentMethod: sale.paymentMethod,
-        cashAmount: sale.cashAmount,
-        zelleAmount: sale.zelleAmount,
-        cardAmount: sale.cardAmount,
-        bargainApplied: sale.bargainApplied,
-        bargainReason: sale.bargainReason,
-        salesPersonNotes: sale.salesPersonNotes,
-        paymentNotes: sale.paymentNotes,
-        createdAt: sale.createdAt.toISOString()
+        cashReceived: sale.cashReceived,
+        changeGiven: sale.changeGiven,
+
+        // ✅ FIXED: Type cast paymentDetails to access properties safely
+        ...((): {
+          cashAmount: number | null
+          zelleAmount: number | null
+          cardAmount: number | null
+          bargainApplied: boolean
+          bargainReason: string | null
+        } => {
+          const paymentDetails = sale.paymentDetails as PaymentDetails | null
+
+          return {
+            cashAmount: paymentDetails?.cashAmount || null,
+            zelleAmount: paymentDetails?.zelleAmount || null,
+            cardAmount: paymentDetails?.cardAmount || null,
+            bargainApplied: paymentDetails?.bargainApplied || (sale.discount || 0) > 0,
+            bargainReason: paymentDetails?.bargainReason || null
+          }
+        })(),
+
+        // ✅ Staff notes and timestamps
+        salesPersonNotes: sale.staffNotes,       // Use correct field name
+        paymentNotes: null,                      // Not stored separately
+        isCompleted: sale.isCompleted,
+        completedAt: sale.completedAt,
+        receiptPrinted: sale.receiptPrinted,
+        receiptEmailSent: sale.receiptEmailSent,
+        createdAt: sale.createdAt,
+        updatedAt: sale.updatedAt
       },
       items: sale.items.map(item => ({
         id: item.id,
-        productName: item.productName,
-        productSku: item.productSku,
-        categoryName: item.categoryName,
+        productId: item.productId,
+        exhibitionProductId: item.exhibitionProductId,
+        quantity: item.quantity,
+
+        // ✅ Get product info from relations
+        productName: item.product?.name || item.exhibitionProduct?.product?.name || 'Unknown Product',
+        productSku: item.product?.sku || item.exhibitionProduct?.product?.sku || 'N/A',
+        categoryName: item.product?.category?.name || 'Uncategorized',
+
+        // ✅ Pricing fields from schema
         originalPrice: item.originalPrice,
         exhibitionPrice: item.exhibitionPrice,
         finalPrice: item.finalPrice,
-        quantity: item.quantity,
-        lineTotal: item.lineTotal
+        lineTotal: item.lineTotal,
+
+        // ✅ Size and discount info
+        sizeLabel: item.sizeLabel || item.productSize?.size || null,
+        discount: item.discount || 0
       })),
-      exhibition: {
-        id: exhibition.id,
-        title: exhibition.title,
-        location: exhibition.location
-      },
-      storeSettings: {
-        storeName: storeSettings.storeName,
-        tagline: storeSettings.tagline,
-        logo: storeSettings.logo,
-        email: storeSettings.email,
-        phone: storeSettings.phone,
-        address: storeSettings.address
-      }
+      exhibition,
+      storeSettings
     }
 
     return NextResponse.json(receiptData)

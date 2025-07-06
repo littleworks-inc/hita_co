@@ -23,7 +23,7 @@ interface Product {
   id: string
   sku: string
   name: string
-  shortDescription?: string
+  shortDescription?: string | null
   images: string[]
   sellingPriceUSD: number
   discountPercentage: number

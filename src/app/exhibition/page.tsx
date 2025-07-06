@@ -46,7 +46,7 @@ interface ExhibitionWithStats {
     quantitySold: number
   }>
   sales: Array<{
-    finalTotal: number  // ✅ FIXED: Use finalTotal instead of total
+    total: number       // ✅ FIXED: Use 'total' (actual database field)
     isCompleted: boolean
   }>
   _count: {
@@ -66,10 +66,10 @@ function calculateExhibitionStatus(exhibition: ExhibitionWithStats) {
   if (startDate > now) status = 'upcoming'
   else if (endDate >= now) status = 'ongoing'
 
-  // ✅ FIXED: Calculate financial metrics using finalTotal
+  // ✅ FIXED: Calculate financial metrics using 'total' (actual database field)
   const revenue = exhibition.sales
     .filter(sale => sale.isCompleted)
-    .reduce((sum, sale) => sum + sale.finalTotal, 0)  // ✅ FIXED: finalTotal instead of total
+    .reduce((sum, sale) => sum + sale.total, 0)  // ✅ FIXED: 'total' instead of 'finalTotal'
   
   const netProfit = revenue - exhibition.participationFee
 
@@ -104,7 +104,7 @@ async function getAllExhibitionsWithStats() {
       },
       sales: {
         select: {
-          total: true,   // ✅ FIXED: Use finalTotal instead of total
+          total: true,        // ✅ This is correct - 'total' exists in database
           isCompleted: true
         }
       },
