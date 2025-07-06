@@ -20,13 +20,16 @@ interface PriceDisplayProps {
   className?: string
 }
 
+// ✅ FIXED: PriceDisplay component with correct currency context usage
+
 export default function PriceDisplay({ 
   product, 
   size = 'md', 
   showSavings = true,
   className = '' 
 }: PriceDisplayProps) {
-  const { currentCurrency, convertPrice } = useCurrency()
+  // ✅ FIXED: Use 'currency' instead of 'currentCurrency'
+  const { currency, convertPrice } = useCurrency()
 
   // Calculate discount information
   const discountInfo = calculateDiscountInfo({
@@ -35,12 +38,12 @@ export default function PriceDisplay({
     showDiscountToCustomers: product.showDiscountToCustomers
   })
 
-  // Convert prices to current currency
-  const finalPrice = convertPrice(product.sellingPriceUSD, currentCurrency)
+  // ✅ FIXED: Convert prices to current currency (without second parameter)
+  const finalPrice = convertPrice(product.sellingPriceUSD)
   const originalPrice = discountInfo.shouldShowDiscount 
-    ? convertPrice(discountInfo.originalPrice, currentCurrency)
+    ? convertPrice(discountInfo.originalPrice)
     : finalPrice
-  const savings = convertPrice(discountInfo.savings, currentCurrency)
+  const savings = convertPrice(discountInfo.savings)
 
   // Size configurations
   const sizeClasses = {
@@ -78,67 +81,39 @@ export default function PriceDisplay({
       <div className="flex items-center gap-3 flex-wrap">
         {discountInfo.shouldShowDiscount ? (
           <>
-            {/* Original Price (Crossed Out) */}
-            <span className={`line-through text-gray-400 ${classes.originalPrice}`}>
-              {formatPrice(originalPrice, currentCurrency)}
+            {/* Final Price (Discounted) */}
+            <span className={`font-bold text-green-600 ${classes.price}`}>
+              {formatPrice(finalPrice)}
             </span>
             
-            {/* Sale Price */}
-            <span className={`font-bold text-red-600 ${classes.price}`}>
-              {formatPrice(finalPrice, currentCurrency)}
+            {/* Original Price (Crossed Out) */}
+            <span className={`text-gray-500 line-through ${classes.originalPrice}`}>
+              {formatPrice(originalPrice)}
             </span>
             
             {/* Discount Badge */}
-            <span className={`bg-red-100 text-red-600 font-bold rounded-full flex items-center gap-1 ${classes.badge}`}>
-              <Percent className="h-3 w-3" />
+            <span className={`bg-red-100 text-red-800 font-medium rounded-full ${classes.badge}`}>
+              <Percent className="inline h-3 w-3 mr-1" />
               {discountInfo.discountPercent}% OFF
             </span>
           </>
         ) : (
           /* Regular Price */
           <span className={`font-bold text-gray-900 ${classes.price}`}>
-            {formatPrice(finalPrice, currentCurrency)}
+            {formatPrice(finalPrice)}
           </span>
         )}
       </div>
 
       {/* Savings Information */}
-      {discountInfo.shouldShowDiscount && showSavings && (
-        <div className={`text-green-600 font-medium ${classes.savings}`}>
-          🎉 You save {formatPrice(savings, currentCurrency)}
-        </div>
-      )}
-
-      {/* Discount Badge (Alternative Layout) */}
-      {discountInfo.shouldShowDiscount && size === 'xl' && (
-        <div className="inline-flex items-center gap-2 bg-red-50 text-red-700 px-4 py-2 rounded-lg border border-red-200">
-          <Tag className="h-4 w-4" />
-          <span className="font-medium">
-            Limited Time: {discountInfo.discountPercent}% Off
+      {showSavings && discountInfo.shouldShowDiscount && (
+        <div className="flex items-center gap-2">
+          <Tag className="h-4 w-4 text-green-600" />
+          <span className={`text-green-600 font-medium ${classes.savings}`}>
+            You save {formatPrice(savings)}
           </span>
         </div>
       )}
     </div>
   )
 }
-
-// ✅ USAGE EXAMPLES:
-/*
-// Basic usage
-<PriceDisplay product={product} />
-
-// Large size with savings
-<PriceDisplay 
-  product={product} 
-  size="xl" 
-  showSavings={true} 
-/>
-
-// Small card version
-<PriceDisplay 
-  product={product} 
-  size="sm" 
-  showSavings={false} 
-  className="text-center"
-/>
-*/

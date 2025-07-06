@@ -7,8 +7,8 @@ import { Card, CardContent, CardHeader, CardTitle, Input, Label } from '@/compon
 import { Search } from 'lucide-react'
 
 interface Product {
-  seoTitle: string
-  seoDescription: string
+  seoTitle?: string      // ✅ CHANGED: Made optional to match ProductForm interface
+  seoDescription?: string // ✅ CHANGED: Made optional to match ProductForm interface
 }
 
 interface ProductSEOProps {
@@ -33,7 +33,7 @@ export default function ProductSEO({
           <Label htmlFor="seoTitle">SEO Title</Label>
           <Input
             id="seoTitle"
-            value={formData.seoTitle || ''}
+            value={formData.seoTitle || ''}  // ✅ Already handles undefined correctly
             onChange={(e) => onInputChange('seoTitle', e.target.value)}
             placeholder="SEO optimized title"
           />
@@ -46,7 +46,7 @@ export default function ProductSEO({
           <Label htmlFor="seoDescription">SEO Description</Label>
           <textarea
             id="seoDescription"
-            value={formData.seoDescription || ''}
+            value={formData.seoDescription || ''}  // ✅ Already handles undefined correctly
             onChange={(e) => onInputChange('seoDescription', e.target.value)}
             placeholder="SEO optimized description"
             rows={3}

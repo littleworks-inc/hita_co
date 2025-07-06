@@ -74,7 +74,7 @@ export default function SupplierForm({ supplier, mode }: SupplierFormProps) {
     isActive: supplier?.isActive ?? true,
   })
 
-  const handleInputChange = (field: keyof Supplier, value: string | number | boolean) => {
+  const handleInputChange = (field: keyof Supplier, value: string | number | boolean | null) => {
     setFormData(prev => ({ ...prev, [field]: value }))
     // Clear error when user starts typing
     if (errors[field]) {
@@ -122,8 +122,8 @@ export default function SupplierForm({ supplier, mode }: SupplierFormProps) {
       }
     }
 
-    // Rating validation
-    if (formData.rating !== null && (formData.rating < 1 || formData.rating > 5)) {
+    // ✅ FIXED: Rating validation - properly handle undefined, null, and number
+    if (formData.rating !== null && formData.rating !== undefined && (formData.rating < 1 || formData.rating > 5)) {
       newErrors.rating = 'Rating must be between 1 and 5'
     }
 
@@ -133,7 +133,7 @@ export default function SupplierForm({ supplier, mode }: SupplierFormProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     if (!validateForm()) {
       return
     }
@@ -142,10 +142,10 @@ export default function SupplierForm({ supplier, mode }: SupplierFormProps) {
     setErrors({})
 
     try {
-      const url = mode === 'create' 
+      const url = mode === 'create'
         ? '/api/admin/suppliers'
         : `/api/admin/suppliers/${supplier?.id}`
-      
+
       const method = mode === 'create' ? 'POST' : 'PUT'
 
       const response = await fetch(url, {
@@ -181,7 +181,7 @@ export default function SupplierForm({ supplier, mode }: SupplierFormProps) {
         <div className="rounded-md bg-red-50 p-4">
           <div className="flex">
             <AlertTriangle className="h-5 w-5 text-red-400" />
-                          <div className="ml-3">
+            <div className="ml-3">
               <h3 className="text-sm font-medium text-red-800">Error</h3>
               <div className="mt-2 text-sm text-red-700">
                 {errors.submit}

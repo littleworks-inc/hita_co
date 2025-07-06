@@ -61,13 +61,26 @@ interface FormData {
 }
 
 interface EnhancedAIInputFormProps {
+  // ✅ EXISTING PROPS
   onDataChange?: (data: FormData) => void
   initialData?: Partial<FormData>
+  
+  // ✅ ADDED MISSING PROPS - Used by ProductForm.tsx
+  productName?: string
+  categoryName?: string
+  images?: string[]
+  onGenerate?: (type: string, enhancedData: any) => Promise<void>
+  isGenerating?: boolean
 }
 
 const EnhancedAIInputForm: React.FC<EnhancedAIInputFormProps> = ({ 
   onDataChange, 
-  initialData = {} 
+  initialData = {},
+  productName = '',
+  categoryName = '',
+  images = [],
+  onGenerate,
+  isGenerating = false
 }) => {
   const [expanded, setExpanded] = useState<boolean>(false);
   const [analyzing, setAnalyzing] = useState<boolean>(false);

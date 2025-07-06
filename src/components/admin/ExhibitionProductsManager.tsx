@@ -14,6 +14,7 @@ import ProductImage from '@/components/admin/ProductImage'
 import {
   Package,
   Plus,
+  Minus,
   Edit,
   Trash2,
   Save,

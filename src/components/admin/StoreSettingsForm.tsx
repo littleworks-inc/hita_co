@@ -63,13 +63,27 @@ interface StoreSettings {
   twitter: string | null
   aiProvider: string | null
   aiApiKey: string | null
-  aiModel?: string | null
+  aiModel: string | null
   currency: string
   timezone: string
+  
+  // ✅ ADDED: Missing return policy fields
   returnsEnabled: boolean | null
   returnPeriodDays: number | null
+  returnPolicyUrl: string | null          // ✅ MISSING FIELD - This was causing the error
+  hasRestockingFee: boolean | null
+  restockingFeePercentage: number | null
+  returnPolicyDescription: string | null
+  noReturnsReason: string | null
+  
+  // ✅ ADDED: Missing catalog mode fields
   disableShoppingCart: boolean | null
   catalogModeSettings: string | null
+  
+  // Database fields
+  createdAt?: Date
+  updatedAt?: Date
+  defaultShippingZoneId?: string | null
 }
 
 interface StoreSettingsFormProps {

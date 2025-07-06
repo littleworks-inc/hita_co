@@ -509,16 +509,16 @@ export default function ProductForm({
     }
 
     // ✅ NEW: Auto-update currency when country changes (ADD THIS)
-  if (field === 'countryId') {
-    const selectedCountry = countries.find(c => c.id === value)
-    if (selectedCountry && !product?.originalCurrency) {
-      // Only auto-set currency for new products, not when editing existing ones
-      setFormData(prev => ({ 
-        ...prev, 
-        originalCurrency: selectedCountry.currency 
-      }))
+    if (field === 'countryId') {
+      const selectedCountry = countries.find(c => c.id === value)
+      if (selectedCountry && !product?.originalCurrency) {
+        // Only auto-set currency for new products, not when editing existing ones
+        setFormData(prev => ({
+          ...prev,
+          originalCurrency: selectedCountry.currency
+        }))
+      }
     }
-  }
 
     // ✅ FIXED: Auto-calculate cost breakdown when relevant fields change
     if (['originalPrice', 'quantity', 'gstPercentage', 'shippingCost', 'conversionCharges', 'additionalExpenses', 'countryId'].includes(field)) {
@@ -926,10 +926,16 @@ export default function ProductForm({
           barcode={formData.barcode}
           barcodeType={formData.barcodeType}
           barcodeNeedsUpdate={barcodeNeedsUpdate}
+          requiresSizes={formData.requiresSizes}           // ✅ ADDED - Missing prop
+          productSizes={formData.productSizes}             // ✅ ADDED - Missing prop
           onBarcodeChange={(barcode) => handleInputChange('barcode', barcode)}
           onBarcodeTypeChange={(type) => handleInputChange('barcodeType', type)}
           onBarcodeGenerated={handleBarcodeGenerated}
           onUpdateNeeded={setBarcodeNeedsUpdate}
+          onSizeBarcodeGenerated={(sizeIndex, barcode) => {  // ✅ ADDED - Optional handler
+            // Handle size-specific barcode generation if needed
+            console.log(`Size ${sizeIndex} barcode generated:`, barcode)
+          }}
         />
 
         {/* 7. SEO Settings with AI */}

@@ -23,7 +23,7 @@ interface Product {
   id: string
   sku: string
   name: string
-  shortDescription?: string | null
+  shortDescription?: string | null 
   images: string[]
   sellingPriceUSD: number
   discountPercentage: number
@@ -54,6 +54,8 @@ interface ProductCardProps {
   className?: string
 }
 
+// ✅ FIXED: ProductCard component with correct currency context usage
+
 export default function ProductCard({ 
   product, 
   storeSettings,
@@ -62,7 +64,9 @@ export default function ProductCard({
   const [imageLoading, setImageLoading] = useState(true)
   const [imageError, setImageError] = useState(false)
   const [isWishlisted, setIsWishlisted] = useState(false)
-  const { currentCurrency, convertPrice } = useCurrency()
+  
+  // ✅ FIXED: Use 'currency' instead of 'currentCurrency'
+  const { currency, convertPrice } = useCurrency()
 
   // Parse catalog mode settings
   const isECommerceMode = !storeSettings?.disableShoppingCart
@@ -87,172 +91,164 @@ export default function ProductCard({
   const primaryImage = product.images && product.images.length > 0 ? product.images[0] : null
   const secondaryImage = product.images && product.images.length > 1 ? product.images[1] : null
 
-  // Generate product slug for URL
-  const productSlug = `${product.name.toLowerCase().replace(/\s+/g, '-')}-${product.sku}`
-
-  // ✅ FIXED: Calculate discount information - MATCHING ADMIN PREVIEW LOGIC
-  const hasDiscount = product.discountPercentage > 0
-  const shouldShowDiscount = hasDiscount && product.showDiscountToCustomers
-
-  // ✅ CRITICAL FIX: Use the SAME logic as admin preview
-  const originalPrice = product.sellingPriceUSD  // $107.11 (crossed out)
-  const discountedPrice = originalPrice * (1 - product.discountPercentage / 100)  // $85.69 (what customer pays)
-  const savings = originalPrice - discountedPrice  // $21.42
+  // ✅ FIXED: Calculate pricing with correct currency conversion
+  const basePrice = convertPrice(product.sellingPriceUSD)
+  const hasDiscount = product.discountPercentage > 0 && product.showDiscountToCustomers
+  const discountedPrice = hasDiscount 
+    ? basePrice * (1 - product.discountPercentage / 100)
+    : basePrice
 
   // Stock status
-  const isOutOfStock = product.stockQuantity === 0
+  const isOutOfStock = product.stockQuantity <= 0
   const isLowStock = product.stockQuantity <= 5 && product.stockQuantity > 0
 
+  // Product slug for URL
+  const productSlug = `${product.name.toLowerCase().replace(/\s+/g, '-')}-${product.sku}`
+
+  const toggleWishlist = () => {
+    setIsWishlisted(!isWishlisted)
+    // TODO: Implement wishlist API call
+  }
+
   return (
-    <div className={`group bg-white rounded-xl shadow-sm hover:shadow-lg transition-all duration-300 overflow-hidden ${className}`}>
-      {/* Product Image Container */}
-      <Link href={`/products/${productSlug}`} className="block">
-        <div className="relative aspect-square overflow-hidden">
-          {/* Discount Badge */}
-          {shouldShowDiscount && (
-            <div className="absolute top-3 left-3 z-10 bg-red-500 text-white px-2 py-1 rounded-full text-xs font-bold">
-              {product.discountPercentage}% OFF
-            </div>
-          )}
-
-          {/* Stock Status Badge */}
-          {isLowStock && !isOutOfStock && (
-            <div className="absolute top-3 right-3 z-10 bg-orange-500 text-white px-2 py-1 rounded-full text-xs font-medium">
-              Only {product.stockQuantity} left
-            </div>
-          )}
-
-          {isOutOfStock && (
-            <div className="absolute top-3 right-3 z-10 bg-gray-500 text-white px-2 py-1 rounded-full text-xs font-medium">
-              Out of Stock
-            </div>
-          )}
-
-          {/* Product Images */}
+    <div className={`group relative bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden hover:shadow-lg transition-shadow duration-300 ${className}`}>
+      {/* Product Image */}
+      <div className="relative aspect-square overflow-hidden">
+        <Link href={`/products/${productSlug}`} className="block w-full h-full">
           {primaryImage && !imageError ? (
             <>
-              {/* Primary Image */}
+              {/* Loading state */}
+              {imageLoading && (
+                <div className="absolute inset-0 bg-gray-100 animate-pulse flex items-center justify-center">
+                  <Package className="h-8 w-8 text-gray-400" />
+                </div>
+              )}
+              
+              {/* Primary image */}
               <Image
                 src={primaryImage}
                 alt={product.name}
                 fill
-                className={`object-cover transition-all duration-500 ${
-                  imageLoading ? 'scale-110 blur-sm' : 'scale-100 blur-0'
-                } ${secondaryImage ? 'group-hover:opacity-0' : ''}`}
+                className={`object-cover transition-all duration-300 ${
+                  imageLoading ? 'opacity-0' : 'opacity-100'
+                } group-hover:scale-105`}
                 onLoad={() => setImageLoading(false)}
                 onError={() => setImageError(true)}
-                priority={product.isFeatured}
               />
-
-              {/* Secondary Image (hover effect) */}
+              
+              {/* Secondary image overlay on hover */}
               {secondaryImage && (
                 <Image
                   src={secondaryImage}
-                  alt={`${product.name} - View 2`}
+                  alt={`${product.name} - view 2`}
                   fill
-                  className="object-cover transition-opacity duration-500 opacity-0 group-hover:opacity-100"
-                  onError={() => {}}
+                  className="object-cover opacity-0 group-hover:opacity-100 transition-opacity duration-300"
                 />
               )}
             </>
           ) : (
-            /* Fallback when no image */
-            <div className="w-full h-full bg-gray-200 flex items-center justify-center">
-              <Package className="h-16 w-16 text-gray-400" />
+            <div className="w-full h-full bg-gray-100 flex items-center justify-center">
+              <Package className="h-12 w-12 text-gray-400" />
             </div>
           )}
-
-          {/* Quick Actions Overlay */}
-          <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-10 transition-all duration-300 flex items-center justify-center">
-            <div className="opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-y-4 group-hover:translate-y-0">
-              <div className="flex items-center gap-2">
-                {/* Quick View */}
-                <button className="p-2 bg-white rounded-full shadow-lg hover:shadow-xl transition-all">
-                  <Eye className="h-4 w-4 text-gray-700" />
-                </button>
-                
-                {/* Wishlist */}
-                <button 
-                  onClick={(e) => {
-                    e.preventDefault()
-                    setIsWishlisted(!isWishlisted)
-                  }}
-                  className="p-2 bg-white rounded-full shadow-lg hover:shadow-xl transition-all"
-                >
-                  <Heart className={`h-4 w-4 ${isWishlisted ? 'text-red-500 fill-current' : 'text-gray-700'}`} />
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </Link>
-
-      {/* Product Information */}
-      <div className="p-4 space-y-3">
-        {/* Category & Stock Status */}
-        <div className="flex items-center justify-between">
-          <span className="text-xs text-gray-500 uppercase tracking-wide">
-            {product.category.name}
-          </span>
-          {product.isFeatured && (
-            <div className="flex items-center gap-1 text-amber-500">
-              <Star className="h-3 w-3 fill-current" />
-              <span className="text-xs font-medium">Featured</span>
-            </div>
-          )}
-        </div>
-
-        {/* Product Name */}
-        <Link href={`/products/${productSlug}`}>
-          <h3 className="font-semibold text-gray-900 hover:text-purple-600 transition-colors line-clamp-2">
-            {product.name}
-          </h3>
         </Link>
 
-        {/* Short Description */}
-        {product.shortDescription && (
-          <p className="text-sm text-gray-600 line-clamp-2">
-            {product.shortDescription}
-          </p>
-        )}
+        {/* Badges */}
+        <div className="absolute top-3 left-3 flex flex-col gap-2">
+          {/* Discount badge */}
+          {hasDiscount && (
+            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+              <Percent className="h-3 w-3 mr-1" />
+              {product.discountPercentage}% OFF
+            </span>
+          )}
+          
+          {/* Featured badge */}
+          {product.isFeatured && (
+            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+              <Star className="h-3 w-3 mr-1" />
+              Featured
+            </span>
+          )}
+        </div>
 
-        {/* Pricing */}
-        <div className="space-y-1">
-          <div className="flex items-center gap-2 flex-wrap">
-            {shouldShowDiscount ? (
+        {/* Wishlist button */}
+        <button
+          onClick={toggleWishlist}
+          className="absolute top-3 right-3 p-2 rounded-full bg-white/80 backdrop-blur-sm hover:bg-white transition-colors"
+        >
+          <Heart className={`h-4 w-4 ${isWishlisted ? 'fill-red-500 text-red-500' : 'text-gray-600'}`} />
+        </button>
+
+        {/* Stock status overlay */}
+        {isOutOfStock && (
+          <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+            <span className="text-white text-sm font-medium bg-black/70 px-3 py-1 rounded-full">
+              Out of Stock
+            </span>
+          </div>
+        )}
+      </div>
+
+      {/* Product Info */}
+      <div className="p-4">
+        <div className="mb-3">
+          <Link href={`/products/${productSlug}`}>
+            <h3 className="font-medium text-gray-900 hover:text-purple-600 transition-colors line-clamp-2 mb-1">
+              {product.name}
+            </h3>
+          </Link>
+          
+          <p className="text-sm text-gray-500 mb-2">
+            {product.category.name} • {product.country.name}
+          </p>
+
+          {/* Product description */}
+          {product.shortDescription && (
+            <p className="text-xs text-gray-600 line-clamp-2 mb-3">
+              {product.shortDescription}
+            </p>
+          )}
+        </div>
+
+        {/* Price */}
+        <div className="mb-4">
+          <div className="flex items-center gap-2">
+            {hasDiscount ? (
               <>
-                {/* Original price (crossed out) - This is the sellingPriceUSD */}
-                <span className="text-base line-through text-gray-400">
-                  {formatPrice(convertPrice(originalPrice, currentCurrency), currentCurrency)}
+                <span className="text-lg font-bold text-green-600">
+                  {formatPrice(discountedPrice)}
                 </span>
-                {/* Final discounted price - What customer actually pays */}
-                <span className="text-xl font-bold text-red-600">
-                  {formatPrice(convertPrice(discountedPrice, currentCurrency), currentCurrency)}
-                </span>
-                {/* Discount badge */}
-                <span className="bg-red-100 text-red-600 px-2 py-1 rounded-full text-xs font-bold">
-                  {product.discountPercentage}% OFF
+                <span className="text-sm text-gray-500 line-through">
+                  {formatPrice(basePrice)}
                 </span>
               </>
             ) : (
-              // Regular price when no discount
-              <span className="text-xl font-bold text-gray-900">
-                {formatPrice(convertPrice(product.sellingPriceUSD, currentCurrency), currentCurrency)}
+              <span className="text-lg font-bold text-gray-900">
+                {formatPrice(discountedPrice)}
               </span>
             )}
           </div>
 
-          {/* Savings information on separate line */}
-          {shouldShowDiscount && (
-            <div className="text-sm">
-              <span className="text-green-600 font-medium">
-                You save {formatPrice(convertPrice(savings, currentCurrency), currentCurrency)}
-              </span>
+          {/* Stock indicator */}
+          {!isOutOfStock && (
+            <div className="flex items-center gap-1 mt-1">
+              {isLowStock ? (
+                <>
+                  <div className="w-2 h-2 bg-orange-400 rounded-full"></div>
+                  <span className="text-xs text-orange-600">Only {product.stockQuantity} left</span>
+                </>
+              ) : (
+                <>
+                  <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                  <span className="text-xs text-green-600">In stock</span>
+                </>
+              )}
             </div>
           )}
         </div>
 
-        {/* ✅ NEW: CONDITIONAL RENDERING - eCommerce vs Catalog Mode */}
+        {/* Action Button */}
         {isECommerceMode ? (
           /* eCommerce Mode: Show Add to Cart Button */
           <AddToCartButton 
@@ -260,7 +256,7 @@ export default function ProductCard({
               id: product.id,
               sku: product.sku || product.id, // Use actual SKU or fallback to ID
               name: product.name,
-              sellingPriceUSD: discountedPrice, // Use the actual price customer pays
+              sellingPriceUSD: product.sellingPriceUSD, // Use original USD price for cart
               stockQuantity: product.stockQuantity,
               images: product.images,
               category: product.category,
