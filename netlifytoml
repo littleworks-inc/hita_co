@@ -1,6 +1,6 @@
 [build]
-  # Build command with Prisma Client generation
-  command = "prisma generate && npm run build"
+  # Build command with connection-safe Prisma generation
+  command = "SKIP_DB_ON_BUILD=true prisma generate && npm run build"
   
   # Publish directory
   publish = ".next"
