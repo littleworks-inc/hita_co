@@ -1,0 +1,36 @@
+[build]
+  # Build command with Prisma Client generation
+  command = "prisma generate && npm run build"
+  
+  # Publish directory
+  publish = ".next"
+  
+  # Node.js version
+  environment = { NODE_VERSION = "18" }
+
+[build.environment]
+  # Disable Next.js telemetry for faster builds
+  NEXT_TELEMETRY_DISABLED = "1"
+  
+  # Prisma configuration for serverless
+  PRISMA_GENERATE_SKIP_AUTOINSTALL = "true"
+
+# Force environment variables to be available during build
+[context.production.environment]
+  NODE_ENV = "production"
+
+# Build-specific settings for preview deployments
+[context.deploy-preview]
+  command = "prisma generate && npm run build"
+
+# Build-specific settings for branch deployments  
+[context.branch-deploy]
+  command = "prisma generate && npm run build"
+
+# Headers for security
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
