@@ -69,37 +69,12 @@ export async function GET(
         break
 
       case 'sku':
-        // Extract base SKU from size variant SKU
-        const queryParts = query.split('-')
-        let baseSkuFromQuery = query
-        
-        // If query looks like a size variant (ends with size like -XXL, -XL, -L, -M, -S)
-        if (queryParts.length > 2) {
-          const lastPart = queryParts[queryParts.length - 1].toUpperCase()
-          const commonSizes = ['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL', 
-                             'SMALL', 'MEDIUM', 'LARGE', 'XLARGE', 'XXLARGE']
-          
-          if (commonSizes.includes(lastPart) || /^\d+$/.test(lastPart)) {
-            // Remove the size part to get base SKU
-            baseSkuFromQuery = queryParts.slice(0, -1).join('-')
-          }
-        }
-        
         searchConditions.push(
-          // Main product SKU (exact match)
+          // Main product SKU
           {
             product: {
               sku: {
                 equals: query,
-                mode: 'insensitive' as const
-              }
-            }
-          },
-          // Base SKU match (for size variants)
-          {
-            product: {
-              sku: {
-                equals: baseSkuFromQuery,
                 mode: 'insensitive' as const
               }
             }
@@ -131,25 +106,9 @@ export async function GET(
         })
         break
 
-      case 'auto':
-      default:
-        // Extract base SKU for size variant handling
-        const autoQueryParts = query.split('-')
-        let autoBaseSkuFromQuery = query
-        
-        if (autoQueryParts.length > 2) {
-          const lastPart = autoQueryParts[autoQueryParts.length - 1].toUpperCase()
-          const commonSizes = ['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL', 
-                             'SMALL', 'MEDIUM', 'LARGE', 'XLARGE', 'XXLARGE']
-          
-          if (commonSizes.includes(lastPart) || /^\d+$/.test(lastPart)) {
-            autoBaseSkuFromQuery = autoQueryParts.slice(0, -1).join('-')
-          }
-        }
-        
-        // Search across barcode, SKU, and name (including size variants)
+      default: // 'auto' - search all fields
         searchConditions = [
-          // Main product barcode
+          // Exact barcode match
           {
             product: {
               barcode: {
@@ -158,7 +117,16 @@ export async function GET(
               }
             }
           },
-          // Main product SKU
+          // Exact SKU match
+          {
+            product: {
+              sku: {
+                equals: query,
+                mode: 'insensitive' as const
+              }
+            }
+          },
+          // Partial SKU match
           {
             product: {
               sku: {
@@ -167,16 +135,7 @@ export async function GET(
               }
             }
           },
-          // Base SKU (for size variants)
-          {
-            product: {
-              sku: {
-                equals: autoBaseSkuFromQuery,
-                mode: 'insensitive' as const
-              }
-            }
-          },
-          // Product name
+          // Product name search
           {
             product: {
               name: {
@@ -214,7 +173,7 @@ export async function GET(
         ]
     }
 
-    // Find exhibition products matching the search
+    // Find exhibition products matching the search - WITHOUT problematic orderBy
     const exhibitionProducts = await db.exhibitionProduct.findMany({
       where: {
         exhibitionId,
@@ -242,27 +201,44 @@ export async function GET(
             }
           }
         }
-      },
-      orderBy: [
-        // Prioritize exact barcode matches
-        {
-          product: {
-            barcode: query
-          }
-        },
-        // Then exact SKU matches
-        {
-          product: {
-            sku: query
-          }
-        },
-        // Then by name
-        {
-          product: {
-            name: 'asc'
-          }
-        }
-      ]
+      }
+    })
+
+    // ✅ FIX: Sort results in JavaScript to prioritize exact matches
+    const sortedResults = exhibitionProducts.sort((a, b) => {
+      const productA = a.product
+      const productB = b.product
+
+      // Priority 1: Exact barcode matches first
+      const aHasExactBarcode = productA.barcode?.toLowerCase() === query.toLowerCase()
+      const bHasExactBarcode = productB.barcode?.toLowerCase() === query.toLowerCase()
+      
+      if (aHasExactBarcode && !bHasExactBarcode) return -1
+      if (!aHasExactBarcode && bHasExactBarcode) return 1
+
+      // Priority 2: Exact SKU matches
+      const aHasExactSku = productA.sku?.toLowerCase() === query.toLowerCase()
+      const bHasExactSku = productB.sku?.toLowerCase() === query.toLowerCase()
+      
+      if (aHasExactSku && !bHasExactSku) return -1
+      if (!aHasExactSku && bHasExactSku) return 1
+
+      // Priority 3: Partial SKU matches
+      const aHasPartialSku = productA.sku?.toLowerCase().includes(query.toLowerCase())
+      const bHasPartialSku = productB.sku?.toLowerCase().includes(query.toLowerCase())
+      
+      if (aHasPartialSku && !bHasPartialSku) return -1
+      if (!aHasPartialSku && bHasPartialSku) return 1
+
+      // Priority 4: Name matches
+      const aHasNameMatch = productA.name?.toLowerCase().includes(query.toLowerCase())
+      const bHasNameMatch = productB.name?.toLowerCase().includes(query.toLowerCase())
+      
+      if (aHasNameMatch && !bHasNameMatch) return -1
+      if (!aHasNameMatch && bHasNameMatch) return 1
+
+      // Default: Sort by name alphabetically
+      return productA.name.localeCompare(productB.name)
     })
 
     // Format response with stock and pricing information
@@ -270,69 +246,56 @@ export async function GET(
       const availableStock = ep.quantityTaken - ep.quantitySold
       const product = ep.product
 
-      // Calculate pricing
+      // Calculate pricing with null safety
       const originalPrice = ep.originalPrice || product.sellingPriceUSD
       const exhibitionPrice = ep.exhibitionPrice || originalPrice
-      const discountedPrice = ep.discountPercentage > 0
-        ? exhibitionPrice * (1 - ep.discountPercentage / 100)
+      const discountPercentage = ep.discountPercentage || 0
+      const discountedPrice = discountPercentage > 0
+        ? exhibitionPrice * (1 - discountPercentage / 100)
         : exhibitionPrice
       const finalPrice = discountedPrice
 
       // Calculate savings
       const totalSavings = originalPrice - finalPrice
-      const savingsPercentage = originalPrice > 0 ? (totalSavings / originalPrice) * 100 : 0
+      const savingsPercentage = originalPrice > 0 ? 
+        Math.round(((originalPrice - finalPrice) / originalPrice) * 100) : 0
+
+      // Determine match type for better UX
+      const matchType = (() => {
+        if (product.barcode?.toLowerCase() === query.toLowerCase()) return 'barcode'
+        if (product.sku?.toLowerCase() === query.toLowerCase()) return 'sku_exact'
+        if (product.sku?.toLowerCase().includes(query.toLowerCase())) return 'sku_partial'
+        if (product.name?.toLowerCase().includes(query.toLowerCase())) return 'name'
+        return 'unknown'
+      })()
 
       return {
-        // Exhibition product info
         id: ep.id,
         exhibitionProductId: ep.id,
         productId: ep.productId,
         quantityTaken: ep.quantityTaken,
         quantitySold: ep.quantitySold,
         availableStock,
-        isClearance: ep.isClearance,
-        
-        // Pricing breakdown
         pricing: {
           originalPrice,
           exhibitionPrice,
           finalPrice,
-          discount: ep.discountPercentage || 0,
+          discountPercentage: discountPercentage,
           totalSavings,
-          savingsPercentage: Math.round(savingsPercentage * 100) / 100,
-          hasExhibitionPrice: ep.exhibitionPrice !== null,
-          hasDiscount: (ep.discountPercentage || 0) > 0
+          savingsPercentage
         },
-
-        // Product details
         product: {
           id: product.id,
           name: product.name,
           sku: product.sku,
           barcode: product.barcode,
-          barcodeType: product.barcodeType,
           description: product.description,
           shortDescription: product.shortDescription,
-          images: product.images,
-          tags: product.tags,
-          sellingPriceUSD: product.sellingPriceUSD,
-          discountPercentage: product.discountPercentage,
-          
-          // Category and country
+          images: product.images || [],
           category: product.category,
           country: product.country,
-          
-          // Size information
-          requiresSizes: product.requiresSizes,
-          productSizes: product.productSizes,
-          
-          // Stock info
-          stockQuantity: product.stockQuantity,
-          lowStockAlert: product.lowStockAlert,
-          isActive: product.isActive
+          productSizes: product.productSizes || []
         },
-
-        // Match information for debugging
         matchType: (() => {
           if (product.barcode === query) return 'barcode'
           if (product.sku.toLowerCase() === query.toLowerCase()) return 'sku_exact'
@@ -492,8 +455,9 @@ export async function POST(
       const availableStock = matchingProduct.quantityTaken - matchingProduct.quantitySold
       const originalPrice = matchingProduct.originalPrice || productData.sellingPriceUSD
       const exhibitionPrice = matchingProduct.exhibitionPrice || originalPrice
-      const finalPrice = (matchingProduct.discountPercentage || 0) > 0
-        ? exhibitionPrice * (1 - (matchingProduct.discountPercentage || 0) / 100)
+      const discountPercentage = matchingProduct.discountPercentage || 0
+      const finalPrice = discountPercentage > 0
+        ? exhibitionPrice * (1 - discountPercentage / 100)
         : exhibitionPrice
 
       return {
