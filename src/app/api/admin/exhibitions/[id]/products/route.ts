@@ -182,14 +182,14 @@ export async function POST(
 
         // Update main product stock (sum of all active sizes)
         const updatedSizes = await tx.productSize.findMany({
-          where: { 
-            productId: productId, 
-            isActive: true 
+          where: {
+            productId: productId,
+            isActive: true
           }
         })
-        
+
         const newTotalStock = updatedSizes.reduce((sum, size) => sum + size.stockQuantity, 0)
-        
+
         await tx.product.update({
           where: { id: productId },
           data: { stockQuantity: newTotalStock }
@@ -218,8 +218,8 @@ export async function POST(
       // Validate quantity against stock
       if (quantityTaken > product.stockQuantity) {
         return NextResponse.json(
-          { 
-            error: `Cannot take ${quantityTaken} items. Only ${product.stockQuantity} available in stock.` 
+          {
+            error: `Cannot take ${quantityTaken} items. Only ${product.stockQuantity} available in stock.`
           },
           { status: 400 }
         )
@@ -278,7 +278,7 @@ export async function POST(
 
   } catch (error) {
     console.error('Exhibition product creation error:', error)
-    
+
     // Handle unique constraint violation
     if (error instanceof Error && error.message.includes('Unique constraint')) {
       return NextResponse.json(
@@ -338,12 +338,16 @@ export async function GET(
           }
         }
       },
-      orderBy: { createdAt: 'desc' }
+      orderBy: {
+        product: {
+          createdAt: 'desc'
+        }
+      }
     })
 
     // Get available products (not in this exhibition)
     const existingProductIds = exhibitionProducts.map(ep => ep.productId)
-    
+
     const availableProducts = await db.product.findMany({
       where: {
         id: { notIn: existingProductIds },
@@ -365,16 +369,27 @@ export async function GET(
       totalProducts: exhibitionProducts.length,
       totalQuantityTaken: exhibitionProducts.reduce((sum, ep) => sum + ep.quantityTaken, 0),
       totalQuantitySold: exhibitionProducts.reduce((sum, ep) => sum + ep.quantitySold, 0),
-      totalValue: exhibitionProducts.reduce((sum, ep) => sum + (ep.originalPrice * ep.quantityTaken), 0),
-      totalRevenue: exhibitionProducts.reduce((sum, ep) => sum + ((ep.exhibitionPrice || ep.originalPrice) * ep.quantitySold), 0),
+      totalValue: exhibitionProducts.reduce((sum, ep) => {
+        const originalPrice = ep.originalPrice ?? 0
+        return sum + (originalPrice * ep.quantityTaken)
+      }, 0),
+      totalRevenue: exhibitionProducts.reduce((sum, ep) => {
+        const originalPrice = ep.originalPrice ?? 0
+        const exhibitionPrice = ep.exhibitionPrice ?? originalPrice
+        return sum + (exhibitionPrice * ep.quantitySold)
+      }, 0),
       clearanceProducts: exhibitionProducts.filter(ep => ep.isClearance).length,
-      customPricedProducts: exhibitionProducts.filter(ep => ep.exhibitionPrice && ep.exhibitionPrice !== ep.originalPrice).length,
+      customPricedProducts: exhibitionProducts.filter(ep =>
+        ep.exhibitionPrice !== null &&
+        ep.originalPrice !== null &&
+        ep.exhibitionPrice !== ep.originalPrice
+      ).length,
       outOfStockProducts: exhibitionProducts.filter(ep => ep.quantityTaken <= ep.quantitySold).length
     }
 
     // Add sell-through rate
-    const sellThroughRate = summary.totalQuantityTaken > 0 
-      ? (summary.totalQuantitySold / summary.totalQuantityTaken) * 100 
+    const sellThroughRate = summary.totalQuantityTaken > 0
+      ? (summary.totalQuantitySold / summary.totalQuantityTaken) * 100
       : 0
 
     return NextResponse.json({
