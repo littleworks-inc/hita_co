@@ -10,19 +10,15 @@
     "build:force": "next build --debug",
     "start": "next start",
     "lint": "next lint",
-    
     "postinstall": "prisma generate",
-    
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
     "db:studio": "prisma studio",
     "db:seed": "npx tsx prisma/seed.ts",
     "db:migrate": "prisma migrate dev",
     "db:reset": "prisma migrate reset",
-    
     "build:static": "NEXT_TELEMETRY_DISABLED=1 next build",
     "build:debug": "DEBUG=prisma* next build",
-    
     "test:db": "node -e \"require('./src/lib/db').dbUtils.testConnection().then(r => console.log('DB Test:', r))\"",
     "check:connections": "node -e \"require('./src/lib/db').dbUtils.getConnectionStatus().then(r => console.log('DB Status:', r))\""
   },
@@ -36,6 +32,7 @@
     "@radix-ui/react-slot": "^1.0.2",
     "@radix-ui/react-tabs": "^1.1.12",
     "@radix-ui/react-toast": "^1.1.5",
+    "@zxing/library": "^0.21.3",
     "bcryptjs": "^2.4.3",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.0.0",
@@ -44,8 +41,10 @@
     "lucide-react": "^0.303.0",
     "next": "14.0.4",
     "next-themes": "^0.4.6",
+    "quagga": "^0.12.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
+    "react-qr-barcode-scanner": "^2.1.8",
     "recharts": "^2.15.4",
     "tailwind-merge": "^2.2.0",
     "tailwindcss-animate": "^1.0.7"
