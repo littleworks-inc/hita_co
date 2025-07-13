@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react'
+import { createContext, useContext, useEffect, useState, ReactNode, useCallback, useRef } from 'react'
 import { 
   SupportedCurrency, 
   SUPPORTED_CURRENCIES,
@@ -48,6 +48,9 @@ export function CurrencyProvider({
   const [exchangeRates, setExchangeRates] = useState<Record<string, number>>(initialRates)
   const [isLoading, setIsLoading] = useState(false)
   const [isClient, setIsClient] = useState(false)
+  
+  // ✅ NEW: Prevent multiple fetches with ref
+  const hasFetchedRef = useRef(false)
 
   // Ensure we're on the client side before accessing localStorage
   useEffect(() => {
@@ -81,10 +84,17 @@ export function CurrencyProvider({
     }
   }, [isClient])
 
-  // Fetch exchange rates
+  // ✅ FIXED: Fetch exchange rates with proper guards against infinite loops
   const fetchExchangeRates = useCallback(async () => {
+    // Prevent multiple simultaneous calls
+    if (isLoading || hasFetchedRef.current) {
+      return
+    }
+    
     try {
       setIsLoading(true)
+      hasFetchedRef.current = true
+      
       const response = await fetch('/api/currency/rates')
       if (response.ok) {
         const rates = await response.json()
@@ -97,21 +107,22 @@ export function CurrencyProvider({
     } finally {
       setIsLoading(false)
     }
-  }, [])
+  }, [isLoading])
 
   // Refresh rates
   const refreshRates = useCallback(async () => {
+    hasFetchedRef.current = false // Reset the fetch guard
     await fetchExchangeRates()
   }, [fetchExchangeRates])
 
-  // Load exchange rates on mount (only on client)
+  // ✅ FIXED: Load exchange rates on mount (only on client) - REMOVED PROBLEMATIC DEPENDENCIES
   useEffect(() => {
     if (!isClient) return
     
     if (Object.keys(exchangeRates).length === 0) {
       fetchExchangeRates()
     }
-  }, [isClient, exchangeRates, fetchExchangeRates])
+  }, [isClient]) // ✅ CRITICAL FIX: Only depend on isClient, not on exchangeRates or fetchExchangeRates
 
   // Convert price from USD
   const convertPrice = useCallback((priceUSD: number): number => {
