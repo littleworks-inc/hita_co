@@ -1,110 +1,201 @@
 // src/app/exhibition/page.tsx
 // =====================================
-// 🔥 FIXED: Exhibition Portal Homepage - Exhibition List with Status Filtering
-// Fixed to use finalTotal instead of total for ExhibitionSale model
+// 🔧 SIMPLIFIED: Exhibition Portal Main Page - No Currency Context
+// Temporarily removed CurrencyContext to fix infinite API loop
 // =====================================
 
 import { redirect } from 'next/navigation'
-import Link from 'next/link'
 import { getSession } from '@/lib/auth'
 import { db } from '@/lib/db'
-import { formatPrice, formatDate } from '@/lib/utils'
-import { Button, Card, CardContent, CardHeader, CardTitle, Badge } from '@/components/ui'
+import Link from 'next/link'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   Calendar,
   MapPin,
   Package,
-  DollarSign,
-  TrendingUp,
+  Play,
   Clock,
   CheckCircle,
-  AlertTriangle,
-  Eye,
-  ShoppingCart,
-  Filter,
-  Search,
-  Grid3X3,
-  List
+  List,
+  Plus,
+  DollarSign,
+  TrendingUp
 } from 'lucide-react'
 
-// ✅ FIXED: Enhanced exhibition interface with correct field names
-interface ExhibitionWithStats {
+interface Exhibition {
   id: string
   title: string
   description: string | null
   location: string
   startDate: Date
   endDate: Date
-  participationFee: number
-  images: string[]
   isActive: boolean
+  participationFee: number
   createdAt: Date
   updatedAt: Date
-  products: Array<{
+  products: {
     id: string
     quantityTaken: number
     quantitySold: number
-  }>
-  sales: Array<{
-    total: number       // ✅ FIXED: Use 'total' (actual database field)
+    originalPrice: number | null
+    exhibitionPrice: number | null
+    discountPercentage: number | null
+    product: {
+      id: string
+      name: string
+      sku: string
+      sellingPriceUSD: number
+      images: string[]
+    }
+  }[]
+  sales: {
+    total: number
     isCompleted: boolean
-  }>
+  }[]
   _count: {
     products: number
     sales: number
   }
 }
 
-// ✅ FIXED: Calculate exhibition status and stats with correct field names
-function calculateExhibitionStatus(exhibition: ExhibitionWithStats) {
-  const now = new Date()
-  const startDate = new Date(exhibition.startDate)
-  const endDate = new Date(exhibition.endDate)
-
-  // Determine status
-  let status: 'upcoming' | 'ongoing' | 'completed' = 'completed'
-  if (startDate > now) status = 'upcoming'
-  else if (endDate >= now) status = 'ongoing'
-
-  // ✅ FIXED: Calculate financial metrics using 'total' (actual database field)
-  const revenue = exhibition.sales
-    .filter(sale => sale.isCompleted)
-    .reduce((sum, sale) => sum + sale.total, 0)  // ✅ FIXED: 'total' instead of 'finalTotal'
-  
-  const netProfit = revenue - exhibition.participationFee
-
-  // Calculate product metrics
-  const totalProductsTaken = exhibition.products.reduce((sum, p) => sum + p.quantityTaken, 0)
-  const totalProductsSold = exhibition.products.reduce((sum, p) => sum + p.quantitySold, 0)
-  const sellThroughRate = totalProductsTaken > 0 ?
-    Math.round((totalProductsSold / totalProductsTaken) * 100) : 0
-
-  return {
-    status,
-    revenue,
-    netProfit,
-    totalProductsTaken,
-    totalProductsSold,
-    sellThroughRate,
-    completedSales: exhibition.sales.filter(sale => sale.isCompleted).length
-  }
+// Format price in USD only (no currency context)
+function formatPrice(price: number): string {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  }).format(price)
 }
 
-// ✅ FIXED: Get all exhibitions with stats using correct field names
-async function getAllExhibitionsWithStats() {
+// Format date
+function formatDate(date: Date): string {
+  return new Intl.DateTimeFormat('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric'
+  }).format(date)
+}
+
+// Get exhibition status
+function getExhibitionStatus(startDate: Date, endDate: Date): 'upcoming' | 'ongoing' | 'completed' {
+  const now = new Date()
+  if (startDate > now) return 'upcoming'
+  if (endDate >= now) return 'ongoing'
+  return 'completed'
+}
+
+// Exhibition Card Component
+function ExhibitionCard({ exhibition }: { exhibition: Exhibition }) {
+  const status = getExhibitionStatus(exhibition.startDate, exhibition.endDate)
+  
+  // Calculate metrics with null handling
+  const totalRevenue = exhibition.sales
+    .filter(sale => sale.isCompleted)
+    .reduce((sum, sale) => sum + sale.total, 0)
+    
+  const totalProductsTaken = exhibition.products.reduce((sum, p) => sum + p.quantityTaken, 0)
+  const totalProductsSold = exhibition.products.reduce((sum, p) => sum + p.quantitySold, 0)
+  
+  const getStatusBadge = () => {
+    switch (status) {
+      case 'ongoing':
+        return <Badge className="bg-green-100 text-green-800">Ongoing</Badge>
+      case 'upcoming':
+        return <Badge className="bg-blue-100 text-blue-800">Upcoming</Badge>
+      case 'completed':
+        return <Badge className="bg-gray-100 text-gray-800">Completed</Badge>
+    }
+  }
+
+  return (
+    <Card className="hover:shadow-md transition-shadow">
+      <CardHeader>
+        <div className="flex justify-between items-start">
+          <div className="flex-1">
+            <CardTitle className="text-lg mb-2">{exhibition.title}</CardTitle>
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-sm text-gray-600">
+                <MapPin className="h-4 w-4" />
+                <span>{exhibition.location}</span>
+              </div>
+              <div className="flex items-center gap-2 text-sm text-gray-600">
+                <Calendar className="h-4 w-4" />
+                <span>{formatDate(exhibition.startDate)} - {formatDate(exhibition.endDate)}</span>
+              </div>
+            </div>
+          </div>
+          {getStatusBadge()}
+        </div>
+      </CardHeader>
+      <CardContent>
+        {/* Quick Stats */}
+        <div className="grid grid-cols-2 gap-4 mb-4">
+          <div className="text-center p-3 bg-gray-50 rounded-lg">
+            <div className="text-sm text-gray-600">Products</div>
+            <div className="text-lg font-semibold">{totalProductsTaken}</div>
+            <div className="text-xs text-gray-500">{totalProductsSold} sold</div>
+          </div>
+          <div className="text-center p-3 bg-gray-50 rounded-lg">
+            <div className="text-sm text-gray-600">Revenue</div>
+            <div className="text-lg font-semibold">{formatPrice(totalRevenue)}</div>
+            <div className="text-xs text-gray-500">{exhibition._count.sales} sales</div>
+          </div>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex gap-2">
+          <Link href={`/exhibition/${exhibition.id}`} className="flex-1">
+            <Button variant="outline" className="w-full">
+              <Play className="h-4 w-4 mr-2" />
+              View Details
+            </Button>
+          </Link>
+          {status === 'ongoing' && (
+            <Link href={`/exhibition/${exhibition.id}/pos`}>
+              <Button>
+                <Package className="h-4 w-4 mr-2" />
+                POS
+              </Button>
+            </Link>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+// Main Exhibition Page Component
+export default async function ExhibitionPage() {
+  // Check authentication
+  const session = await getSession()
+  
+  if (!session) {
+    redirect('/exhibition/login')
+  }
+
+  // Fetch exhibitions data
   const exhibitions = await db.exhibition.findMany({
     where: { isActive: true },
     include: {
       products: {
-        select: {
-          id: true,
-          quantityTaken: true,
-          quantitySold: true
+        include: {
+          product: {
+            select: {
+              id: true,
+              name: true,
+              sku: true,
+              sellingPriceUSD: true,
+              images: true
+            }
+          }
         }
       },
       sales: {
         select: {
-          total: true,        // ✅ This is correct - 'total' exists in database
+          total: true,
           isCompleted: true
         }
       },
@@ -120,187 +211,84 @@ async function getAllExhibitionsWithStats() {
     }
   })
 
-  return exhibitions.map(exhibition => ({
-    ...exhibition,
-    stats: calculateExhibitionStatus(exhibition)
-  }))
-}
-
-export default async function ExhibitionListPage() {
-  const session = await getSession()
-  
-  if (!session) {
-    redirect('/exhibition/login')
-  }
-
-  const exhibitions = await getAllExhibitionsWithStats()
-
   // Group exhibitions by status
-  const groupedExhibitions = {
-    ongoing: exhibitions.filter(ex => ex.stats.status === 'ongoing'),
-    upcoming: exhibitions.filter(ex => ex.stats.status === 'upcoming'),
-    completed: exhibitions.filter(ex => ex.stats.status === 'completed')
-  }
-
-  const StatusBadge = ({ status }: { status: 'ongoing' | 'upcoming' | 'completed' }) => {
-    const configs = {
-      ongoing: { label: 'Ongoing', icon: CheckCircle, className: 'bg-green-100 text-green-800' },
-      upcoming: { label: 'Upcoming', icon: Clock, className: 'bg-blue-100 text-blue-800' },
-      completed: { label: 'Completed', icon: CheckCircle, className: 'bg-gray-100 text-gray-800' }
-    }
-    
-    const config = configs[status]
-    const Icon = config.icon
-    
-    return (
-      <Badge className={`flex items-center gap-1 ${config.className}`}>
-        <Icon className="h-3 w-3" />
-        {config.label}
-      </Badge>
-    )
-  }
-
-  const PerformanceIndicator = ({ stats }: { stats: any }) => {
-    const isGoodPerformance = stats.sellThroughRate >= 50 || stats.netProfit > 0
-    
-    return (
-      <div className={`flex items-center gap-1 ${isGoodPerformance ? 'text-green-600' : 'text-yellow-600'}`}>
-        {isGoodPerformance ? (
-          <TrendingUp className="h-4 w-4" />
-        ) : (
-          <AlertTriangle className="h-4 w-4" />
-        )}
-        <span className="text-sm font-medium">
-          {isGoodPerformance ? 'Good' : 'Needs Attention'}
-        </span>
-      </div>
-    )
-  }
-
-  const ExhibitionCard = ({ exhibition }: { exhibition: any }) => (
-    <Card className="hover:shadow-lg transition-shadow">
-      <CardContent className="p-6">
-        <div className="space-y-4">
-          {/* Header */}
-          <div className="flex justify-between items-start">
-            <div className="space-y-1">
-              <h3 className="font-semibold text-lg text-gray-900">
-                {exhibition.title}
-              </h3>
-              <div className="flex items-center gap-2 text-sm text-gray-600">
-                <MapPin className="h-4 w-4" />
-                {exhibition.location}
-              </div>
-            </div>
-            <StatusBadge status={exhibition.stats.status} />
-          </div>
-
-          {/* Dates */}
-          <div className="flex items-center gap-4 text-sm text-gray-600">
-            <div className="flex items-center gap-1">
-              <Calendar className="h-4 w-4" />
-              <span>{formatDate(exhibition.startDate)}</span>
-            </div>
-            <span>to</span>
-            <span>{formatDate(exhibition.endDate)}</span>
-          </div>
-
-          {/* Stats Grid */}
-          <div className="grid grid-cols-2 gap-4 pt-2">
-            <div className="space-y-2">
-              <div className="flex items-center gap-2 text-sm">
-                <Package className="h-4 w-4 text-gray-500" />
-                <span className="text-gray-600">Products:</span>
-                <span className="font-medium">
-                  {exhibition.stats.totalProductsSold}/{exhibition.stats.totalProductsTaken}
-                </span>
-              </div>
-              <div className="flex items-center gap-2 text-sm">
-                <TrendingUp className="h-4 w-4 text-gray-500" />
-                <span className="text-gray-600">Sell Rate:</span>
-                <span className="font-medium">{exhibition.stats.sellThroughRate}%</span>
-              </div>
-            </div>
-            
-            <div className="space-y-2">
-              <div className="flex items-center gap-2 text-sm">
-                <DollarSign className="h-4 w-4 text-gray-500" />
-                <span className="text-gray-600">Revenue:</span>
-                <span className="font-medium">{formatPrice(exhibition.stats.revenue)}</span>
-              </div>
-              <div className={`flex items-center gap-2 text-sm ${exhibition.stats.netProfit >= 0 
-                ? 'text-green-600' : 'text-red-600'}`}>
-                <span className="text-gray-600">Net:</span>
-                <span className="font-medium">{formatPrice(exhibition.stats.netProfit)}</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Performance */}
-          <div className="flex justify-between items-center pt-2 border-t">
-            <PerformanceIndicator stats={exhibition.stats} />
-            <div className="text-sm text-gray-500">
-              {exhibition.stats.completedSales} sales
-            </div>
-          </div>
-
-          {/* Actions */}
-          <div className="flex gap-2 pt-2">
-            <Link href={`/exhibition/${exhibition.id}`} className="flex-1">
-              <Button variant="outline" size="sm" className="w-full">
-                <Eye className="h-4 w-4 mr-2" />
-                View Details
-              </Button>
-            </Link>
-            {exhibition.stats.status === 'ongoing' && (
-              <Link href={`/exhibition/${exhibition.id}/pos`} className="flex-1">
-                <Button size="sm" className="w-full">
-                  <ShoppingCart className="h-4 w-4 mr-2" />
-                  Open POS
-                </Button>
-              </Link>
-            )}
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  )
+  const now = new Date()
+  const groupedExhibitions = exhibitions.reduce((acc, exhibition) => {
+    const status = getExhibitionStatus(exhibition.startDate, exhibition.endDate)
+    acc[status].push(exhibition)
+    return acc
+  }, {
+    ongoing: [] as Exhibition[],
+    upcoming: [] as Exhibition[],
+    completed: [] as Exhibition[]
+  })
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">
-            Exhibition Portal
-          </h1>
-          <p className="text-gray-600">
-            Manage exhibitions and access POS systems
-          </p>
+          <h1 className="text-2xl font-bold text-gray-900">Exhibition Portal</h1>
+          <p className="text-gray-600">Manage your exhibition sales and inventory</p>
         </div>
-        
-        {/* Quick Stats */}
-        <div className="flex gap-4 text-sm">
-          <div className="text-center">
-            <div className="font-semibold text-green-600">{groupedExhibitions.ongoing.length}</div>
-            <div className="text-gray-500">Ongoing</div>
-          </div>
-          <div className="text-center">
-            <div className="font-semibold text-blue-600">{groupedExhibitions.upcoming.length}</div>
-            <div className="text-gray-500">Upcoming</div>
-          </div>
-          <div className="text-center">
-            <div className="font-semibold text-gray-600">{groupedExhibitions.completed.length}</div>
-            <div className="text-gray-500">Completed</div>
-          </div>
-        </div>
+        <Link href="/admin/exhibitions">
+          <Button variant="outline">
+            <Plus className="h-4 w-4 mr-2" />
+            Admin Panel
+          </Button>
+        </Link>
+      </div>
+
+      {/* Stats Overview */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Ongoing Exhibitions</p>
+                <p className="text-2xl font-bold text-green-600">{groupedExhibitions.ongoing.length}</p>
+              </div>
+              <Play className="h-8 w-8 text-green-600" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Upcoming Exhibitions</p>
+                <p className="text-2xl font-bold text-blue-600">{groupedExhibitions.upcoming.length}</p>
+              </div>
+              <Clock className="h-8 w-8 text-blue-600" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Total Revenue</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {formatPrice(
+                    exhibitions.reduce((sum, ex) => 
+                      sum + ex.sales.filter(s => s.isCompleted).reduce((s, sale) => s + sale.total, 0), 0
+                    )
+                  )}
+                </p>
+              </div>
+              <DollarSign className="h-8 w-8 text-gray-600" />
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Ongoing Exhibitions */}
       {groupedExhibitions.ongoing.length > 0 && (
         <div className="space-y-4">
           <div className="flex items-center gap-2">
-            <CheckCircle className="h-5 w-5 text-green-600" />
+            <Play className="h-5 w-5 text-green-600" />
             <h2 className="text-xl font-semibold text-gray-900">Ongoing Exhibitions</h2>
             <Badge className="bg-green-100 text-green-800">{groupedExhibitions.ongoing.length}</Badge>
           </div>

@@ -1,12 +1,12 @@
 // src/app/exhibition/login/page.tsx
 // =====================================
-// Exhibition Staff Login - Mobile-First Authentication
-// Provides touch-optimized login interface for exhibition staff
+// 🔧 FIXED: Exhibition Staff Login - Prevents Redirect Loop
+// Now includes authentication check to prevent already logged-in users from accessing login page
 // =====================================
 
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
@@ -30,7 +30,37 @@ export default function ExhibitionLoginPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true)
   const router = useRouter()
+
+  // ✅ NEW: Check if user is already authenticated
+  useEffect(() => {
+    const checkExistingAuth = async () => {
+      try {
+        // Check if user has session cookies
+        const response = await fetch('/api/auth/session', {
+          method: 'GET',
+          credentials: 'include',
+        })
+        
+        if (response.ok) {
+          const data = await response.json()
+          if (data.authenticated) {
+            // User is already authenticated, redirect to exhibition portal
+            console.log('User already authenticated, redirecting to exhibition portal')
+            router.replace('/exhibition')
+            return
+          }
+        }
+      } catch (error) {
+        console.log('No existing authentication found')
+      } finally {
+        setIsCheckingAuth(false)
+      }
+    }
+
+    checkExistingAuth()
+  }, [router])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -65,6 +95,18 @@ export default function ExhibitionLoginPage() {
     } finally {
       setIsLoading(false)
     }
+  }
+
+  // ✅ NEW: Show loading state while checking authentication
+  if (isCheckingAuth) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600">Checking authentication...</p>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -102,37 +144,36 @@ export default function ExhibitionLoginPage() {
       {/* Main Content */}
       <main className="flex-1 flex items-center justify-center px-4 py-8">
         <div className="w-full max-w-md">
-          {/* Welcome Card */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 sm:p-8">
+          {/* Login Card */}
+          <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-8">
             {/* Icon & Title */}
             <div className="text-center mb-8">
-              <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Shield className="w-8 h-8 text-blue-600" />
+              <div className="w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Shield className="w-8 h-8 text-white" />
               </div>
               <h2 className="text-2xl font-bold text-gray-900 mb-2">
-                Welcome to Exhibition Portal
+                Staff Login
               </h2>
               <p className="text-gray-600">
-                Sign in to access the mobile POS system
+                Access the exhibition portal
               </p>
             </div>
 
-            {/* Success Message */}
-            {success && (
-              <Alert className="mb-6 border-green-200 bg-green-50">
-                <CheckCircle className="h-4 w-4 text-green-600" />
-                <AlertDescription className="text-green-800">
-                  {success}
-                </AlertDescription>
-              </Alert>
-            )}
-
-            {/* Error Message */}
+            {/* Alert Messages */}
             {error && (
               <Alert className="mb-6 border-red-200 bg-red-50">
                 <AlertCircle className="h-4 w-4 text-red-600" />
                 <AlertDescription className="text-red-800">
                   {error}
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {success && (
+              <Alert className="mb-6 border-green-200 bg-green-50">
+                <CheckCircle className="h-4 w-4 text-green-600" />
+                <AlertDescription className="text-green-800">
+                  {success}
                 </AlertDescription>
               </Alert>
             )}
@@ -149,12 +190,11 @@ export default function ExhibitionLoginPage() {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="staff@hitaco.com"
+                  placeholder="Enter your email"
                   required
                   disabled={isLoading}
                   className="h-12 text-base border-gray-300 focus:border-blue-500 focus:ring-blue-500"
                   autoComplete="email"
-                  autoCapitalize="none"
                 />
               </div>
 

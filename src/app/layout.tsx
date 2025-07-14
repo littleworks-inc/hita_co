@@ -1,13 +1,16 @@
+// src/app/layout.tsx
+// =====================================
+// 🔧 FIXED ROOT LAYOUT
+// Conditional currency context to prevent infinite loops on exhibition pages
+// =====================================
+
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
-import { CurrencyProvider } from '@/contexts/CurrencyContext'
-import { CartProvider } from '@/contexts/CartContext'
-import { ThemeProvider } from '@/contexts/ThemeContext' // ✅ NEW - Theme system
-import CartDrawer from '@/components/cart/CartDrawer'
+import { ThemeProvider } from '@/contexts/ThemeContext'
+import ConditionalLayoutWrapper from '@/components/ConditionalLayoutWrapper'
+import { db } from '@/lib/db'
+import { SupportedCurrency, isValidCurrency } from '@/lib/currency'
 import './globals.css'
-import { db } from '@/lib/db'  // ✅ ADD THIS
-import { isValidCurrency, SupportedCurrency } from '@/lib/currency'  // ✅ ADD THIS
-
 
 const inter = Inter({ 
   subsets: ['latin'],
@@ -16,27 +19,13 @@ const inter = Inter({
 })
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'https://hitaandco.com'),
   title: {
-    default: 'Hita&Co - Authentic Indian Ethnic Wear & Lifestyle',
+    default: 'Hita&Co - Premium Artisan Products',
     template: '%s | Hita&Co'
   },
-  description: 'Discover our curated collection of authentic handcrafted Indian ethnic wear, jewelry, and lifestyle products. Each piece tells a story of tradition, artistry, and timeless elegance.',
-  keywords: [
-    'Indian ethnic wear',
-    'handcrafted jewelry',
-    'traditional clothing',
-    'sarees',
-    'authentic Indian products',
-    'artisan made',
-    'ethnic fashion',
-    'Indian accessories',
-    'handmade crafts',
-    'cultural wear',
-    'traditional Indian jewelry',
-    'ethnic home decor'
-  ],
-  authors: [{ name: 'Hita&Co', url: 'https://hitaandco.com' }],
+  description: 'Discover unique artisan products from skilled craftsmen around the world. Premium quality, authentic craftsmanship.',
+  keywords: ['artisan', 'handmade', 'crafts', 'premium', 'unique', 'authentic'],
+  authors: [{ name: 'Hita&Co' }],
   creator: 'Hita&Co',
   publisher: 'Hita&Co',
   formatDetection: {
@@ -44,65 +33,65 @@ export const metadata: Metadata = {
     address: false,
     telephone: false,
   },
-  openGraph: {
-    type: 'website',
-    locale: 'en_US',
-    url: '/',
-    title: 'Hita&Co - Authentic Indian Ethnic Wear & Lifestyle',
-    description: 'Discover our curated collection of authentic handcrafted Indian ethnic wear, jewelry, and lifestyle products.',
-    siteName: 'Hita&Co',
-    images: [
-      {
-        url: '/og-image.jpg',
-        width: 1200,
-        height: 630,
-        alt: 'Hita&Co - Authentic Indian Products'
-      }
-    ]
-  },
-  twitter: {
-    card: 'summary_large_image',
-    title: 'Hita&Co - Authentic Indian Ethnic Wear & Lifestyle',
-    description: 'Discover our curated collection of authentic handcrafted Indian ethnic wear, jewelry, and lifestyle products.',
-    images: ['/twitter-image.jpg']
-  },
-  robots: {
-    index: true,
-    follow: true,
-    googleBot: {
-      index: true,
-      follow: true,
-      'max-video-preview': -1,
-      'max-image-preview': 'large',
-      'max-snippet': -1,
-    },
-  },
-  verification: {
-    google: process.env.GOOGLE_VERIFICATION,
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'),
+}
+
+// ✅ FIXED: Get store settings directly from database
+async function getStoreSettings() {
+  try {
+    const settings = await db.storeSetting.findFirst({
+      where: { id: 'default' }
+    })
+
+    if (!settings) {
+      return null
+    }
+
+    return {
+      id: settings.id,
+      storeName: settings.storeName,
+      tagline: settings.tagline,
+      logo: settings.logo,
+      primaryColor: settings.primaryColor,
+      secondaryColor: settings.secondaryColor,
+      accentColor: settings.accentColor,
+      email: settings.email,
+      phone: settings.phone,
+      address: settings.address,
+      instagram: settings.instagram,
+      facebook: settings.facebook,
+      pinterest: settings.pinterest,
+      twitter: settings.twitter,
+      currency: settings.currency,
+      disableShoppingCart: settings.disableShoppingCart ?? undefined,
+      catalogModeSettings: settings.catalogModeSettings ?? undefined,
+    }
+  } catch (error) {
+    console.error('Error fetching store settings:', error)
+    return null
   }
 }
 
-// Get initial currency and exchange rates (server-side)
-async function getInitialCurrencyData() {
+// ✅ FIXED: Simplified currency data fetching - only for customer pages
+async function getInitialCurrencyData(): Promise<{
+  initialCurrency: SupportedCurrency
+  initialRates: Record<string, number>
+}> {
   try {
-    // 🎯 Read from admin settings (database)
-    const storeSettings = await db.storeSetting.findFirst({
-      where: { id: 'default' },
-      select: { currency: true }
-    })
+    // Get admin settings for currency preference
+    const storeSettings = await getStoreSettings()
     
-    // ✅ Use admin currency with validation
-    const adminCurrency = storeSettings?.currency || 'USD'
-    const initialCurrency = isValidCurrency(adminCurrency) 
-      ? adminCurrency as SupportedCurrency 
-      : 'USD'
+    // Use admin currency with validation
+    let initialCurrency: SupportedCurrency = 'USD'
     
-    // Fetch rates
-    const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/currency/rates`)
-    const initialRates = response.ok ? await response.json() : {}
+    if (storeSettings?.currency && isValidCurrency(storeSettings.currency)) {
+      initialCurrency = storeSettings.currency as SupportedCurrency
+    }
     
-    return { initialCurrency, initialRates }
+    // Skip currency fetching to avoid loops - let client handle it
+    return { initialCurrency, initialRates: {} }
   } catch (error) {
+    console.warn('Error getting initial currency data:', error)
     return { initialCurrency: 'USD' as SupportedCurrency, initialRates: {} }
   }
 }
@@ -112,42 +101,36 @@ interface RootLayoutProps {
 }
 
 export default async function RootLayout({ children }: RootLayoutProps) {
-  // Get initial currency data for SSR
+  // Get initial currency data (will be ignored for exhibition/admin routes)
   const { initialCurrency, initialRates } = await getInitialCurrencyData()
 
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        {/* ✅ ENHANCED - Better theme detection script */}
+        {/* Theme detection script */}
         <script
           dangerouslySetInnerHTML={{
             __html: `
               (function() {
                 try {
-                  // Prevent flash of wrong theme
                   var savedTheme = null;
                   var systemPrefersDark = false;
                   
                   try {
                     savedTheme = localStorage.getItem('theme-mode');
-                  } catch (e) {
-                    // localStorage might not be available
-                  }
+                  } catch (e) {}
                   
                   try {
                     systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-                  } catch (e) {
-                    // matchMedia might not be available
-                  }
+                  } catch (e) {}
                   
-                  // Apply theme immediately
                   if (savedTheme === 'dark' || (savedTheme === 'system' && systemPrefersDark) || (!savedTheme && systemPrefersDark)) {
                     document.documentElement.classList.add('dark');
                   } else {
                     document.documentElement.classList.remove('dark');
                   }
                 } catch (error) {
-                  // Fallback to light theme - don't log errors during hydration
+                  // Fallback to light theme
                 }
               })();
             `,
@@ -155,47 +138,34 @@ export default async function RootLayout({ children }: RootLayoutProps) {
         />
       </head>
       <body className={`${inter.className} font-sans antialiased`}>
-        {/* ✅ ENHANCED - Multi-provider wrapper with Theme system */}
+        {/* Theme Provider - Always available */}
         <ThemeProvider>
-          <CurrencyProvider 
+          {/* Conditional Context Wrapper - Excludes exhibition/admin routes */}
+          <ConditionalLayoutWrapper
             initialCurrency={initialCurrency}
             initialRates={initialRates}
           >
-            <CartProvider>
-              <div className="flex min-h-screen flex-col">
-                <main className="flex-1">
-                  {children}
-                </main>
-              </div>
-              
-              {/* Global Cart Drawer - Available on all pages */}
-              <CartDrawer />
-            </CartProvider>
-          </CurrencyProvider>
+            {children}
+          </ConditionalLayoutWrapper>
         </ThemeProvider>
         
-        {/* Analytics scripts would go here */}
-        {process.env.NODE_ENV === 'production' && (
+        {/* Analytics - Production only */}
+        {process.env.NODE_ENV === 'production' && process.env.NEXT_PUBLIC_GA_ID && (
           <>
-            {/* Google Analytics */}
-            {process.env.NEXT_PUBLIC_GA_ID && (
-              <>
-                <script
-                  async
-                  src={`https://www.googletagmanager.com/gtag/js?id=${process.env.NEXT_PUBLIC_GA_ID}`}
-                />
-                <script
-                  dangerouslySetInnerHTML={{
-                    __html: `
-                      window.dataLayer = window.dataLayer || [];
-                      function gtag(){dataLayer.push(arguments);}
-                      gtag('js', new Date());
-                      gtag('config', '${process.env.NEXT_PUBLIC_GA_ID}');
-                    `,
-                  }}
-                />
-              </>
-            )}
+            <script
+              async
+              src={`https://www.googletagmanager.com/gtag/js?id=${process.env.NEXT_PUBLIC_GA_ID}`}
+            />
+            <script
+              dangerouslySetInnerHTML={{
+                __html: `
+                  window.dataLayer = window.dataLayer || [];
+                  function gtag(){dataLayer.push(arguments);}
+                  gtag('js', new Date());
+                  gtag('config', '${process.env.NEXT_PUBLIC_GA_ID}');
+                `,
+              }}
+            />
           </>
         )}
       </body>
