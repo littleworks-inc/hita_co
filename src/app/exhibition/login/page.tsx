@@ -1,12 +1,12 @@
 // src/app/exhibition/login/page.tsx
 // =====================================
-// 🔧 FIXED: Exhibition Staff Login - Prevents Redirect Loop
-// Now includes authentication check to prevent already logged-in users from accessing login page
+// 🔧 COMPLETELY FIXED: Exhibition Staff Login
+// NO authentication checking to prevent redirect loops
 // =====================================
 
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
@@ -30,37 +30,9 @@ export default function ExhibitionLoginPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
-  const [isCheckingAuth, setIsCheckingAuth] = useState(true)
   const router = useRouter()
 
-  // ✅ NEW: Check if user is already authenticated
-  useEffect(() => {
-    const checkExistingAuth = async () => {
-      try {
-        // Check if user has session cookies
-        const response = await fetch('/api/auth/session', {
-          method: 'GET',
-          credentials: 'include',
-        })
-        
-        if (response.ok) {
-          const data = await response.json()
-          if (data.authenticated) {
-            // User is already authenticated, redirect to exhibition portal
-            console.log('User already authenticated, redirecting to exhibition portal')
-            router.replace('/exhibition')
-            return
-          }
-        }
-      } catch (error) {
-        console.log('No existing authentication found')
-      } finally {
-        setIsCheckingAuth(false)
-      }
-    }
-
-    checkExistingAuth()
-  }, [router])
+  // ✅ NO useEffect, NO authentication checking, NO /api/auth/session calls
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -83,8 +55,7 @@ export default function ExhibitionLoginPage() {
         setSuccess('Login successful! Redirecting to exhibition portal...')
         // Small delay to show success message
         setTimeout(() => {
-          router.push('/exhibition')
-          router.refresh()
+          window.location.href = '/exhibition'  // Use window.location for reliable redirect
         }, 1000)
       } else {
         setError(data.error || 'Login failed. Please check your credentials.')
@@ -95,18 +66,6 @@ export default function ExhibitionLoginPage() {
     } finally {
       setIsLoading(false)
     }
-  }
-
-  // ✅ NEW: Show loading state while checking authentication
-  if (isCheckingAuth) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-600">Checking authentication...</p>
-        </div>
-      </div>
-    )
   }
 
   return (
@@ -253,66 +212,27 @@ export default function ExhibitionLoginPage() {
                 <p className="text-sm text-gray-600 mb-4">
                   Need help accessing your account?
                 </p>
-                <div className="space-y-2">
-                  <p className="text-xs text-gray-500">
-                    Contact your exhibition manager or administrator
-                  </p>
-                  <p className="text-xs text-gray-500">
-                    This is a secure staff-only portal
-                  </p>
-                </div>
+                <Link href="/exhibition/help">
+                  <Button variant="outline" size="sm">
+                    Contact Support
+                  </Button>
+                </Link>
               </div>
             </div>
-          </div>
 
-          {/* Mobile Admin Link */}
-          <div className="mt-6 text-center sm:hidden">
-            <Link 
-              href="/admin/login"
-              className="inline-flex items-center gap-2 px-4 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-white hover:shadow-sm rounded-lg transition-all"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              Switch to Admin Login
-            </Link>
+            {/* Mobile Back Link */}
+            <div className="sm:hidden mt-6 pt-6 border-t border-gray-200">
+              <Link 
+                href="/admin/login"
+                className="flex items-center justify-center gap-2 px-4 py-2 text-sm text-gray-600 hover:text-gray-900 rounded-md transition-colors"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                Back to Admin Login
+              </Link>
+            </div>
           </div>
         </div>
       </main>
-
-      {/* Footer */}
-      <footer className="bg-white border-t border-gray-200 px-4 py-4">
-        <div className="text-center">
-          <p className="text-xs text-gray-500">
-            © 2024 Hita&Co Exhibition Portal - Staff Access Only
-          </p>
-        </div>
-      </footer>
-
-      {/* Mobile-specific styles */}
-      <style jsx global>{`
-        /* Prevent zoom on inputs for better mobile UX */
-        input[type="email"],
-        input[type="password"] {
-          font-size: 16px;
-        }
-
-        /* Smooth touch scrolling */
-        * {
-          -webkit-overflow-scrolling: touch;
-        }
-
-        /* Touch-friendly button sizing */
-        button {
-          min-height: 44px;
-          min-width: 44px;
-        }
-
-        /* Focus styles for better accessibility */
-        input:focus,
-        button:focus {
-          outline: 2px solid #3b82f6;
-          outline-offset: 2px;
-        }
-      `}</style>
     </div>
   )
 }
