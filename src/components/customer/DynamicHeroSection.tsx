@@ -1,4 +1,4 @@
-// src/components/customer/DynamicHeroSection.tsx
+// src/components/customer/DynamicHeroSection.tsx - Responsive Version
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -137,7 +137,9 @@ export default function DynamicHeroSection({ storeSettings }: DynamicHeroSection
   if (loading) {
     return (
       <section className="relative overflow-hidden bg-white">
-        <div className="w-full h-[70vh] bg-gray-200 animate-pulse"></div>
+        <div className="w-full bg-gray-200 animate-pulse" style={{ aspectRatio: '16/9' }}>
+          <div className="h-full min-h-[50vh] sm:min-h-[60vh] lg:min-h-[70vh]"></div>
+        </div>
       </section>
     )
   }
@@ -150,77 +152,96 @@ export default function DynamicHeroSection({ storeSettings }: DynamicHeroSection
 
   return (
     <section 
-      className="relative overflow-hidden bg-white min-h-[70vh]"
+      className="relative overflow-hidden bg-gray-50 w-full"
       onMouseEnter={() => setIsPaused(true)}
       onMouseLeave={() => setIsPaused(false)}
     >
-      {/* Hero Background */}
-      <div className="absolute inset-0">
-        {currentSlideData.image ? (
-          <div className="absolute inset-0">
-            <Image
-              src={currentSlideData.image}
-              alt="Hero background"
-              fill
-              className="object-cover"
-              priority
-              sizes="100vw"
-            />
-          </div>
-        ) : (
-          // Fallback gradient when no image
-          <div className={`absolute inset-0 bg-gradient-to-br ${currentSlideData.gradient || 'from-purple-600 to-pink-600'}`}>
-            {/* Subtle background pattern */}
-            <div className="absolute inset-0 opacity-10">
-              <div className="absolute inset-0" style={{
-                backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23FFFFFF' fill-opacity='0.3'%3E%3Ccircle cx='30' cy='30' r='3'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
-              }} />
+      {/* Constrained container for hero content */}
+      <div className="relative w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+        {/* Hero Background with Responsive Height and Width Constraints */}
+        <div 
+          className="relative w-full h-[25vh] sm:h-[30vh] md:h-[35vh] lg:h-[40vh] xl:h-[45vh] 
+                     rounded-lg sm:rounded-xl lg:rounded-2xl overflow-hidden shadow-lg"
+        >
+          {currentSlideData.image ? (
+            // Image Background with Proper Scaling
+            <div className="absolute inset-0">
+              <Image
+                src={currentSlideData.image}
+                alt="Hero background"
+                fill
+                className="object-cover object-center"
+                priority
+                sizes="100vw"
+                quality={85}
+                style={{
+                  objectFit: 'cover',
+                  objectPosition: 'center'
+                }}
+                className="w-full h-full"
+              />
+              {/* Overlay for better content readability */}
+              <div className="absolute inset-0 bg-black/20"></div>
             </div>
-          </div>
+          ) : (
+            // Fallback gradient when no image with responsive scaling
+            <div className={`absolute inset-0 bg-gradient-to-br ${currentSlideData.gradient || 'from-purple-600 to-pink-600'}`}>
+              {/* Subtle background pattern that scales */}
+              <div 
+                className="absolute inset-0 opacity-10"
+                style={{
+                  backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23FFFFFF' fill-opacity='0.3'%3E%3Ccircle cx='30' cy='30' r='3'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
+                  backgroundSize: 'clamp(40px, 4vw, 80px)' // Responsive pattern size
+                }}
+              />
+            </div>
+          )}
+        </div>
+
+        {/* Navigation Controls - Only show if multiple slides */}
+        {slides.length > 1 && (
+          <>
+            {/* Slide Indicators - Responsive Positioning */}
+            <div className="absolute bottom-4 sm:bottom-6 lg:bottom-8 left-1/2 transform -translate-x-1/2 flex items-center space-x-3 sm:space-x-4 z-20">
+              {/* Previous Button - Responsive Size */}
+              <button
+                onClick={prevSlide}
+                className="p-2 sm:p-3 rounded-full bg-white/20 backdrop-blur-sm shadow-lg hover:bg-white/30 border border-white/30 transition-all duration-200 hover:scale-105"
+                aria-label="Previous slide"
+              >
+                <ChevronLeft className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
+              </button>
+
+              {/* Slide Indicators - Responsive Size */}
+              <div className="flex space-x-1.5 sm:space-x-2">
+                {slides.map((_, index) => (
+                  <button
+                    key={index}
+                    onClick={() => goToSlide(index)}
+                    className={`rounded-full transition-all duration-200 ${
+                      index === currentSlide
+                        ? 'bg-white scale-125 shadow-lg w-3 h-3 sm:w-4 sm:h-4'
+                        : 'bg-white/50 hover:bg-white/70 w-2.5 h-2.5 sm:w-3 sm:h-3'
+                    }`}
+                    aria-label={`Go to slide ${index + 1}`}
+                  />
+                ))}
+              </div>
+
+              {/* Next Button - Responsive Size */}
+              <button
+                onClick={nextSlide}
+                className="p-2 sm:p-3 rounded-full bg-white/20 backdrop-blur-sm shadow-lg hover:bg-white/30 border border-white/30 transition-all duration-200 hover:scale-105"
+                aria-label="Next slide"
+              >
+                <ChevronRight className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
+              </button>
+            </div>
+          </>
         )}
       </div>
 
-      {/* Navigation Controls - Only show if multiple slides */}
-      {slides.length > 1 && (
-        <>
-          {/* Slide Indicators - Bottom Center */}
-          <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 flex items-center space-x-4 z-20">
-            {/* Previous Button */}
-            <button
-              onClick={prevSlide}
-              className="p-2 rounded-full bg-white/20 backdrop-blur-sm shadow-lg hover:bg-white/30 border border-white/30 transition-all duration-200 hover:scale-105"
-              aria-label="Previous slide"
-            >
-              <ChevronLeft className="h-5 w-5 text-white" />
-            </button>
-
-            {/* Slide Indicators */}
-            <div className="flex space-x-2">
-              {slides.map((_, index) => (
-                <button
-                  key={index}
-                  onClick={() => goToSlide(index)}
-                  className={`w-3 h-3 rounded-full transition-all duration-200 ${
-                    index === currentSlide
-                      ? 'bg-white scale-125 shadow-lg'
-                      : 'bg-white/50 hover:bg-white/70'
-                  }`}
-                  aria-label={`Go to slide ${index + 1}`}
-                />
-              ))}
-            </div>
-
-            {/* Next Button */}
-            <button
-              onClick={nextSlide}
-              className="p-2 rounded-full bg-white/20 backdrop-blur-sm shadow-lg hover:bg-white/30 border border-white/30 transition-all duration-200 hover:scale-105"
-              aria-label="Next slide"
-            >
-              <ChevronRight className="h-5 w-5 text-white" />
-            </button>
-          </div>
-        </>
-      )}
+      {/* Remove custom CSS - use Tailwind responsive classes only */}
     </section>
   )
 }

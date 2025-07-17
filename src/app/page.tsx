@@ -1,14 +1,18 @@
+// src/app/page.tsx - Updated with New Arrivals and Enhanced Featured Products
+
 import { Suspense } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { db } from '@/lib/db'
-import { isValidCurrency, SupportedCurrency } from '@/lib/currency'  // ✅ ADD: For layout fix
+import { isValidCurrency, SupportedCurrency } from '@/lib/currency'
 import { generateStoreMetadata, generateOrganizationJsonLd } from '@/lib/seo'
 import CustomerNavigation from '@/components/customer/CustomerNavigation'
 import ProductCard from '@/components/customer/ProductCard'
 import LoadingSpinner from '@/components/customer/LoadingSpinner'
 import CurrencyNotification from '@/components/customer/CurrencyNotification'
-import DynamicHeroSection from '@/components/customer/DynamicHeroSection' // ✅ Import the updated clean component
+import DynamicHeroSection from '@/components/customer/DynamicHeroSection'
+import NewArrivals from '@/components/customer/NewArrivals'
+import EnhancedFeaturedProducts from '@/components/customer/EnhancedFeaturedProducts'
 import {
   Star,
   Truck,
@@ -59,11 +63,12 @@ async function getStoreSettings() {
 
 // ✅ NEW: Helper function to convert for ProductCard (only needs specific fields)
 function convertForProductCard(storeSettings: Awaited<ReturnType<typeof getStoreSettings>>) {
-  if (!storeSettings) return undefined
+  if (!storeSettings) return null
   
   return {
-    disableShoppingCart: storeSettings.disableShoppingCart,
-    catalogModeSettings: storeSettings.catalogModeSettings
+    storeName: storeSettings.storeName,
+    primaryColor: storeSettings.primaryColor,
+    disableShoppingCart: storeSettings.disableShoppingCart
   }
 }
 
@@ -211,7 +216,7 @@ async function CategoryShowcase() {
   )
 }
 
-// Dynamic Featured Products - ✅ FIXED: Updated to use helper function
+// Dynamic Featured Products - ✅ EXISTING: Updated to use helper function
 async function FeaturedProducts({ storeSettings }: { storeSettings: Awaited<ReturnType<typeof getStoreSettings>> }) {
   const products = await getFeaturedProducts()
   const storeSettingsForProductCard = convertForProductCard(storeSettings) // ✅ Convert inside component
@@ -226,10 +231,10 @@ async function FeaturedProducts({ storeSettings }: { storeSettings: Awaited<Retu
           </p>
           <Link
             href="/products"
-            className="inline-flex items-center gap-2 bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 transition-colors"
+            className="inline-flex items-center gap-2 bg-purple-600 text-white px-8 py-4 rounded-lg hover:bg-purple-700 transition-colors font-medium text-lg"
           >
-            View All Products
-            <ArrowRight className="h-4 w-4" />
+            Browse All Products
+            <ArrowRight className="h-5 w-5" />
           </Link>
         </div>
       </section>
@@ -240,32 +245,30 @@ async function FeaturedProducts({ storeSettings }: { storeSettings: Awaited<Retu
     <section className="py-16 bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-12">
-          <div className="flex items-center justify-center gap-2 mb-4">
-            <Star className="h-6 w-6 text-purple-600" />
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-900">Featured Products</h2>
-            <Sparkles className="h-6 w-6 text-purple-600" />
-          </div>
+          <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
+            Featured Products
+          </h2>
           <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-            Discover our handpicked selection from {storeSettings?.storeName}
+            Discover our handpicked selection of exceptional products from {storeSettings?.storeName || 'our collection'}
           </p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
           {products.map((product) => (
-            <ProductCard
-              key={product.id}
+            <ProductCard 
+              key={product.id} 
               product={{
                 ...product,
                 shortDescription: product.shortDescription || undefined  // ✅ Convert null to undefined
-              }}
-              storeSettings={storeSettingsForProductCard} // ✅ Now properly typed for ProductCard interface
+              }} 
+              storeSettings={storeSettingsForProductCard}  // ✅ Use helper function
             />
           ))}
         </div>
 
-        <div className="text-center mt-12">
+        <div className="text-center">
           <Link
-            href="/products?isFeatured=true"
+            href="/products?featured=true"
             className="inline-flex items-center gap-2 bg-purple-600 text-white px-8 py-4 rounded-lg hover:bg-purple-700 transition-colors font-medium text-lg"
           >
             View All Featured Products
@@ -277,66 +280,16 @@ async function FeaturedProducts({ storeSettings }: { storeSettings: Awaited<Retu
   )
 }
 
-// Dynamic Trust Indicators - Uses existing store settings
+// Dynamic Trust Indicators
 function DynamicTrustIndicators({ storeSettings }: { storeSettings: Awaited<ReturnType<typeof getStoreSettings>> }) {
-  const storeName = storeSettings?.storeName || 'our store'
-  const isECommerceMode = !storeSettings?.disableShoppingCart
-
-  // Create dynamic trust badges based on your existing fields
-  const trustBadges = [
-    {
-      icon: Shield,
-      title: 'Secure Shopping',
-      description: `Safe and secure transactions at ${storeName}`,
-      color: 'text-green-600'
-    },
-    {
-      icon: isECommerceMode ? Truck : Users,
-      title: isECommerceMode ? 'Fast Delivery' : 'Expert Service',
-      description: isECommerceMode ? 'Quick and reliable shipping' : 'Personalized customer service',
-      color: 'text-blue-600'
-    },
-    {
-      icon: Award,
-      title: 'Quality Guarantee',
-      description: `Premium quality products from ${storeName}`,
-      color: 'text-purple-600'
-    }
-  ]
-
-  return (
-    <section className="py-12 bg-white border-t border-gray-100">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {trustBadges.map((badge, index) => {
-            const Icon = badge.icon
-            return (
-              <div key={index} className="text-center">
-                <div className="mb-4">
-                  <Icon className={`h-12 w-12 mx-auto ${badge.color}`} />
-                </div>
-                <h3 className="font-semibold text-gray-900 mb-2">{badge.title}</h3>
-                <p className="text-sm text-gray-600">{badge.description}</p>
-              </div>
-            )
-          })}
-        </div>
-      </div>
-    </section>
-  )
-}
-
-// Dynamic Store Highlights
-function StoreHighlights({ storeSettings }: { storeSettings: Awaited<ReturnType<typeof getStoreSettings>> }) {
-  const storeName = storeSettings?.storeName || 'Our Store'
   const primaryColor = storeSettings?.primaryColor || '#7c3aed'
 
   return (
-    <section className="py-16 bg-gradient-to-br from-gray-50 to-purple-50">
+    <section className="py-16 bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-12">
           <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
-            Why Choose {storeName}?
+            Why Choose {storeSettings?.storeName || 'Us'}?
           </h2>
           <p className="text-lg text-gray-600 max-w-2xl mx-auto">
             {storeSettings?.tagline || 'We are committed to bringing you the best products and service'}
@@ -368,7 +321,57 @@ function StoreHighlights({ storeSettings }: { storeSettings: Awaited<ReturnType<
   )
 }
 
-// ✅ MAIN HOME PAGE COMPONENT - Uses the clean DynamicHeroSection
+// Store Highlights Section
+function StoreHighlights({ storeSettings }: { storeSettings: Awaited<ReturnType<typeof getStoreSettings>> }) {
+  const primaryColor = storeSettings?.primaryColor || '#7c3aed'
+
+  return (
+    <section className="py-16 bg-white">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {[
+            {
+              icon: Truck,
+              title: 'Free Shipping',
+              description: 'Free shipping on orders over $100 worldwide',
+              color: 'green'
+            },
+            {
+              icon: Shield,
+              title: 'Secure Payment',
+              description: '100% secure payment processing',
+              color: 'blue'
+            },
+            {
+              icon: Heart,
+              title: '24/7 Support',
+              description: 'Dedicated customer support team',
+              color: 'purple'
+            }
+          ].map((item, index) => {
+            const Icon = item.icon
+            return (
+              <div key={index} className="flex items-center gap-4 p-6 border border-gray-200 rounded-xl hover:shadow-lg transition-all duration-300">
+                <div
+                  className="w-12 h-12 rounded-full flex items-center justify-center text-white"
+                  style={{ backgroundColor: primaryColor }}
+                >
+                  <Icon className="h-6 w-6" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-gray-900 mb-1">{item.title}</h3>
+                  <p className="text-sm text-gray-600">{item.description}</p>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    </section>
+  )
+}
+
+// ✅ MAIN HOME PAGE COMPONENT - Now with New Arrivals and Enhanced Featured Products
 export default async function HomePage() {
   const storeSettingsRaw = await getStoreSettings() // ✅ Returns StoreSettings | null for SEO and most components
 
@@ -382,17 +385,22 @@ export default async function HomePage() {
 
       {/* Main Content */}
       <main>
-        {/* ✅ CLEAN: Dynamic Hero Section - Now uses the updated clean component */}
+        {/* ✅ UPDATED: Dynamic Hero Section - Now uses database slides */}
         <DynamicHeroSection storeSettings={storeSettingsRaw} />
 
-        {/* Category Showcase */}
+        {/* Category Showcase - MOVED TO SECOND POSITION */}
         <Suspense fallback={<LoadingSpinner size="lg" text="Loading categories..." />}>
           <CategoryShowcase />
         </Suspense>
 
-        {/* Featured Products */}
+        {/* ✅ NEW: New Arrivals Section - MOVED TO THIRD POSITION */}
+        <Suspense fallback={<LoadingSpinner size="lg" text="Loading new arrivals..." />}>
+          <NewArrivals storeSettings={convertForProductCard(storeSettingsRaw)} />
+        </Suspense>
+
+        {/* ✅ NEW: Enhanced Featured Products Section - MOVED TO FOURTH POSITION */}
         <Suspense fallback={<LoadingSpinner size="lg" text="Loading featured products..." />}>
-          <FeaturedProducts storeSettings={storeSettingsRaw} />
+          <EnhancedFeaturedProducts storeSettings={convertForProductCard(storeSettingsRaw)} />
         </Suspense>
 
         {/* Trust Indicators - Uses raw version */}

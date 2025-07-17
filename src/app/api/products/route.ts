@@ -1,15 +1,13 @@
-// src/app/api/products/route.ts
-// ✅ FIXED: Properly handle dynamic server usage for query parameters
-
+// src/app/api/products/route.ts - FIXED with all required fields for ProductCard
 import { NextRequest, NextResponse } from 'next/server'
 import { db, buildSafeDb } from '@/lib/db'
 
-// ✅ IMPORTANT: Mark as dynamic since we use request.url for query params
+// Mark as dynamic since we use request.url for query params
 export const dynamic = 'force-dynamic'
 
 export async function GET(request: NextRequest) {
   try {
-    // ✅ SAFE: Access URL after marking as dynamic
+    // Access URL after marking as dynamic
     const { searchParams } = new URL(request.url)
     
     // Extract query parameters
@@ -19,6 +17,7 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get('search')
     const sort = searchParams.get('sort') || 'newest'
     const featured = searchParams.get('featured') === 'true'
+    const status = searchParams.get('status') || 'PUBLISHED' // Default to published
 
     // Validate parameters
     const validatedPage = Math.max(1, page)
@@ -27,7 +26,9 @@ export async function GET(request: NextRequest) {
 
     // Build where clause
     const whereConditions: any = {
-      status: 'PUBLISHED'
+      status: status, // Use the status parameter
+      isActive: true,
+      stockQuantity: { gt: 0 } // Only show products with stock > 0
     }
 
     if (category) {
@@ -71,24 +72,39 @@ export async function GET(request: NextRequest) {
         orderBy = { createdAt: 'desc' }
     }
 
-    // ✅ SAFE: Use build-safe database operations
+    // Execute queries with all required fields for ProductCard
     const [products, totalCount] = await Promise.all([
       buildSafeDb.execute(
         () => db.product.findMany({
           where: whereConditions,
           select: {
             id: true,
-            name: true,
             sku: true,
+            name: true,
+            shortDescription: true,
             sellingPriceUSD: true,
+            discountPercentage: true,
+            showDiscountToCustomers: true,
             images: true,
-            isFeatured: true,
             stockQuantity: true,
+            isFeatured: true,
+            status: true,
+            createdAt: true,
+            // Include category relation with all required fields
             category: {
               select: {
                 id: true,
                 name: true,
                 slug: true
+              }
+            },
+            // Include country relation with all required fields
+            country: {
+              select: {
+                id: true,
+                name: true,
+                currency: true,
+                currencySymbol: true
               }
             }
           },
@@ -105,20 +121,20 @@ export async function GET(request: NextRequest) {
     ])
 
     // Calculate pagination info
-    const totalPages = Math.ceil((totalCount || 0) / validatedLimit)
+    const totalPages = Math.ceil(totalCount / validatedLimit)
     const hasNextPage = validatedPage < totalPages
     const hasPrevPage = validatedPage > 1
 
+    // Return properly formatted response
     return NextResponse.json({
-      success: true,
-      products: products || [],
+      products,
       pagination: {
-        currentPage: validatedPage,
+        page: validatedPage,
+        limit: validatedLimit,
+        totalCount,
         totalPages,
-        totalCount: totalCount || 0,
         hasNextPage,
-        hasPrevPage,
-        limit: validatedLimit
+        hasPrevPage
       },
       filters: {
         category,
@@ -130,38 +146,20 @@ export async function GET(request: NextRequest) {
 
   } catch (error) {
     console.error('Products API error:', error)
-
-    return NextResponse.json({
-      success: false,
-      error: 'Failed to fetch products',
-      products: [],
-      pagination: {
-        currentPage: 1,
-        totalPages: 0,
-        totalCount: 0,
-        hasNextPage: false,
-        hasPrevPage: false,
-        limit: 12
-      }
-    }, { status: 500 })
-  }
-}
-
-// ✅ Also handle POST requests for creating products (admin only)
-export async function POST(request: NextRequest) {
-  try {
-    // This would handle product creation
-    // For now, return method not allowed for public API
-    return NextResponse.json({
-      success: false,
-      error: 'Method not allowed for public API'
-    }, { status: 405 })
-
-  } catch (error) {
-    console.error('Products POST error:', error)
-    return NextResponse.json({
-      success: false,
-      error: 'Internal server error'
-    }, { status: 500 })
+    return NextResponse.json(
+      { 
+        error: 'Failed to fetch products',
+        products: [],
+        pagination: {
+          page: 1,
+          limit: 12,
+          totalCount: 0,
+          totalPages: 0,
+          hasNextPage: false,
+          hasPrevPage: false
+        }
+      },
+      { status: 500 }
+    )
   }
 }
