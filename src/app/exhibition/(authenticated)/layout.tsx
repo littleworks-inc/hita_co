@@ -1,13 +1,12 @@
-// src/app/exhibition/layout.tsx
+// src/app/exhibition/(authenticated)/layout.tsx
 // =====================================
-// 🔧 FIXED: Exhibition Portal Layout - Excludes Login Pages
-// Prevents redirect loops by not applying authentication to login pages
+// 🔧 FIXED: Move exhibition layout to route group
+// This prevents it from applying to login pages
 // =====================================
 
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import { redirect } from 'next/navigation'
-import { headers } from 'next/headers'
 import { getSession } from '@/lib/auth'
 import { db } from '@/lib/db'
 
@@ -23,14 +22,14 @@ export const metadata: Metadata = {
     template: '%s | Exhibition Portal'
   },
   description: 'Mobile POS system for exhibition sales',
-  robots: 'noindex, nofollow', // Exhibition portal should not be indexed
+  robots: 'noindex, nofollow',
 }
 
 export const viewport = {
   width: 'device-width',
   initialScale: 1,
   maximumScale: 1,
-  userScalable: false, // Prevent zoom on mobile for POS use
+  userScalable: false,
 }
 
 interface ExhibitionLayoutProps {
@@ -72,22 +71,8 @@ async function getExhibitionCounts() {
   }
 }
 
-export default async function ExhibitionLayout({ children }: ExhibitionLayoutProps) {
-  // ✅ CRITICAL FIX: Create a wrapper component to handle route detection
-  return <ExhibitionLayoutWrapper>{children}</ExhibitionLayoutWrapper>
-}
-
-// Client-side wrapper to detect route and apply appropriate layout
-function ExhibitionLayoutWrapper({ children }: { children: React.ReactNode }) {
-  // This will be handled by middleware, but we need a fallback approach
-  // Since we can't easily detect the route in server components without headers
-  // Let's create separate layout files instead
-  return <ExhibitionAuthenticatedLayout>{children}</ExhibitionAuthenticatedLayout>
-}
-
-async function ExhibitionAuthenticatedLayout({ children }: { children: React.ReactNode }) {
-
-  // ✅ For all other exhibition pages, check authentication
+export default async function ExhibitionAuthenticatedLayout({ children }: ExhibitionLayoutProps) {
+  // ✅ This layout only applies to authenticated exhibition routes
   const session = await getSession()
   
   if (!session) {
