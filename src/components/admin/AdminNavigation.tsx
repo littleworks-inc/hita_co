@@ -1,4 +1,4 @@
-// Updated src/components/admin/AdminNavigation.tsx - ADD SHIPPING MENU ITEM
+// Updated src/components/admin/AdminNavigation.tsx - ADD HERO SLIDES MENU ITEM
 
 'use client'
 
@@ -21,17 +21,19 @@ import {
   Building2,
   FolderTree,
   Share2,
-  Truck // ✅ NEW - Shipping icon
+  Truck,
+  ImageIcon // ✅ NEW - Hero Slides icon
 } from 'lucide-react'
 
-// ✅ UPDATED NAVIGATION ARRAY - Add shipping menu item
+// ✅ UPDATED NAVIGATION ARRAY - Add hero slides menu item
 const navigation = [
   { name: 'Dashboard', href: '/admin/dashboard', icon: LayoutDashboard },
   { name: 'Products', href: '/admin/products', icon: Package },
   { name: 'Categories', href: '/admin/categories', icon: FolderTree },
   { name: 'Suppliers', href: '/admin/suppliers', icon: Building2 },
   { name: 'Orders', href: '/admin/orders', icon: ShoppingCart },
-  { name: 'Shipping', href: '/admin/shipping', icon: Truck }, // ✅ NEW - Shipping menu item
+  { name: 'Shipping', href: '/admin/shipping', icon: Truck },
+  { name: 'Hero Slides', href: '/admin/hero-slides', icon: ImageIcon }, // ✅ NEW - Hero Slides menu item
   { name: 'Exhibitions', href: '/admin/exhibitions', icon: Calendar },
   { name: 'Social Media', href: '/admin/social', icon: Share2 },
   { name: 'Analytics', href: '/admin/analytics', icon: BarChart3 },

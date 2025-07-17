@@ -1,6 +1,3 @@
-// src/app/page.tsx - FIXED: StoreSettings Type Compatibility
-// ✅ Convert database null values to undefined for component compatibility
-
 import { Suspense } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -11,6 +8,7 @@ import CustomerNavigation from '@/components/customer/CustomerNavigation'
 import ProductCard from '@/components/customer/ProductCard'
 import LoadingSpinner from '@/components/customer/LoadingSpinner'
 import CurrencyNotification from '@/components/customer/CurrencyNotification'
+import DynamicHeroSection from '@/components/customer/DynamicHeroSection' // ✅ NEW: Import dynamic hero component
 import {
   Star,
   Truck,
@@ -155,119 +153,7 @@ async function getCategories() {
   })
 }
 
-// Dynamic Hero Section - Uses only existing database fields
-function DynamicHeroSection({ storeSettings }: { storeSettings: Awaited<ReturnType<typeof getStoreSettings>> }) {
-  const storeName = storeSettings?.storeName || 'Your Store'
-  const tagline = storeSettings?.tagline || 'Quality Products'
-  const primaryColor = storeSettings?.primaryColor || '#7c3aed'
-  const accentColor = storeSettings?.accentColor || '#ec4899'
-  const logo = storeSettings?.logo
-
-  // Create dynamic content from existing fields
-  const heroTitle = `Welcome to ${storeName}`
-  const heroSubtitle = tagline
-  const heroDescription = `Discover the finest collection at ${storeName}. ${tagline ? tagline + '.' : ''} Each product is carefully selected to bring you quality, authenticity, and exceptional value.`
-  const isECommerceMode = !storeSettings?.disableShoppingCart
-
-  return (
-    <section
-      className="relative py-16 lg:py-20 text-white overflow-hidden"
-      style={{
-        background: `linear-gradient(135deg, ${primaryColor} 0%, ${accentColor} 100%)`
-      }}
-    >
-      {/* Background Pattern */}
-      <div className="absolute inset-0 opacity-10">
-        <div className="absolute inset-0" style={{
-          backgroundImage: 'radial-gradient(circle at 25% 25%, white 2px, transparent 2px)',
-          backgroundSize: '50px 50px'
-        }} />
-      </div>
-
-      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-          {/* Content Side */}
-          <div className="text-center lg:text-left">
-            <div className="mb-6">
-              <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-4 leading-tight">
-                {heroTitle.split(' ').map((word, index) => (
-                  <span key={index}>
-                    {word === storeName ? (
-                      <span className="bg-white bg-opacity-20 px-2 py-1 rounded-lg">
-                        {word}
-                      </span>
-                    ) : (
-                      word
-                    )}
-                    {index < heroTitle.split(' ').length - 1 && ' '}
-                  </span>
-                ))}
-              </h1>
-
-              <h2 className="text-xl md:text-2xl text-white/90 font-medium mb-6">
-                {heroSubtitle}
-              </h2>
-            </div>
-
-            <p className="text-lg text-white/80 leading-relaxed max-w-2xl mb-8">
-              {heroDescription}
-            </p>
-
-            {/* Dynamic Action Buttons */}
-            <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
-              <Link
-                href="/products"
-                className="inline-flex items-center gap-2 bg-white text-gray-900 px-8 py-4 rounded-full font-semibold text-lg hover:bg-gray-100 transition-all duration-300 shadow-lg"
-              >
-                <Package className="h-5 w-5" />
-                {isECommerceMode ? 'Shop Collection' : 'View Catalog'}
-                <ArrowRight className="h-5 w-5" />
-              </Link>
-
-              <Link
-                href="/categories"
-                className="inline-flex items-center gap-2 border-2 border-white text-white px-8 py-4 rounded-full font-semibold text-lg hover:bg-white hover:text-gray-900 transition-all duration-300"
-              >
-                <Eye className="h-5 w-5" />
-                Browse Categories
-              </Link>
-            </div>
-          </div>
-
-          {/* Visual Side */}
-          <div className="relative">
-            <div className="relative aspect-square lg:aspect-[4/5] rounded-3xl overflow-hidden shadow-2xl">
-              {logo ? (
-                <div className="w-full h-full flex items-center justify-center bg-white/10 backdrop-blur-sm">
-                  <Image
-                    src={logo}
-                    alt={storeName}
-                    width={300}
-                    height={300}
-                    className="max-w-xs max-h-xs object-contain"
-                  />
-                </div>
-              ) : (
-                <div className="w-full h-full bg-white/10 backdrop-blur-sm flex items-center justify-center">
-                  <div className="text-center">
-                    <div
-                      className="w-32 h-32 mx-auto mb-4 rounded-full flex items-center justify-center text-white text-4xl font-bold"
-                      style={{ backgroundColor: 'rgba(255,255,255,0.2)' }}
-                    >
-                      {storeName.charAt(0)}
-                    </div>
-                    <p className="text-xl font-medium text-white">{storeName}</p>
-                    <p className="text-white/80 mt-2">{tagline}</p>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-  )
-}
+// ✅ REMOVED: Old DynamicHeroSection function - now using imported component
 
 // Dynamic Category Showcase
 async function CategoryShowcase() {
@@ -498,7 +384,7 @@ export default async function HomePage() {
 
       {/* Main Content */}
       <main>
-        {/* Dynamic Hero Section - Uses raw version */}
+        {/* ✅ UPDATED: Dynamic Hero Section - Now uses database slides */}
         <DynamicHeroSection storeSettings={storeSettingsRaw} />
 
         {/* Category Showcase */}
@@ -528,31 +414,3 @@ export default async function HomePage() {
     </div>
   )
 }
-
-// =====================================
-// 🔧 WHAT WAS FIXED
-// =====================================
-
-/*
-✅ STORE SETTINGS TYPE ISSUE:
-- Created dual-approach system: getStoreSettings() returns null, convertStoreSettingsForComponents() returns undefined
-- SEO functions use raw version (with null), components use converted version (with undefined)
-- FeaturedProducts now receives storeSettings as prop instead of fetching separately
-- All type mismatches resolved
-
-✅ LAYOUT CURRENCY ISSUE (BONUS):
-- Added getInitialCurrencyData function for layout.tsx
-- Added necessary imports for currency validation
-- Uses admin currency setting from database
-
-✅ PRODUCT INTERFACE:
-- Already handled shortDescription null to undefined conversion
-- Maintains proper type safety throughout
-
-🎯 RESULT:
-- All TypeScript errors should be resolved
-- Homepage will load correctly with proper store settings
-- Admin currency settings will work in layout.tsx
-- Components receive the expected undefined values instead of null
-- SEO functions receive the expected null values
-*/

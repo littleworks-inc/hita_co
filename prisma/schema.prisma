@@ -557,3 +557,20 @@ model ConfigurationTemplate {
   
   @@map("configuration_templates")
 }
+
+model HeroSlide {
+  id              String    @id @default(cuid())
+  title           String    // Main headline text
+  subtitle        String?   // Secondary text
+  description     String?   // Supporting description
+  ctaText         String?   // Call-to-action button text
+  ctaLink         String?   // Call-to-action button link
+  image           String?   // Hero image URL
+  gradient        String?   // Fallback gradient (e.g., "from-purple-600 to-pink-600")
+  order           Int       @default(0)  // Display order (0 = first)
+  isActive        Boolean   @default(true)  // Can be enabled/disabled
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@map("hero_slides")
+}
