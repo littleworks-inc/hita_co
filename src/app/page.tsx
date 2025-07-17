@@ -8,7 +8,7 @@ import CustomerNavigation from '@/components/customer/CustomerNavigation'
 import ProductCard from '@/components/customer/ProductCard'
 import LoadingSpinner from '@/components/customer/LoadingSpinner'
 import CurrencyNotification from '@/components/customer/CurrencyNotification'
-import DynamicHeroSection from '@/components/customer/DynamicHeroSection' // ✅ NEW: Import dynamic hero component
+import DynamicHeroSection from '@/components/customer/DynamicHeroSection' // ✅ Import the updated clean component
 import {
   Star,
   Truck,
@@ -152,8 +152,6 @@ async function getCategories() {
     take: 6
   })
 }
-
-// ✅ REMOVED: Old DynamicHeroSection function - now using imported component
 
 // Dynamic Category Showcase
 async function CategoryShowcase() {
@@ -370,7 +368,7 @@ function StoreHighlights({ storeSettings }: { storeSettings: Awaited<ReturnType<
   )
 }
 
-// ✅ FIXED: Main Home Page Component - Now with proper type handling for BOTH SEO and components
+// ✅ MAIN HOME PAGE COMPONENT - Uses the clean DynamicHeroSection
 export default async function HomePage() {
   const storeSettingsRaw = await getStoreSettings() // ✅ Returns StoreSettings | null for SEO and most components
 
@@ -384,7 +382,7 @@ export default async function HomePage() {
 
       {/* Main Content */}
       <main>
-        {/* ✅ UPDATED: Dynamic Hero Section - Now uses database slides */}
+        {/* ✅ CLEAN: Dynamic Hero Section - Now uses the updated clean component */}
         <DynamicHeroSection storeSettings={storeSettingsRaw} />
 
         {/* Category Showcase */}
