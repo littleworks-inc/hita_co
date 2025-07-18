@@ -1,4 +1,4 @@
-// Updated src/components/admin/AdminNavigation.tsx - ADD HERO SLIDES MENU ITEM
+// Updated src/components/admin/AdminNavigation.tsx - ADD BARCODE PRINTING MENU ITEM
 
 'use client'
 
@@ -22,18 +22,20 @@ import {
   FolderTree,
   Share2,
   Truck,
-  ImageIcon // ✅ NEW - Hero Slides icon
+  ImageIcon, // ✅ EXISTING - Hero Slides icon
+  Printer // ✅ NEW - Barcode printing icon
 } from 'lucide-react'
 
-// ✅ UPDATED NAVIGATION ARRAY - Add hero slides menu item
+// ✅ UPDATED NAVIGATION ARRAY - Add barcode printing menu item
 const navigation = [
   { name: 'Dashboard', href: '/admin/dashboard', icon: LayoutDashboard },
   { name: 'Products', href: '/admin/products', icon: Package },
+  { name: 'Print Labels', href: '/admin/barcode-printing', icon: Printer }, // ✅ NEW - Barcode printing menu item
   { name: 'Categories', href: '/admin/categories', icon: FolderTree },
   { name: 'Suppliers', href: '/admin/suppliers', icon: Building2 },
   { name: 'Orders', href: '/admin/orders', icon: ShoppingCart },
   { name: 'Shipping', href: '/admin/shipping', icon: Truck },
-  { name: 'Hero Slides', href: '/admin/hero-slides', icon: ImageIcon }, // ✅ NEW - Hero Slides menu item
+  { name: 'Hero Slides', href: '/admin/hero-slides', icon: ImageIcon }, // ✅ EXISTING - Hero Slides menu item
   { name: 'Exhibitions', href: '/admin/exhibitions', icon: Calendar },
   { name: 'Social Media', href: '/admin/social', icon: Share2 },
   { name: 'Analytics', href: '/admin/analytics', icon: BarChart3 },

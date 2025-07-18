@@ -1,8 +1,12 @@
+// src/app/admin/products/[id]/edit/page.tsx
+// ✅ UPDATED: Added QuickBarcodePrinter integration
+
 import { redirect, notFound } from 'next/navigation'
 import { getSession } from '@/lib/auth'
 import { db } from '@/lib/db'
 import AdminNavigation from '@/components/admin/AdminNavigation'
 import ProductForm from '@/components/admin/ProductForm'
+import QuickBarcodePrinter from '@/components/admin/QuickBarcodePrinter' // ✅ NEW IMPORT
 import { ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui'
@@ -27,7 +31,7 @@ export default async function EditProductPage({ params }: EditProductPageProps) 
       category: true,
       country: true,
       supplier: true,
-      // ✅ ADD THIS: Include product sizes
+      // ✅ EXISTING: Include product sizes
       productSizes: {
         orderBy: {
           sortOrder: 'asc'
@@ -54,7 +58,7 @@ export default async function EditProductPage({ params }: EditProductPageProps) 
     })
   ])
 
-  // ✅ FIX: Convert null values to undefined for TypeScript compatibility
+  // ✅ EXISTING: Convert null values to undefined for TypeScript compatibility
   const suppliers = suppliersRaw.map(supplier => ({
     ...supplier,
     contactPerson: supplier.contactPerson ?? undefined,
@@ -76,7 +80,7 @@ export default async function EditProductPage({ params }: EditProductPageProps) 
     rating: supplier.rating ?? undefined,
   }))
 
-  // ✅ FIX: Convert product null values to strings for TypeScript compatibility
+  // ✅ EXISTING: Convert product null values to strings for TypeScript compatibility
   const productForForm = product ? {
     ...product,
     description: product.description || '',
@@ -91,12 +95,29 @@ export default async function EditProductPage({ params }: EditProductPageProps) 
     purchaseDate: product.purchaseDate?.toISOString().split('T')[0] || '',
   } : undefined
 
+  // ✅ NEW: Format product for QuickBarcodePrinter
+  const productForBarcode = {
+    id: product.id,
+    name: product.name,
+    sku: product.sku,
+    barcode: product.barcode || undefined,
+    sellingPriceUSD: product.sellingPriceUSD,
+    stockQuantity: product.stockQuantity,
+    category: { name: product.category.name },
+    requiresSizes: product.requiresSizes,
+    productSizes: product.productSizes.map(size => ({
+      size: size.size,
+      sku: size.sku,
+      stockQuantity: size.stockQuantity
+    }))
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       <AdminNavigation />
       
       <main className="lg:pl-64">
-        <div className="max-w-4xl mx-auto py-6 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8"> {/* ✅ WIDENED: Changed from max-w-4xl to max-w-7xl */}
           <div className="px-4 py-6 sm:px-0">
             {/* Header */}
             <div className="border-b border-gray-200 pb-5 mb-6">
@@ -118,14 +139,114 @@ export default async function EditProductPage({ params }: EditProductPageProps) 
               </div>
             </div>
 
-            {/* Product Form */}
-            <ProductForm 
-              categories={categories}
-              countries={countries}
-              suppliers={suppliers}
-              product={productForForm}
-              mode="edit"
-            />
+            {/* ✅ NEW: Two-column layout */}
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
+              
+              {/* Left Column: Product Form */}
+              <div className="xl:col-span-2">
+                <ProductForm 
+                  categories={categories}
+                  countries={countries}
+                  suppliers={suppliers}
+                  product={productForForm}
+                  mode="edit"
+                />
+              </div>
+
+              {/* ✅ NEW: Right Column: Barcode Printing */}
+              <div className="xl:col-span-1">
+                <div className="sticky top-6 space-y-6">
+                  
+                  {/* Quick Barcode Printer */}
+                  <QuickBarcodePrinter 
+                    product={productForBarcode}
+                    onBarcodeGenerated={async (newBarcode) => {
+                      // Update the product barcode in database
+                      try {
+                        const response = await fetch(`/api/admin/products/${product.id}`, {
+                          method: 'PATCH',
+                          headers: {
+                            'Content-Type': 'application/json',
+                          },
+                          body: JSON.stringify({ barcode: newBarcode }),
+                        })
+                        
+                        if (response.ok) {
+                          // Refresh the page to show updated barcode
+                          window.location.reload()
+                        }
+                      } catch (error) {
+                        console.error('Failed to update barcode:', error)
+                      }
+                    }}
+                  />
+
+                  {/* Product Quick Stats */}
+                  <div className="bg-white rounded-lg border p-4">
+                    <h3 className="font-medium text-gray-900 mb-3">Quick Stats</h3>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Status:</span>
+                        <span className={`font-medium ${
+                          product.status === 'PUBLISHED' ? 'text-green-600' :
+                          product.status === 'DRAFT' ? 'text-yellow-600' : 'text-gray-600'
+                        }`}>
+                          {product.status}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Category:</span>
+                        <span className="font-medium">{product.category.name}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Stock:</span>
+                        <span className={`font-medium ${
+                          product.stockQuantity > product.lowStockAlert ? 'text-green-600' :
+                          product.stockQuantity > 0 ? 'text-yellow-600' : 'text-red-600'
+                        }`}>
+                          {product.stockQuantity} units
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Price:</span>
+                        <span className="font-medium text-green-600">
+                          ${product.sellingPriceUSD.toFixed(2)}
+                        </span>
+                      </div>
+                      {product.requiresSizes && (
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Sizes:</span>
+                          <span className="font-medium">
+                            {product.productSizes.length} variants
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Quick Actions */}
+                  <div className="bg-white rounded-lg border p-4">
+                    <h3 className="font-medium text-gray-900 mb-3">Quick Actions</h3>
+                    <div className="space-y-2">
+                      <Link href={`/admin/products/${product.id}`} className="block">
+                        <Button variant="outline" size="sm" className="w-full justify-start">
+                          View Product Details
+                        </Button>
+                      </Link>
+                      {product.status === 'DRAFT' && (
+                        <Button variant="outline" size="sm" className="w-full justify-start">
+                          Publish Product
+                        </Button>
+                      )}
+                      <Button variant="outline" size="sm" className="w-full justify-start">
+                        Duplicate Product
+                      </Button>
+                    </div>
+                  </div>
+
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </main>
