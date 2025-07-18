@@ -9,6 +9,47 @@ import { getSession } from '@/lib/auth'
 import { db } from '@/lib/db'
 
 // =====================================
+// 🔄 TYPE DEFINITIONS FOR SHARED STOCK
+// =====================================
+
+interface ExhibitionProductForAnalytics {
+  id: string
+  quantityTaken: number
+  quantitySold: number
+  originalPrice: number | null
+  exhibitionPrice: number | null
+  isClearance: boolean
+  productId: string
+  product: {
+    requiresSizes: boolean
+    stockQuantity: number
+    productSizes?: {
+      stockQuantity: number
+      isActive: boolean
+    }[]
+  }
+  sharedStockInfo?: {
+    totalInventory: number
+    totalSoldAllChannels: number
+    sharedAvailableStock: number
+    exhibitionAllocated: number
+    exhibitionSold: number
+    exhibitionRemaining: number
+    canStillSellFromSharedStock: boolean
+    soldOnlineEstimate: number
+    stockUtilization: number
+  }
+}
+
+interface OrderItemForStock {
+  quantity: number
+}
+
+interface ExhibitionSaleItemForStock {
+  quantity: number
+}
+
+// =====================================
 // 🔄 NEW: SHARED STOCK CALCULATION HELPER
 // =====================================
 async function calculateTotalSoldAcrossChannels(productId: string, sizeId?: string): Promise<number> {
@@ -24,7 +65,7 @@ async function calculateTotalSoldAcrossChannels(productId: string, sizeId?: stri
     select: { quantity: true }
   })
   
-  const soldToCustomers = customerOrderItems.reduce((sum, item) => sum + item.quantity, 0)
+  const soldToCustomers = customerOrderItems.reduce((sum: number, item: OrderItemForStock) => sum + item.quantity, 0)
 
   // Calculate sales from exhibitions (POS channel)
   const exhibitionSaleItems = await db.exhibitionSaleItem.findMany({
@@ -35,7 +76,7 @@ async function calculateTotalSoldAcrossChannels(productId: string, sizeId?: stri
     select: { quantity: true }
   })
   
-  const soldAtExhibitions = exhibitionSaleItems.reduce((sum, item) => sum + item.quantity, 0)
+  const soldAtExhibitions = exhibitionSaleItems.reduce((sum: number, item: ExhibitionSaleItemForStock) => sum + item.quantity, 0)
 
   return soldToCustomers + soldAtExhibitions
 }
@@ -444,7 +485,7 @@ export async function GET(
         // Calculate available stock (shared across all channels)
         const product = ep.product
         const totalInventory = product.requiresSizes 
-          ? product.productSizes.reduce((sum, size) => sum + size.stockQuantity, 0)
+          ? product.productSizes?.reduce((sum: number, size: { stockQuantity: number, isActive: boolean }) => sum + size.stockQuantity, 0) || 0
           : product.stockQuantity
         
         const sharedAvailableStock = Math.max(0, totalInventory - totalSoldAllChannels)
@@ -493,31 +534,31 @@ export async function GET(
     // Calculate summary with shared stock insights
     const summary = {
       totalProducts: exhibitionProducts.length,
-      totalQuantityAllocated: exhibitionProducts.reduce((sum, ep) => sum + ep.quantityTaken, 0),
-      totalQuantitySoldAtExhibition: exhibitionProducts.reduce((sum, ep) => sum + ep.quantitySold, 0),
-      totalValue: exhibitionProducts.reduce((sum, ep) => {
+      totalQuantityAllocated: exhibitionProducts.reduce((sum: number, ep: any) => sum + ep.quantityTaken, 0),
+      totalQuantitySoldAtExhibition: exhibitionProducts.reduce((sum: number, ep: any) => sum + ep.quantitySold, 0),
+      totalValue: exhibitionProducts.reduce((sum: number, ep: any) => {
         const originalPrice = ep.originalPrice ?? 0
         return sum + (originalPrice * ep.quantityTaken)
       }, 0),
-      totalRevenue: exhibitionProducts.reduce((sum, ep) => {
+      totalRevenue: exhibitionProducts.reduce((sum: number, ep: any) => {
         const originalPrice = ep.originalPrice ?? 0
         const exhibitionPrice = ep.exhibitionPrice ?? originalPrice
         return sum + (exhibitionPrice * ep.quantitySold)
       }, 0),
-      clearanceProducts: exhibitionProducts.filter(ep => ep.isClearance).length,
-      customPricedProducts: exhibitionProducts.filter(ep =>
+      clearanceProducts: exhibitionProducts.filter((ep: any) => ep.isClearance).length,
+      customPricedProducts: exhibitionProducts.filter((ep: any) =>
         ep.exhibitionPrice !== null &&
         ep.originalPrice !== null &&
         ep.exhibitionPrice !== ep.originalPrice
       ).length,
-      productsFullySoldAtExhibition: exhibitionProducts.filter(ep => ep.quantityTaken <= ep.quantitySold).length,
+      productsFullySoldAtExhibition: exhibitionProducts.filter((ep: any) => ep.quantityTaken <= ep.quantitySold).length,
       
       // 🔄 NEW: Shared stock summary
       sharedStockSummary: {
         totalProductsInSharedPool: enhancedProducts.length,
-        productsWithSharedStockAvailable: enhancedProducts.filter(ep => ep.sharedStockInfo.sharedAvailableStock > 0).length,
+        productsWithSharedStockAvailable: enhancedProducts.filter((ep: ExhibitionProductForAnalytics) => ep.sharedStockInfo?.sharedAvailableStock && ep.sharedStockInfo.sharedAvailableStock > 0).length,
         averageStockUtilization: enhancedProducts.length > 0 
-          ? enhancedProducts.reduce((sum, ep) => sum + ep.sharedStockInfo.stockUtilization, 0) / enhancedProducts.length 
+          ? enhancedProducts.reduce((sum: number, ep: ExhibitionProductForAnalytics) => sum + (ep.sharedStockInfo?.stockUtilization || 0), 0) / enhancedProducts.length 
           : 0
       }
     }
