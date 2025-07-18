@@ -1,12 +1,105 @@
 // =====================================
-// src/app/api/admin/exhibitions/[id]/products/route.ts - COMPLETE
-// Enhanced to support size-based product additions
+// src/app/api/admin/exhibitions/[id]/products/route.ts - SHARED STOCK SYSTEM
+// 🔄 MODIFIED: Implements shared stock - exhibition allocation doesn't reduce customer stock
+// 📊 ENHANCED: Adds sales channel tracking for analytics
 // =====================================
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth'
 import { db } from '@/lib/db'
 
+// =====================================
+// 🔄 NEW: SHARED STOCK CALCULATION HELPER
+// =====================================
+async function calculateTotalSoldAcrossChannels(productId: string, sizeId?: string): Promise<number> {
+  // Calculate sales from customer orders (online channel)
+  const customerOrderItems = await db.orderItem.findMany({
+    where: {
+      productId,
+      ...(sizeId && { productSizeId: sizeId }),
+      order: {
+        status: { not: 'CANCELLED' }
+      }
+    },
+    select: { quantity: true }
+  })
+  
+  const soldToCustomers = customerOrderItems.reduce((sum, item) => sum + item.quantity, 0)
+
+  // Calculate sales from exhibitions (POS channel)
+  const exhibitionSaleItems = await db.exhibitionSaleItem.findMany({
+    where: {
+      productId,
+      ...(sizeId && { productSizeId: sizeId })
+    },
+    select: { quantity: true }
+  })
+  
+  const soldAtExhibitions = exhibitionSaleItems.reduce((sum, item) => sum + item.quantity, 0)
+
+  return soldToCustomers + soldAtExhibitions
+}
+
+// =====================================
+// 🔄 NEW: SHARED STOCK AVAILABILITY CHECK
+// =====================================
+async function checkSharedStockAvailability(
+  productId: string, 
+  requestedQuantity: number, 
+  sizeAllocations?: Array<{ sizeId: string, quantity: number }>
+): Promise<{ available: boolean, details: string }> {
+  
+  if (sizeAllocations) {
+    // Check each size separately
+    for (const allocation of sizeAllocations) {
+      const productSize = await db.productSize.findUnique({
+        where: { id: allocation.sizeId },
+        select: { stockQuantity: true, size: true }
+      })
+      
+      if (!productSize) {
+        return { available: false, details: `Size not found` }
+      }
+      
+      const totalSoldThisSize = await calculateTotalSoldAcrossChannels(productId, allocation.sizeId)
+      const availableThisSize = productSize.stockQuantity - totalSoldThisSize
+      
+      if (allocation.quantity > availableThisSize) {
+        return { 
+          available: false, 
+          details: `Size ${productSize.size}: Only ${availableThisSize} available, requested ${allocation.quantity}` 
+        }
+      }
+    }
+    return { available: true, details: 'All size allocations available' }
+  } else {
+    // Check main product
+    const product = await db.product.findUnique({
+      where: { id: productId },
+      select: { stockQuantity: true, name: true }
+    })
+    
+    if (!product) {
+      return { available: false, details: 'Product not found' }
+    }
+    
+    const totalSold = await calculateTotalSoldAcrossChannels(productId)
+    const availableStock = product.stockQuantity - totalSold
+    
+    if (requestedQuantity > availableStock) {
+      return { 
+        available: false, 
+        details: `Only ${availableStock} available (${totalSold} sold across all channels), requested ${requestedQuantity}` 
+      }
+    }
+    
+    return { available: true, details: `${availableStock} available for allocation` }
+  }
+}
+
+// =====================================
+// POST - ADD PRODUCT TO EXHIBITION (SHARED STOCK)
+// =====================================
 export async function POST(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -21,7 +114,8 @@ export async function POST(
 
     // Validate exhibition exists
     const exhibition = await db.exhibition.findUnique({
-      where: { id: exhibitionId }
+      where: { id: exhibitionId },
+      select: { id: true, title: true, isActive: true }
     })
 
     if (!exhibition) {
@@ -32,7 +126,7 @@ export async function POST(
     const data = await request.json()
     const { productId, quantityTaken, sizes } = data
 
-    console.log('Received data:', { productId, quantityTaken, sizes })
+    console.log('🔄 SHARED STOCK: Allocating product to exhibition:', { productId, quantityTaken, sizes })
 
     // Validate required fields
     if (!productId) {
@@ -46,7 +140,12 @@ export async function POST(
     const product = await db.product.findUnique({
       where: { id: productId },
       include: {
-        productSizes: true
+        category: true,
+        country: true,
+        productSizes: {
+          where: { isActive: true },
+          orderBy: { sortOrder: 'asc' }
+        }
       }
     })
 
@@ -76,9 +175,12 @@ export async function POST(
       )
     }
 
-    // ✅ ENHANCED: Handle both sized and non-sized products
+    // =====================================
+    // 🔄 SHARED STOCK IMPLEMENTATION
+    // =====================================
+    
     if (product.requiresSizes) {
-      // ✅ SIZE-BASED PRODUCT ADDITION
+      // ✅ SIZE-BASED PRODUCT ALLOCATION (SHARED STOCK)
       if (!sizes || !Array.isArray(sizes) || sizes.length === 0) {
         return NextResponse.json(
           { error: 'Size selections are required for this product' },
@@ -86,9 +188,8 @@ export async function POST(
         )
       }
 
-      console.log('Processing sized product with sizes:', sizes)
-
-      // Validate each size selection
+      // Validate size selections and prepare allocation data
+      const sizeAllocations = []
       for (const sizeSelection of sizes) {
         const { productSizeId, quantityTaken: sizeQuantity } = sizeSelection
 
@@ -99,15 +200,8 @@ export async function POST(
           )
         }
 
-        // Validate the product size exists and has enough stock
-        const productSize = await db.productSize.findFirst({
-          where: {
-            id: productSizeId,
-            productId: productId,
-            isActive: true
-          }
-        })
-
+        // Validate the product size exists
+        const productSize = product.productSizes.find(ps => ps.id === productSizeId)
         if (!productSize) {
           return NextResponse.json(
             { error: `Invalid size selection for product` },
@@ -115,18 +209,26 @@ export async function POST(
           )
         }
 
-        if (sizeQuantity > productSize.stockQuantity) {
-          return NextResponse.json(
-            { error: `Cannot take ${sizeQuantity} of size ${productSize.size}. Only ${productSize.stockQuantity} available.` },
-            { status: 400 }
-          )
-        }
+        sizeAllocations.push({
+          sizeId: productSizeId,
+          quantity: sizeQuantity,
+          size: productSize.size
+        })
+      }
+
+      // 🔄 SHARED STOCK CHECK: Verify availability across all channels
+      const availabilityCheck = await checkSharedStockAvailability(productId, 0, sizeAllocations)
+      if (!availabilityCheck.available) {
+        return NextResponse.json(
+          { error: `🔄 SHARED STOCK: ${availabilityCheck.details}` },
+          { status: 400 }
+        )
       }
 
       // Calculate total quantity from all sizes
       const totalQuantity = sizes.reduce((sum: number, size: any) => sum + size.quantityTaken, 0)
 
-      // Create exhibition product with sizes in transaction
+      // 🔄 CREATE EXHIBITION ALLOCATION (NO STOCK REDUCTION)
       const result = await db.$transaction(async (tx) => {
         // Create main exhibition product entry
         const exhibitionProduct = await tx.exhibitionProduct.create({
@@ -142,17 +244,26 @@ export async function POST(
             priceHistory: [
               {
                 timestamp: new Date().toISOString(),
-                action: 'product_added',
+                action: 'product_allocated_shared_stock',
                 originalPrice: product.sellingPriceUSD,
                 exhibitionPrice: product.sellingPriceUSD,
-                quantityTaken: totalQuantity,
-                notes: `Product added to exhibition: ${exhibition.title}`,
+                quantityAllocated: totalQuantity,
+                notes: `🔄 SHARED STOCK: Product allocated to exhibition: ${exhibition.title}`,
                 sizes: sizes.map((s: any) => ({
                   sizeId: s.productSizeId,
                   quantity: s.quantityTaken
-                }))
+                })),
+                systemNote: 'Shared stock system - no inventory reduction on allocation'
               }
             ]
+          },
+          include: {
+            product: {
+              include: {
+                category: true,
+                country: true
+              }
+            }
           }
         })
 
@@ -168,46 +279,24 @@ export async function POST(
           data: exhibitionSizesData
         })
 
-        // Update stock quantities for each size
-        for (const sizeSelection of sizes) {
-          await tx.productSize.update({
-            where: { id: sizeSelection.productSizeId },
-            data: {
-              stockQuantity: {
-                decrement: sizeSelection.quantityTaken
-              }
-            }
-          })
-        }
+        // 🔄 KEY CHANGE: NO STOCK REDUCTION ON ALLOCATION
+        // In shared stock system, we track allocation but don't reduce inventory
+        // Stock is only reduced when actual sales happen
 
-        // Update main product stock (sum of all active sizes)
-        const updatedSizes = await tx.productSize.findMany({
-          where: {
-            productId: productId,
-            isActive: true
-          }
-        })
-
-        const newTotalStock = updatedSizes.reduce((sum, size) => sum + size.stockQuantity, 0)
-
-        await tx.product.update({
-          where: { id: productId },
-          data: { stockQuantity: newTotalStock }
-        })
-
+        console.log('✅ SHARED STOCK: Sized product allocated successfully (no stock reduction):', exhibitionProduct.id)
+        
         return exhibitionProduct
       })
-
-      console.log('✅ Sized product added successfully:', result.id)
 
       return NextResponse.json({
         success: true,
         exhibitionProduct: result,
-        message: `${product.name} (${totalQuantity} units across ${sizes.length} sizes) added to exhibition successfully`
+        message: `🔄 SHARED STOCK: ${product.name} (${totalQuantity} units across ${sizes.length} sizes) allocated to exhibition. Stock remains available for all channels.`,
+        systemNote: 'Shared stock allocation - inventory will be reduced only when sales occur'
       })
 
     } else {
-      // ✅ NON-SIZED PRODUCT ADDITION (Original logic)
+      // ✅ NON-SIZED PRODUCT ALLOCATION (SHARED STOCK)
       if (!quantityTaken || quantityTaken <= 0) {
         return NextResponse.json(
           { error: 'Quantity taken must be greater than 0' },
@@ -215,17 +304,16 @@ export async function POST(
         )
       }
 
-      // Validate quantity against stock
-      if (quantityTaken > product.stockQuantity) {
+      // 🔄 SHARED STOCK CHECK: Verify availability across all channels
+      const availabilityCheck = await checkSharedStockAvailability(productId, quantityTaken)
+      if (!availabilityCheck.available) {
         return NextResponse.json(
-          {
-            error: `Cannot take ${quantityTaken} items. Only ${product.stockQuantity} available in stock.`
-          },
+          { error: `🔄 SHARED STOCK: ${availabilityCheck.details}` },
           { status: 400 }
         )
       }
 
-      // Create exhibition product entry
+      // 🔄 CREATE EXHIBITION ALLOCATION (NO STOCK REDUCTION)
       const exhibitionProduct = await db.exhibitionProduct.create({
         data: {
           exhibitionId: exhibitionId,
@@ -239,11 +327,12 @@ export async function POST(
           priceHistory: [
             {
               timestamp: new Date().toISOString(),
-              action: 'product_added',
+              action: 'product_allocated_shared_stock',
               originalPrice: product.sellingPriceUSD,
               exhibitionPrice: product.sellingPriceUSD,
-              quantityTaken: quantityTaken,
-              notes: `Product added to exhibition: ${exhibition.title}`
+              quantityAllocated: quantityTaken,
+              notes: `🔄 SHARED STOCK: Product allocated to exhibition: ${exhibition.title}`,
+              systemNote: 'Shared stock system - no inventory reduction on allocation'
             }
           ]
         },
@@ -257,27 +346,23 @@ export async function POST(
         }
       })
 
-      // Update product stock
-      await db.product.update({
-        where: { id: productId },
-        data: {
-          stockQuantity: {
-            decrement: quantityTaken
-          }
-        }
-      })
+      // 🔄 KEY CHANGE: NO STOCK REDUCTION ON ALLOCATION
+      // In shared stock system, we track allocation but don't reduce inventory
+      // The old code would do: await db.product.update({ data: { stockQuantity: { decrement: quantityTaken } } })
+      // We DON'T do this anymore
 
-      console.log('✅ Regular product added successfully:', exhibitionProduct.id)
+      console.log('✅ SHARED STOCK: Regular product allocated successfully (no stock reduction):', exhibitionProduct.id)
 
       return NextResponse.json({
         success: true,
         exhibitionProduct,
-        message: `${product.name} added to exhibition successfully`
+        message: `🔄 SHARED STOCK: ${product.name} (${quantityTaken} units) allocated to exhibition. Stock remains available for all channels.`,
+        systemNote: 'Shared stock allocation - inventory will be reduced only when sales occur'
       })
     }
 
   } catch (error) {
-    console.error('Exhibition product creation error:', error)
+    console.error('🔄 SHARED STOCK: Exhibition product allocation error:', error)
 
     // Handle unique constraint violation
     if (error instanceof Error && error.message.includes('Unique constraint')) {
@@ -294,7 +379,9 @@ export async function POST(
   }
 }
 
-// ✅ GET - Fetch exhibition products
+// =====================================
+// GET - FETCH EXHIBITION PRODUCTS (ENHANCED WITH SHARED STOCK INFO)
+// =====================================
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -316,7 +403,7 @@ export async function GET(
       return NextResponse.json({ error: 'Exhibition not found' }, { status: 404 })
     }
 
-    // Get exhibition products with related data
+    // Get exhibition products with enhanced shared stock information
     const exhibitionProducts = await db.exhibitionProduct.findMany({
       where: { exhibitionId },
       include: {
@@ -324,7 +411,10 @@ export async function GET(
           include: {
             category: true,
             country: true,
-            productSizes: true
+            productSizes: {
+              where: { isActive: true },
+              orderBy: { sortOrder: 'asc' }
+            }
           }
         },
         exhibitionSizes: {
@@ -345,6 +435,42 @@ export async function GET(
       }
     })
 
+    // 🔄 ENHANCED: Add shared stock information to each product
+    const enhancedProducts = await Promise.all(
+      exhibitionProducts.map(async (ep) => {
+        // Calculate total sold across all channels for this product
+        const totalSoldAllChannels = await calculateTotalSoldAcrossChannels(ep.productId)
+        
+        // Calculate available stock (shared across all channels)
+        const product = ep.product
+        const totalInventory = product.requiresSizes 
+          ? product.productSizes.reduce((sum, size) => sum + size.stockQuantity, 0)
+          : product.stockQuantity
+        
+        const sharedAvailableStock = Math.max(0, totalInventory - totalSoldAllChannels)
+        
+        // Calculate exhibition-specific remaining allocation
+        const exhibitionRemaining = Math.max(0, ep.quantityTaken - ep.quantitySold)
+
+        return {
+          ...ep,
+          // 🔄 NEW: Shared stock analytics
+          sharedStockInfo: {
+            totalInventory,
+            totalSoldAllChannels,
+            sharedAvailableStock,
+            exhibitionAllocated: ep.quantityTaken,
+            exhibitionSold: ep.quantitySold,
+            exhibitionRemaining,
+            canStillSellFromSharedStock: sharedAvailableStock > 0,
+            // Analytics for reporting
+            soldOnlineEstimate: totalSoldAllChannels - ep.quantitySold,
+            stockUtilization: totalInventory > 0 ? (totalSoldAllChannels / totalInventory) * 100 : 0
+          }
+        }
+      })
+    )
+
     // Get available products (not in this exhibition)
     const existingProductIds = exhibitionProducts.map(ep => ep.productId)
 
@@ -364,11 +490,11 @@ export async function GET(
       orderBy: { name: 'asc' }
     })
 
-    // Calculate summary
+    // Calculate summary with shared stock insights
     const summary = {
       totalProducts: exhibitionProducts.length,
-      totalQuantityTaken: exhibitionProducts.reduce((sum, ep) => sum + ep.quantityTaken, 0),
-      totalQuantitySold: exhibitionProducts.reduce((sum, ep) => sum + ep.quantitySold, 0),
+      totalQuantityAllocated: exhibitionProducts.reduce((sum, ep) => sum + ep.quantityTaken, 0),
+      totalQuantitySoldAtExhibition: exhibitionProducts.reduce((sum, ep) => sum + ep.quantitySold, 0),
       totalValue: exhibitionProducts.reduce((sum, ep) => {
         const originalPrice = ep.originalPrice ?? 0
         return sum + (originalPrice * ep.quantityTaken)
@@ -384,27 +510,40 @@ export async function GET(
         ep.originalPrice !== null &&
         ep.exhibitionPrice !== ep.originalPrice
       ).length,
-      outOfStockProducts: exhibitionProducts.filter(ep => ep.quantityTaken <= ep.quantitySold).length
+      productsFullySoldAtExhibition: exhibitionProducts.filter(ep => ep.quantityTaken <= ep.quantitySold).length,
+      
+      // 🔄 NEW: Shared stock summary
+      sharedStockSummary: {
+        totalProductsInSharedPool: enhancedProducts.length,
+        productsWithSharedStockAvailable: enhancedProducts.filter(ep => ep.sharedStockInfo.sharedAvailableStock > 0).length,
+        averageStockUtilization: enhancedProducts.length > 0 
+          ? enhancedProducts.reduce((sum, ep) => sum + ep.sharedStockInfo.stockUtilization, 0) / enhancedProducts.length 
+          : 0
+      }
     }
 
-    // Add sell-through rate
-    const sellThroughRate = summary.totalQuantityTaken > 0
-      ? (summary.totalQuantitySold / summary.totalQuantityTaken) * 100
+    // Add sell-through rate (exhibition specific)
+    const exhibitionSellThroughRate = summary.totalQuantityAllocated > 0
+      ? (summary.totalQuantitySoldAtExhibition / summary.totalQuantityAllocated) * 100
       : 0
 
     return NextResponse.json({
       success: true,
       exhibition,
-      products: exhibitionProducts,
+      products: enhancedProducts,
       availableProducts,
       summary: {
         ...summary,
-        sellThroughRate: Math.round(sellThroughRate * 100) / 100
+        exhibitionSellThroughRate: Math.round(exhibitionSellThroughRate * 100) / 100
+      },
+      systemInfo: {
+        stockSystem: 'shared_stock_v1',
+        note: 'Products allocated to exhibitions remain available for customer purchases until sold'
       }
     })
 
   } catch (error) {
-    console.error('Error fetching exhibition products:', error)
+    console.error('🔄 SHARED STOCK: Error fetching exhibition products:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
