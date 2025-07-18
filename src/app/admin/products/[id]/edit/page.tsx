@@ -1,12 +1,12 @@
 // src/app/admin/products/[id]/edit/page.tsx
-// ✅ UPDATED: Added QuickBarcodePrinter integration
+// ✅ UPDATED: Fixed server component event handler issue
 
 import { redirect, notFound } from 'next/navigation'
 import { getSession } from '@/lib/auth'
 import { db } from '@/lib/db'
 import AdminNavigation from '@/components/admin/AdminNavigation'
 import ProductForm from '@/components/admin/ProductForm'
-import QuickBarcodePrinter from '@/components/admin/QuickBarcodePrinter' // ✅ NEW IMPORT
+import BarcodeClientWrapper from '@/components/admin/BarcodeClientWrapper' // ✅ NEW: Use wrapper instead
 import { ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui'
@@ -95,7 +95,7 @@ export default async function EditProductPage({ params }: EditProductPageProps) 
     purchaseDate: product.purchaseDate?.toISOString().split('T')[0] || '',
   } : undefined
 
-  // ✅ NEW: Format product for QuickBarcodePrinter
+  // ✅ UPDATED: Format product for BarcodeClientWrapper
   const productForBarcode = {
     id: product.id,
     name: product.name,
@@ -117,7 +117,7 @@ export default async function EditProductPage({ params }: EditProductPageProps) 
       <AdminNavigation />
       
       <main className="lg:pl-64">
-        <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8"> {/* ✅ WIDENED: Changed from max-w-4xl to max-w-7xl */}
+        <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
           <div className="px-4 py-6 sm:px-0">
             {/* Header */}
             <div className="border-b border-gray-200 pb-5 mb-6">
@@ -139,7 +139,7 @@ export default async function EditProductPage({ params }: EditProductPageProps) 
               </div>
             </div>
 
-            {/* ✅ NEW: Two-column layout */}
+            {/* ✅ EXISTING: Two-column layout */}
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
               
               {/* Left Column: Product Form */}
@@ -153,33 +153,12 @@ export default async function EditProductPage({ params }: EditProductPageProps) 
                 />
               </div>
 
-              {/* ✅ NEW: Right Column: Barcode Printing */}
+              {/* ✅ UPDATED: Right Column - Using BarcodeClientWrapper */}
               <div className="xl:col-span-1">
                 <div className="sticky top-6 space-y-6">
                   
-                  {/* Quick Barcode Printer */}
-                  <QuickBarcodePrinter 
-                    product={productForBarcode}
-                    onBarcodeGenerated={async (newBarcode) => {
-                      // Update the product barcode in database
-                      try {
-                        const response = await fetch(`/api/admin/products/${product.id}`, {
-                          method: 'PATCH',
-                          headers: {
-                            'Content-Type': 'application/json',
-                          },
-                          body: JSON.stringify({ barcode: newBarcode }),
-                        })
-                        
-                        if (response.ok) {
-                          // Refresh the page to show updated barcode
-                          window.location.reload()
-                        }
-                      } catch (error) {
-                        console.error('Failed to update barcode:', error)
-                      }
-                    }}
-                  />
+                  {/* ✅ FIXED: Use wrapper component (no function passing) */}
+                  <BarcodeClientWrapper product={productForBarcode} />
 
                   {/* Product Quick Stats */}
                   <div className="bg-white rounded-lg border p-4">
@@ -189,61 +168,55 @@ export default async function EditProductPage({ params }: EditProductPageProps) 
                         <span className="text-gray-600">Status:</span>
                         <span className={`font-medium ${
                           product.status === 'PUBLISHED' ? 'text-green-600' :
-                          product.status === 'DRAFT' ? 'text-yellow-600' : 'text-gray-600'
+                          product.status === 'DRAFT' ? 'text-yellow-600' :
+                          'text-gray-600'
                         }`}>
                           {product.status}
                         </span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-gray-600">Category:</span>
-                        <span className="font-medium">{product.category.name}</span>
-                      </div>
-                      <div className="flex justify-between">
                         <span className="text-gray-600">Stock:</span>
                         <span className={`font-medium ${
-                          product.stockQuantity > product.lowStockAlert ? 'text-green-600' :
-                          product.stockQuantity > 0 ? 'text-yellow-600' : 'text-red-600'
+                          product.stockQuantity > 10 ? 'text-green-600' :
+                          product.stockQuantity > 0 ? 'text-yellow-600' :
+                          'text-red-600'
                         }`}>
                           {product.stockQuantity} units
                         </span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-gray-600">Price:</span>
-                        <span className="font-medium text-green-600">
-                          ${product.sellingPriceUSD.toFixed(2)}
+                        <span className="text-gray-600">Created:</span>
+                        <span className="text-gray-900">
+                          {new Date(product.createdAt).toLocaleDateString()}
                         </span>
                       </div>
-                      {product.requiresSizes && (
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">Sizes:</span>
-                          <span className="font-medium">
-                            {product.productSizes.length} variants
-                          </span>
-                        </div>
-                      )}
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Updated:</span>
+                        <span className="text-gray-900">
+                          {new Date(product.updatedAt).toLocaleDateString()}
+                        </span>
+                      </div>
                     </div>
                   </div>
 
-                  {/* Quick Actions */}
-                  <div className="bg-white rounded-lg border p-4">
-                    <h3 className="font-medium text-gray-900 mb-3">Quick Actions</h3>
-                    <div className="space-y-2">
-                      <Link href={`/admin/products/${product.id}`} className="block">
-                        <Button variant="outline" size="sm" className="w-full justify-start">
-                          View Product Details
-                        </Button>
-                      </Link>
-                      {product.status === 'DRAFT' && (
-                        <Button variant="outline" size="sm" className="w-full justify-start">
-                          Publish Product
-                        </Button>
-                      )}
-                      <Button variant="outline" size="sm" className="w-full justify-start">
-                        Duplicate Product
-                      </Button>
+                  {/* Product Sizes (if applicable) */}
+                  {product.requiresSizes && product.productSizes.length > 0 && (
+                    <div className="bg-white rounded-lg border p-4">
+                      <h3 className="font-medium text-gray-900 mb-3">Size Variants</h3>
+                      <div className="space-y-2">
+                        {product.productSizes.map((size) => (
+                          <div key={size.id} className="flex justify-between text-sm">
+                            <span className="text-gray-600">{size.size}:</span>
+                            <span className={`font-medium ${
+                              size.stockQuantity > 0 ? 'text-green-600' : 'text-red-600'
+                            }`}>
+                              {size.stockQuantity} units
+                            </span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-
+                  )}
                 </div>
               </div>
             </div>
