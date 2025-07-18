@@ -1,232 +1,476 @@
-// File: src/app/api/admin/orders/route.ts
+// =====================================
+// src/app/api/orders/route.ts - CUSTOMER ORDERS SHARED STOCK SYSTEM
+// 🔄 MODIFIED: Customer orders use shared stock validation and tracking
+// 📊 ENHANCED: Sales channel tracking and shared stock updates
+// =====================================
 
 import { NextRequest, NextResponse } from 'next/server'
-import { getSession } from '@/lib/auth'
 import { db } from '@/lib/db'
-import { Prisma, OrderStatus, OrderSource } from '@prisma/client' // ✅ ADD: Import OrderSource enum
+
+// =====================================
+// 🔄 SHARED STOCK CALCULATION HELPERS
+// =====================================
+
+/**
+ * Calculate total sold across all channels (customer orders + exhibition sales)
+ */
+async function calculateTotalSoldAllChannels(productId: string, sizeId?: string): Promise<number> {
+  // Get customer orders (online sales)
+  const customerOrderItems = await db.orderItem.findMany({
+    where: {
+      productId,
+      ...(sizeId && { productSizeId: sizeId }),
+      order: {
+        status: { not: 'CANCELLED' }
+      }
+    },
+    select: { quantity: true }
+  })
+  
+  const soldToCustomers = customerOrderItems.reduce((sum, item) => sum + item.quantity, 0)
+
+  // Get exhibition sales (POS sales)
+  const exhibitionSaleItems = await db.exhibitionSaleItem.findMany({
+    where: {
+      productId,
+      ...(sizeId && { productSizeId: sizeId })
+    },
+    select: { quantity: true }
+  })
+  
+  const soldAtExhibitions = exhibitionSaleItems.reduce((sum, item) => sum + item.quantity, 0)
+
+  return soldToCustomers + soldAtExhibitions
+}
+
+/**
+ * Check shared stock availability for an item
+ */
+async function checkSharedStockForItem(
+  productId: string, 
+  requestedQuantity: number, 
+  sizeId?: string
+): Promise<{
+  available: boolean
+  availableQuantity: number
+  originalStock: number
+  totalSold: number
+  message: string
+}> {
+  
+  if (sizeId) {
+    // Check specific size
+    const productSize = await db.productSize.findUnique({
+      where: { id: sizeId },
+      select: { stockQuantity: true, size: true }
+    })
+    
+    if (!productSize) {
+      return {
+        available: false,
+        availableQuantity: 0,
+        originalStock: 0,
+        totalSold: 0,
+        message: 'Size not found'
+      }
+    }
+    
+    const totalSold = await calculateTotalSoldAllChannels(productId, sizeId)
+    const availableQuantity = Math.max(0, productSize.stockQuantity - totalSold)
+    
+    return {
+      available: availableQuantity >= requestedQuantity,
+      availableQuantity,
+      originalStock: productSize.stockQuantity,
+      totalSold,
+      message: availableQuantity >= requestedQuantity 
+        ? `${availableQuantity} available` 
+        : availableQuantity === 0 
+          ? 'Out of stock' 
+          : `Only ${availableQuantity} available`
+    }
+  } else {
+    // Check main product
+    const product = await db.product.findUnique({
+      where: { id: productId },
+      select: { stockQuantity: true, name: true, requiresSizes: true }
+    })
+    
+    if (!product) {
+      return {
+        available: false,
+        availableQuantity: 0,
+        originalStock: 0,
+        totalSold: 0,
+        message: 'Product not found'
+      }
+    }
+    
+    const totalSold = await calculateTotalSoldAllChannels(productId)
+    const availableQuantity = Math.max(0, product.stockQuantity - totalSold)
+    
+    return {
+      available: availableQuantity >= requestedQuantity,
+      availableQuantity,
+      originalStock: product.stockQuantity,
+      totalSold,
+      message: availableQuantity >= requestedQuantity 
+        ? `${availableQuantity} available` 
+        : availableQuantity === 0 
+          ? 'Out of stock' 
+          : `Only ${availableQuantity} available`
+    }
+  }
+}
+
+// =====================================
+// ORDER INTERFACES
+// =====================================
+
+interface OrderCreateRequest {
+  customerInfo: {
+    firstName: string
+    lastName: string
+    email: string
+    phone: string
+  }
+  shippingAddress: {
+    street: string
+    city: string
+    state: string
+    postalCode: string
+    country: string
+  }
+  items: Array<{
+    productId: string
+    productSizeId?: string
+    quantity: number
+    pricePerItem: number
+    totalPrice: number
+  }>
+  subtotal: number
+  tax: number
+  shipping: number
+  total: number
+  currency: string
+  paymentMethod: string
+}
+
+// =====================================
+// PAYMENT METHOD MAPPING
+// =====================================
+
+const paymentMethodMap = {
+  'credit_card': 'CREDIT_CARD',
+  'debit_card': 'DEBIT_CARD', 
+  'paypal': 'PAYPAL',
+  'stripe': 'STRIPE',
+  'bank_transfer': 'BANK_TRANSFER'
+} as const
+
+// =====================================
+// 🔄 SHARED STOCK ORDER CREATION
+// =====================================
+
+async function createOrderWithSharedStock(data: OrderCreateRequest) {
+  return await db.$transaction(async (tx) => {
+    const orderNumber = generateOrderNumber()
+    
+    console.log('🔄 SHARED STOCK: Creating order with shared stock validation')
+    
+    // Step 1: Validate all items with shared stock logic
+    const stockValidations = []
+    
+    for (const item of data.items) {
+      const stockCheck = await checkSharedStockForItem(
+        item.productId, 
+        item.quantity, 
+        item.productSizeId
+      )
+      
+      if (!stockCheck.available) {
+        throw new Error(`🔄 SHARED STOCK: Insufficient stock for product. ${stockCheck.message}`)
+      }
+      
+      stockValidations.push({
+        ...item,
+        stockCheck
+      })
+      
+      console.log(`🔄 SHARED STOCK: Item validated - Product ${item.productId}, Requested: ${item.quantity}, Available: ${stockCheck.availableQuantity}`)
+    }
+
+    // Step 2: Create the order with sales channel tracking
+    const order = await tx.order.create({
+      data: {
+        orderNumber,
+        customerName: `${data.customerInfo.firstName} ${data.customerInfo.lastName}`,
+        customerEmail: data.customerInfo.email,
+        customerPhone: data.customerInfo.phone,
+        shippingAddress: JSON.stringify(data.shippingAddress),
+        subtotal: data.subtotal,
+        tax: data.tax,
+        shipping: data.shipping,
+        total: data.total,
+        currency: data.currency,
+        paymentMethod: paymentMethodMap[data.paymentMethod as keyof typeof paymentMethodMap],
+        paymentStatus: 'PENDING',
+        status: 'PENDING',
+        // 🔄 NEW: Sales channel tracking
+        salesChannel: 'ONLINE',
+        salesLocation: 'Customer Portal',
+        deviceType: 'web', // Could be detected from user agent
+        source: 'ONLINE'
+      }
+    })
+
+    console.log('🔄 SHARED STOCK: Order created:', order.orderNumber)
+
+    // Step 3: Create order items with size tracking
+    const orderItems = await Promise.all(
+      data.items.map(item =>
+        tx.orderItem.create({
+          data: {
+            orderId: order.id,
+            productId: item.productId,
+            productSizeId: item.productSizeId || null,
+            quantity: item.quantity,
+            pricePerItem: item.pricePerItem,
+            totalPrice: item.totalPrice,
+            // 🔄 NEW: Add size info for analytics
+            sizeLabel: item.productSizeId ? 'size-tracked' : null
+          }
+        })
+      )
+    )
+
+    console.log('🔄 SHARED STOCK: Order items created:', orderItems.length)
+
+    // Step 4: 🔄 KEY CHANGE - Update stock using shared stock logic
+    // Instead of decrementing product.stockQuantity directly,
+    // we now respect the shared stock system
+    
+    for (const validation of stockValidations) {
+      const item = validation
+      
+      if (item.productSizeId) {
+        // For sized products: Update size stock and recalculate main product stock
+        await tx.productSize.update({
+          where: { id: item.productSizeId },
+          data: {
+            stockQuantity: {
+              decrement: item.quantity
+            }
+          }
+        })
+        
+        // Recalculate main product stock as sum of all active sizes
+        const updatedSizes = await tx.productSize.findMany({
+          where: { 
+            productId: item.productId, 
+            isActive: true 
+          },
+          select: { stockQuantity: true }
+        })
+        
+        const newMainStock = updatedSizes.reduce((sum, size) => sum + size.stockQuantity, 0)
+        
+        await tx.product.update({
+          where: { id: item.productId },
+          data: { stockQuantity: newMainStock }
+        })
+        
+        console.log(`🔄 SHARED STOCK: Updated size stock for product ${item.productId}, new main stock: ${newMainStock}`)
+        
+      } else {
+        // For regular products: Update main stock directly
+        await tx.product.update({
+          where: { id: item.productId },
+          data: {
+            stockQuantity: {
+              decrement: item.quantity
+            }
+          }
+        })
+        
+        console.log(`🔄 SHARED STOCK: Updated main stock for product ${item.productId}`)
+      }
+    }
+
+    // Step 5: 🔄 NEW - Final shared stock validation
+    // Verify no negative stock and shared stock integrity
+    for (const validation of stockValidations) {
+      const item = validation
+      
+      // Check final stock state
+      const finalStockCheck = await checkSharedStockForItem(
+        item.productId, 
+        0, // Just checking current state
+        item.productSizeId
+      )
+      
+      if (finalStockCheck.availableQuantity < 0) {
+        throw new Error(`🔄 SHARED STOCK: Stock validation failed after update for product ${item.productId}`)
+      }
+      
+      console.log(`🔄 SHARED STOCK: Final validation passed - Product ${item.productId}, Remaining: ${finalStockCheck.availableQuantity}`)
+    }
+
+    return {
+      order,
+      orderItems,
+      stockValidations: stockValidations.map(v => ({
+        productId: v.productId,
+        quantityOrdered: v.quantity,
+        stockAfterOrder: v.stockCheck.availableQuantity - v.quantity
+      }))
+    }
+  }, {
+    isolationLevel: 'Serializable' // Prevent race conditions
+  })
+}
+
+// =====================================
+// ORDER NUMBER GENERATION
+// =====================================
+
+function generateOrderNumber(): string {
+  const timestamp = Date.now().toString()
+  const random = Math.random().toString(36).substring(2, 5).toUpperCase()
+  return `ORD-${timestamp.slice(-6)}-${random}`
+}
+
+// =====================================
+// POST /api/orders - CREATE ORDER
+// =====================================
+
+export async function POST(request: NextRequest) {
+  try {
+    const data: OrderCreateRequest = await request.json()
+
+    console.log('🔄 SHARED STOCK: Processing new order with items:', data.items.length)
+
+    // Validate required fields
+    if (!data.customerInfo || !data.items || data.items.length === 0) {
+      return NextResponse.json(
+        { error: 'Invalid order data' },
+        { status: 400 }
+      )
+    }
+
+    // Create order using shared stock system
+    const result = await createOrderWithSharedStock(data)
+
+    console.log('🔄 SHARED STOCK: Order created successfully:', result.order.orderNumber)
+
+    return NextResponse.json({
+      success: true,
+      orderId: result.order.id,
+      orderNumber: result.order.orderNumber,
+      message: 'Order created successfully',
+      // 🔄 NEW: Shared stock summary
+      sharedStockSummary: {
+        totalItemsOrdered: data.items.reduce((sum, item) => sum + item.quantity, 0),
+        stockValidations: result.stockValidations,
+        systemNote: 'Order processed using shared stock system',
+        salesChannel: 'ONLINE'
+      }
+    })
+
+  } catch (error) {
+    console.error('🔄 SHARED STOCK: Order creation error:', error)
+    
+    // Enhanced error handling for shared stock issues
+    if (error instanceof Error) {
+      if (error.message.includes('🔄 SHARED STOCK:')) {
+        return NextResponse.json(
+          { error: error.message.replace('🔄 SHARED STOCK: ', '') },
+          { status: 400 }
+        )
+      }
+      
+      if (error.message.includes('Insufficient stock')) {
+        return NextResponse.json(
+          { error: error.message },
+          { status: 400 }
+        )
+      }
+    }
+
+    return NextResponse.json(
+      { error: 'Failed to create order' },
+      { status: 500 }
+    )
+  }
+}
+
+// =====================================
+// GET /api/orders - LIST ORDERS (Enhanced with shared stock info)
+// =====================================
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await getSession()
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
     const { searchParams } = new URL(request.url)
-    const search = searchParams.get('search') || ''
-    const status = searchParams.get('status') || 'all'
-    const source = searchParams.get('source') || 'all'
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '10')
+    const status = searchParams.get('status')
 
-    // ✅ FIXED: Build where clause with proper typing
-    const where: Prisma.OrderWhereInput = {}
+    const skip = (page - 1) * limit
 
-    // Search filter
-    if (search) {
-      where.OR = [
-        { orderNumber: { contains: search, mode: Prisma.QueryMode.insensitive } },
-        { customerName: { contains: search, mode: Prisma.QueryMode.insensitive } },
-        { customerEmail: { contains: search, mode: Prisma.QueryMode.insensitive } },
-        { customerPhone: { contains: search, mode: Prisma.QueryMode.insensitive } }
-      ]
+    // Build where clause
+    const where: any = {}
+    if (status) {
+      where.status = status
     }
 
-    // ✅ FIXED: Status filter with proper enum validation
-    if (status !== 'all') {
-      // Validate that the status is a valid OrderStatus enum value
-      if (Object.values(OrderStatus).includes(status as OrderStatus)) {
-        where.status = status as OrderStatus
-      }
-    }
-
-    // ✅ FIXED: Source filter with proper enum validation
-    if (source !== 'all') {
-      // Validate that the source is a valid OrderSource enum value
-      if (Object.values(OrderSource).includes(source as OrderSource)) {
-        where.source = source as OrderSource
-      }
-    }
-
-    // Get total count
-    const total = await db.order.count({ where })
-
-    // Get orders with pagination
+    // Get orders with enhanced information
     const orders = await db.order.findMany({
       where,
       include: {
         items: {
           include: {
             product: {
-              select: {
-                id: true,
-                name: true,
-                images: true,
-                sku: true
+              select: { 
+                name: true, 
+                sku: true,
+                images: true 
+              }
+            },
+            productSize: {
+              select: { 
+                size: true, 
+                sku: true 
               }
             }
-          }
-        },
-        exhibition: {
-          select: {
-            id: true,
-            title: true
           }
         }
       },
       orderBy: { createdAt: 'desc' },
-      skip: (page - 1) * limit,
+      skip,
       take: limit
     })
 
-    // ✅ FIXED: Calculate summary statistics with proper where clause typing
-    const statsWhere: Prisma.OrderWhereInput = {}
-    
-    // Add status filter if valid
-    if (status !== 'all' && Object.values(OrderStatus).includes(status as OrderStatus)) {
-      statsWhere.status = status as OrderStatus
-    }
-    
-    // Add source filter if valid
-    if (source !== 'all' && Object.values(OrderSource).includes(source as OrderSource)) {
-      statsWhere.source = source as OrderSource
-    }
-
-    const stats = await db.order.aggregate({
-      where: statsWhere,
-      _count: { id: true },
-      _sum: { total: true },
-      _avg: { total: true }
-    })
-
-    // Get status breakdown
-    const statusBreakdown = await db.order.groupBy({
-      by: ['status'],
-      _count: { status: true },
-      _sum: { total: true }
-    })
-
-    // Get source breakdown
-    const sourceBreakdown = await db.order.groupBy({
-      by: ['source'],
-      _count: { source: true },
-      _sum: { total: true }
-    })
+    const totalCount = await db.order.count({ where })
 
     return NextResponse.json({
+      success: true,
       orders,
       pagination: {
         page,
         limit,
-        total,
-        pages: Math.ceil(total / limit)
+        totalCount,
+        totalPages: Math.ceil(totalCount / limit)
       },
-      stats: {
-        totalOrders: stats._count.id || 0,
-        totalRevenue: stats._sum.total || 0,
-        averageOrderValue: stats._avg.total || 0,
-        statusBreakdown: statusBreakdown.map(item => ({
-          status: item.status,
-          count: item._count.status,
-          revenue: item._sum.total || 0
-        })),
-        sourceBreakdown: sourceBreakdown.map(item => ({
-          source: item.source,
-          count: item._count.source,
-          revenue: item._sum.total || 0
-        }))
+      systemInfo: {
+        stockSystem: 'shared_stock_v1',
+        note: 'Orders processed with shared stock validation'
       }
     })
 
   } catch (error) {
-    console.error('Orders API error:', error)
+    console.error('Error fetching orders:', error)
     return NextResponse.json(
       { error: 'Failed to fetch orders' },
-      { status: 500 }
-    )
-  }
-}
-
-export async function PATCH(request: NextRequest) {
-  try {
-    const session = await getSession()
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const body = await request.json()
-    const { orderId, status, source } = body
-
-    if (!orderId) {
-      return NextResponse.json(
-        { error: 'Order ID is required' },
-        { status: 400 }
-      )
-    }
-
-    // Prepare update data
-    const updateData: any = {}
-
-    // ✅ FIXED: Validate status before updating
-    if (status !== undefined) {
-      if (!Object.values(OrderStatus).includes(status as OrderStatus)) {
-        return NextResponse.json(
-          { error: 'Invalid order status' },
-          { status: 400 }
-        )
-      }
-      updateData.status = status as OrderStatus
-    }
-
-    // ✅ FIXED: Validate source before updating
-    if (source !== undefined) {
-      if (!Object.values(OrderSource).includes(source as OrderSource)) {
-        return NextResponse.json(
-          { error: 'Invalid order source' },
-          { status: 400 }
-        )
-      }
-      updateData.source = source as OrderSource
-    }
-
-    if (Object.keys(updateData).length === 0) {
-      return NextResponse.json(
-        { error: 'No valid fields to update' },
-        { status: 400 }
-      )
-    }
-
-    // Update order with proper typing
-    const updatedOrder = await db.order.update({
-      where: { id: orderId },
-      data: {
-        ...updateData,
-        updatedAt: new Date()
-      },
-      include: {
-        items: {
-          include: {
-            product: {
-              select: {
-                id: true,
-                name: true,
-                images: true
-              }
-            }
-          }
-        }
-      }
-    })
-
-    return NextResponse.json({
-      success: true,
-      order: updatedOrder
-    })
-
-  } catch (error) {
-    console.error('Order update error:', error)
-    return NextResponse.json(
-      { error: 'Failed to update order' },
       { status: 500 }
     )
   }
