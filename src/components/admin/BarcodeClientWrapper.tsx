@@ -4,7 +4,8 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import QuickBarcodePrinter from './QuickBarcodePrinter'
+// import QuickBarcodePrinter from './QuickBarcodePrinter'
+import WorkingBarcodePrinter from './WorkingBarcodePrinter'
 
 interface BarcodeClientWrapperProps {
   product: {
@@ -33,7 +34,7 @@ const BarcodeClientWrapper: React.FC<BarcodeClientWrapperProps> = ({ product }) 
     if (isUpdating) return
 
     setIsUpdating(true)
-    
+
     try {
       const response = await fetch(`/api/admin/products/${product.id}`, {
         method: 'PATCH',
@@ -42,7 +43,7 @@ const BarcodeClientWrapper: React.FC<BarcodeClientWrapperProps> = ({ product }) 
         },
         body: JSON.stringify({ barcode: newBarcode }),
       })
-      
+
       if (response.ok) {
         // Refresh the page to show updated barcode
         router.refresh()
@@ -59,7 +60,7 @@ const BarcodeClientWrapper: React.FC<BarcodeClientWrapperProps> = ({ product }) 
   }
 
   return (
-    <QuickBarcodePrinter 
+    <WorkingBarcodePrinter
       product={product}
       onBarcodeGenerated={handleBarcodeGenerated}
     />
