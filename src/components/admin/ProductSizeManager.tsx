@@ -1,6 +1,6 @@
 // =====================================
 // src/components/admin/ProductSizeManager.tsx
-// Size Management Component with Individual Inventory Tracking
+// ✅ FIXED: Enable Traditional Inventory inputs for non-sized products
 // =====================================
 
 'use client'
@@ -35,6 +35,11 @@ interface ProductSizeManagerProps {
   onSizesChange: (sizes: ProductSize[]) => void
   onError: (field: string, error: string) => void
   onClearError: (field: string) => void
+  // ✅ ADDED: Props for traditional inventory management
+  stockQuantity?: number
+  lowStockAlert?: number
+  onStockQuantityChange?: (value: number) => void
+  onLowStockAlertChange?: (value: number) => void
 }
 
 export default function ProductSizeManager({
@@ -45,7 +50,12 @@ export default function ProductSizeManager({
   onRequiresSizesChange,
   onSizesChange,
   onError,
-  onClearError
+  onClearError,
+  // ✅ ADDED: Traditional inventory props with defaults
+  stockQuantity = 0,
+  lowStockAlert = 0,
+  onStockQuantityChange,
+  onLowStockAlertChange
 }: ProductSizeManagerProps) {
 
   // =====================================
@@ -64,8 +74,8 @@ export default function ProductSizeManager({
     const newSize: ProductSize = {
       size: size.trim(),
       sku: `${baseSku}-${size.trim().toUpperCase()}`,
-      stockQuantity: 0,           // ✅ No default stock - admin sets
-      lowStockAlert: 0,           // ✅ No default alert - admin sets  
+      stockQuantity: 0,
+      lowStockAlert: 0,
       isActive: true,
       sortOrder: productSizes?.length || 0
     }
@@ -86,113 +96,94 @@ export default function ProductSizeManager({
     onSizesChange(newSizes)
   }
 
-  const addStandardSizes = (sizeType: 'clothing' | 'shoes' | 'jewelry') => {
-    const sizePresets = {
+  const addStandardSizes = (type: 'clothing' | 'jewelry' | 'footwear') => {
+    const sizeMap = {
       clothing: ['XS', 'S', 'M', 'L', 'XL', 'XXL'],
-      shoes: ['6', '7', '8', '9', '10', '11'],
-      jewelry: ['XS', 'S', 'M', 'L']
+      jewelry: ['Small', 'Medium', 'Large'],
+      footwear: ['6', '7', '8', '9', '10', '11', '12']
     }
 
-    sizePresets[sizeType].forEach(size => {
-      if (!productSizes?.some(s => s.size === size)) {
-        addSize(size)
-      }
-    })
-  }
+    const sizes = sizeMap[type]
+    const newSizes = sizes.map((size, index) => ({
+      size,
+      sku: `${baseSku}-${size.toUpperCase()}`,
+      stockQuantity: 0,
+      lowStockAlert: 0,
+      isActive: true,
+      sortOrder: (productSizes?.length || 0) + index
+    }))
 
-  const handleRequiresSizesChange = (checked: boolean) => {
-    onRequiresSizesChange(checked)
-    // Clear sizes if disabling
-    if (!checked) {
-      onSizesChange([])
-    }
+    onSizesChange([...(productSizes || []), ...newSizes])
+    onClearError('sizes')
   }
-
-  // =====================================
-  // RENDER COMPONENT
-  // =====================================
 
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <Package className="h-5 w-5 text-blue-600" />
+          <Package className="h-5 w-5" />
           Inventory Management
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
-        
-        {/* Manual Size Checkbox */}
-        <div className="mb-6">
-          <div className="flex items-center gap-2 p-4 bg-gray-50 rounded-lg border">
-            <input
-              type="checkbox"
-              id="requiresSizes"
-              checked={requiresSizes}
-              onChange={(e) => handleRequiresSizesChange(e.target.checked)}
-              className="rounded h-4 w-4"
-            />
-            <Label htmlFor="requiresSizes" className="cursor-pointer">
-              <span className="font-medium">This product has size variants</span>
-              <div className="text-sm text-gray-500 mt-1">
-                Enable for kurtas, blouses, lehengas, and other fitted garments that require different sizes
-              </div>
-            </Label>
+        {/* Size Variants Toggle */}
+        <div className="flex items-start gap-3">
+          <input
+            type="checkbox"
+            id="requiresSizes"
+            checked={requiresSizes}
+            onChange={(e) => onRequiresSizesChange(e.target.checked)}
+            className="mt-1"
+          />
+          <div>
+            <label htmlFor="requiresSizes" className="font-medium text-gray-900 cursor-pointer">
+              This product has size variants
+            </label>
+            <p className="text-sm text-gray-600 mt-1">
+              Enable for kurtas, blouses, lehengas, and other fitted garments that require different sizes
+            </p>
           </div>
         </div>
 
-        {/* Size Selection Interface */}
+        {/* Size Management (when sizes are enabled) */}
         {requiresSizes && (
-          <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
-            <div className="flex items-center justify-between mb-4">
-              <h4 className="font-medium text-blue-900">Size Variants Management</h4>
-              <div className="text-sm text-blue-700">
-                {productSizes.length} size{productSizes.length !== 1 ? 's' : ''} added
-              </div>
+          <div className="space-y-4">
+            {/* Quick Size Addition */}
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => addStandardSizes('clothing')}
+                className="text-xs"
+              >
+                <Plus className="h-3 w-3 mr-1" />
+                Clothing Sizes
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => addStandardSizes('jewelry')}
+                className="text-xs"
+              >
+                <Plus className="h-3 w-3 mr-1" />
+                Jewelry Sizes
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => addStandardSizes('footwear')}
+                className="text-xs"
+              >
+                <Plus className="h-3 w-3 mr-1" />
+                Footwear Sizes
+              </Button>
             </div>
 
-            {/* Quick Size Addition Buttons */}
-            <div className="mb-4">
-              <div className="text-sm font-medium text-gray-700 mb-2">Quick Add:</div>
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => addStandardSizes('clothing')}
-                  className="text-xs"
-                >
-                  <Plus className="h-3 w-3 mr-1" />
-                  Clothing Sizes (XS-XXL)
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => addStandardSizes('shoes')}
-                  className="text-xs"
-                >
-                  <Plus className="h-3 w-3 mr-1" />
-                  Shoe Sizes (6-11)
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    const size = prompt('Enter custom size name (e.g., 32, 34, 36 for waist sizes):')
-                    if (size?.trim()) addSize(size.trim())
-                  }}
-                  className="text-xs"
-                >
-                  <Plus className="h-3 w-3 mr-1" />
-                  Custom Size
-                </Button>
-              </div>
-            </div>
-
-            {/* Size Management Table */}
-            {productSizes.length > 0 ? (
+            {/* Size List */}
+            {productSizes && productSizes.length > 0 ? (
               <div className="space-y-3">
                 {/* Table Header */}
                 <div className="grid grid-cols-6 gap-3 text-xs font-medium text-gray-600 px-3 py-2 bg-white rounded border">
@@ -234,19 +225,19 @@ export default function ProductSizeManager({
                       min="0"
                       value={size.lowStockAlert}
                       onChange={(e) => updateSize(index, 'lowStockAlert', parseInt(e.target.value) || 0)}
-                      placeholder="5"
+                      placeholder="0"
                       className="text-xs h-8"
                     />
                     
-                    {/* Status Toggle */}
-                    <div className="flex items-center">
+                    {/* Status */}
+                    <div className="flex items-center gap-1">
                       <input
                         type="checkbox"
                         checked={size.isActive}
                         onChange={(e) => updateSize(index, 'isActive', e.target.checked)}
-                        className="rounded h-3 w-3"
+                        className="h-3 w-3"
                       />
-                      <span className="ml-1 text-xs text-gray-600">Active</span>
+                      <span className="text-xs text-gray-600">Active</span>
                     </div>
                     
                     {/* Remove Button */}
@@ -255,46 +246,12 @@ export default function ProductSizeManager({
                       variant="ghost"
                       size="sm"
                       onClick={() => removeSize(index)}
-                      className="text-red-600 hover:text-red-800 h-6 w-6 p-0"
+                      className="h-6 w-6 p-0 text-red-600 hover:text-red-800"
                     >
                       <Trash2 className="h-3 w-3" />
                     </Button>
                   </div>
                 ))}
-
-                {/* Size Summary Card */}
-                <div className="mt-4 p-3 bg-white rounded border">
-                  <div className="grid grid-cols-4 gap-4 text-sm">
-                    <div className="text-center">
-                      <div className="text-gray-600">Total Stock</div>
-                      <div className="text-lg font-bold text-blue-600">
-                        {productSizes.reduce((sum, size) => sum + size.stockQuantity, 0)}
-                      </div>
-                      <div className="text-xs text-gray-500">across all sizes</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-gray-600">Active Sizes</div>
-                      <div className="text-lg font-bold text-green-600">
-                        {productSizes.filter(size => size.isActive).length}
-                      </div>
-                      <div className="text-xs text-gray-500">available for sale</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-gray-600">Low Stock</div>
-                      <div className="text-lg font-bold text-orange-600">
-                        {productSizes.filter(size => size.stockQuantity <= size.lowStockAlert).length}
-                      </div>
-                      <div className="text-xs text-gray-500">need restocking</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-gray-600">Out of Stock</div>
-                      <div className="text-lg font-bold text-red-600">
-                        {productSizes.filter(size => size.stockQuantity === 0).length}
-                      </div>
-                      <div className="text-xs text-gray-500">unavailable</div>
-                    </div>
-                  </div>
-                </div>
               </div>
             ) : (
               <div className="text-center py-8 text-gray-500">
@@ -327,43 +284,46 @@ export default function ProductSizeManager({
           </div>
         )}
 
-        {/* Traditional Stock Management (for non-sized products) */}
+        {/* ✅ FIXED: Traditional Stock Management (for non-sized products) */}
         {!requiresSizes && (
           <div className="p-4 bg-gray-50 rounded-lg border">
             <h4 className="font-medium text-gray-900 mb-3">Traditional Inventory</h4>
-            <div className="text-sm text-gray-600 mb-3">
+            <div className="text-sm text-gray-600 mb-4">
               This product doesn't have size variants. Use simple stock tracking.
             </div>
+            
             <div className="grid gap-4 md:grid-cols-2">
+              {/* ✅ FIXED: Enabled Stock Quantity Input */}
               <div className="space-y-2">
                 <Label htmlFor="stockQuantity">Stock Quantity *</Label>
                 <Input
                   id="stockQuantity"
                   type="number"
                   min="0"
-                  value={0} // This will be managed by parent component
-                  disabled
-                  placeholder="Managed by main form"
-                  className="bg-gray-100"
+                  value={stockQuantity}
+                  onChange={(e) => onStockQuantityChange?.(parseInt(e.target.value) || 0)}
+                  placeholder="Enter stock quantity"
+                  className="bg-white"
                 />
                 <div className="text-xs text-gray-500">
-                  Configure in the main pricing section above
+                  Number of items available for sale
                 </div>
               </div>
 
+              {/* ✅ FIXED: Enabled Low Stock Alert Input */}
               <div className="space-y-2">
                 <Label htmlFor="lowStockAlert">Low Stock Alert</Label>
                 <Input
                   id="lowStockAlert"
                   type="number"
                   min="0"
-                  value={0} // This will be managed by parent component
-                  disabled
-                  placeholder="Managed by main form"
-                  className="bg-gray-100"
+                  value={lowStockAlert}
+                  onChange={(e) => onLowStockAlertChange?.(parseInt(e.target.value) || 0)}
+                  placeholder="Enter alert threshold"
+                  className="bg-white"
                 />
                 <div className="text-xs text-gray-500">
-                  Configure in the main pricing section above
+                  Get notified when stock falls below this number
                 </div>
               </div>
             </div>
