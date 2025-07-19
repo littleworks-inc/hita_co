@@ -1,22 +1,58 @@
-// =====================================
-// src/app/api/products/route.ts - CUSTOMER PORTAL SHARED STOCK SYSTEM
-// 🔄 MODIFIED: Shows products with shared stock across all channels
-// 📊 ENHANCED: Real-time stock calculation from all sales channels
-// =====================================
+// src/app/api/admin/products/route.ts
+// ✅ FIXED: Added missing POST handler for product creation while preserving stock validation
 
 import { NextRequest, NextResponse } from 'next/server'
+import { getSession } from '@/lib/auth'
 import { db } from '@/lib/db'
-
-// Mark as dynamic since we use request.url for query params
-export const dynamic = 'force-dynamic'
+import { ProductStatus } from '@prisma/client'
+// Removed external import - using inline functions instead
 
 // =====================================
-// 🔄 NEW: SHARED STOCK CALCULATION HELPERS
+// SHARED STOCK HELPERS (INLINE)
 // =====================================
 
 /**
+ * Calculate total sold across all channels (customer orders + exhibition sales)
+ */
+async function calculateTotalSoldAllChannels(productId: string, sizeId?: string): Promise<number> {
+  // Get customer orders (online sales)
+  const customerOrderItems = await db.orderItem.findMany({
+    where: {
+      productId,
+      ...(sizeId && { productSizeId: sizeId }),
+      order: {
+        status: { not: 'CANCELLED' }
+      }
+    },
+    select: { quantity: true }
+  })
+  
+  const soldToCustomers = customerOrderItems.reduce((sum, item) => sum + item.quantity, 0)
+
+  // Get exhibition sales (POS sales)  
+  const exhibitionSaleItems = await db.exhibitionSaleItem.findMany({
+    where: {
+      productId,
+      ...(sizeId && { productSizeId: sizeId })
+    },
+    select: { quantity: true }
+  })
+  
+  const soldAtExhibitions = exhibitionSaleItems.reduce((sum, item) => sum + item.quantity, 0)
+
+  return soldToCustomers + soldAtExhibitions
+}
+
+/**
+ * Calculate available stock for a specific size
+ */
+async function calculateSizeSharedStock(productId: string, sizeId: string, originalSizeStock: number): Promise<number> {
+  const totalSold = await calculateTotalSoldAllChannels(productId, sizeId)
+  return Math.max(0, originalSizeStock - totalSold)
+}
+
+/**
  * Calculate actual available stock considering all sales channels
- * This replaces the simple stockQuantity > 0 check
  */
 async function calculateSharedAvailableStock(productId: string, requiresSizes: boolean, productSizes?: any[]): Promise<number> {
   if (requiresSizes && productSizes) {
@@ -45,153 +81,226 @@ async function calculateSharedAvailableStock(productId: string, requiresSizes: b
 }
 
 /**
- * Calculate available stock for a specific size
+ * Check shared stock availability for an item
  */
-async function calculateSizeSharedStock(productId: string, sizeId: string, originalSizeStock: number): Promise<number> {
-  const totalSold = await calculateTotalSoldAllChannels(productId, sizeId)
-  return Math.max(0, originalSizeStock - totalSold)
-}
-
-/**
- * Calculate total sold across all channels (customer orders + exhibition sales)
- */
-async function calculateTotalSoldAllChannels(productId: string, sizeId?: string): Promise<number> {
-  // Get customer orders (online sales)
-  const customerOrderItems = await db.orderItem.findMany({
-    where: {
-      productId,
-      ...(sizeId && { productSizeId: sizeId }),
-      order: {
-        status: { not: 'CANCELLED' }
+async function checkSharedStockForItem(
+  productId: string, 
+  requestedQuantity: number, 
+  sizeId?: string
+): Promise<{
+  isAvailable: boolean
+  availableQuantity: number
+  originalStock: number
+  totalSold: number
+  message: string
+}> {
+  
+  if (sizeId) {
+    // Check specific size
+    const productSize = await db.productSize.findUnique({
+      where: { id: sizeId },
+      select: { stockQuantity: true, size: true }
+    })
+    
+    if (!productSize) {
+      return {
+        isAvailable: false,
+        availableQuantity: 0,
+        originalStock: 0,
+        totalSold: 0,
+        message: 'Size not found'
       }
-    },
-    select: { quantity: true }
-  })
-  
-  const soldToCustomers = customerOrderItems.reduce((sum, item) => sum + item.quantity, 0)
-
-  // Get exhibition sales (POS sales)
-  const exhibitionSaleItems = await db.exhibitionSaleItem.findMany({
-    where: {
-      productId,
-      ...(sizeId && { productSizeId: sizeId })
-    },
-    select: { quantity: true }
-  })
-  
-  const soldAtExhibitions = exhibitionSaleItems.reduce((sum, item) => sum + item.quantity, 0)
-
-  return soldToCustomers + soldAtExhibitions
+    }
+    
+    const totalSold = await calculateTotalSoldAllChannels(productId, sizeId)
+    const availableQuantity = Math.max(0, productSize.stockQuantity - totalSold)
+    
+    return {
+      isAvailable: availableQuantity >= requestedQuantity,
+      availableQuantity,
+      originalStock: productSize.stockQuantity,
+      totalSold,
+      message: availableQuantity >= requestedQuantity 
+        ? `${availableQuantity} available` 
+        : availableQuantity === 0 
+          ? 'Out of stock'
+          : `Only ${availableQuantity} available`
+    }
+  } else {
+    // Check main product stock
+    const product = await db.product.findUnique({
+      where: { id: productId },
+      select: { stockQuantity: true, name: true }
+    })
+    
+    if (!product) {
+      return {
+        isAvailable: false,
+        availableQuantity: 0,
+        originalStock: 0,
+        totalSold: 0,
+        message: 'Product not found'
+      }
+    }
+    
+    const totalSold = await calculateTotalSoldAllChannels(productId)
+    const availableQuantity = Math.max(0, product.stockQuantity - totalSold)
+    
+    return {
+      isAvailable: availableQuantity >= requestedQuantity,
+      availableQuantity,
+      originalStock: product.stockQuantity,
+      totalSold,
+      message: availableQuantity >= requestedQuantity 
+        ? `${availableQuantity} available` 
+        : availableQuantity === 0 
+          ? 'Out of stock'
+          : `Only ${availableQuantity} available`
+    }
+  }
 }
 
 // =====================================
-// 🔄 ENHANCED CUSTOMER PRODUCTS API
+// INTERFACES & TYPES
+// =====================================
+
+interface ProductCreateRequest {
+  sku: string
+  name: string
+  description?: string
+  shortDescription?: string
+  categoryId: string
+  countryId: string
+  supplierId: string
+  barcode?: string
+  barcodeType?: string
+  originalPrice: number
+  originalCurrency: string
+  quantity: number
+  gstPercentage: number
+  shippingCost: number
+  conversionCharges: number
+  additionalExpenses: number
+  costPriceUSD: number
+  piecePriceUSD: number
+  profitMargin: number
+  discountPercentage: number
+  showDiscountToCustomers?: boolean
+  sellingPriceUSD: number
+  stockQuantity: number
+  lowStockAlert: number
+  tags: string[]
+  images: string[]
+  seoTitle?: string
+  seoDescription?: string
+  purchaseDate?: string
+  invoiceNumber?: string
+  isActive?: boolean
+  isFeatured?: boolean
+  status?: ProductStatus
+  publishedAt?: string
+  requiresSizes: boolean
+  productSizes?: Array<{
+    size: string
+    sku: string
+    stockQuantity: number
+    lowStockAlert: number
+    isActive: boolean
+    sortOrder: number
+  }>
+}
+
+interface StockValidationRequest {
+  items: Array<{
+    productId: string
+    productSizeId?: string
+    quantity: number
+  }>
+}
+
+// =====================================
+// GET HANDLER - EXISTING FUNCTIONALITY
 // =====================================
 
 export async function GET(request: NextRequest) {
   try {
-    // Access URL after marking as dynamic
+    const session = await getSession()
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const { searchParams } = new URL(request.url)
-    
-    // Extract query parameters
-    const page = parseInt(searchParams.get('page') || '1')
-    const limit = parseInt(searchParams.get('limit') || '12')
-    const category = searchParams.get('category')
-    const search = searchParams.get('search')
-    const sort = searchParams.get('sort') || 'newest'
+    const search = searchParams.get('search') || ''
+    const categoryId = searchParams.get('categoryId')
+    const countryId = searchParams.get('countryId')
     const featured = searchParams.get('featured') === 'true'
-    const status = searchParams.get('status') || 'PUBLISHED'
+    const status = searchParams.get('status') as ProductStatus
+    const isActive = searchParams.get('isActive')
+    const validatedPage = Math.max(1, parseInt(searchParams.get('page') || '1'))
+    const validatedLimit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '12')))
+    const validatedSkip = (validatedPage - 1) * validatedLimit
 
-    // Validate parameters
-    const validatedPage = Math.max(1, page)
-    const validatedLimit = Math.min(Math.max(1, limit), 50)
-    const skip = (validatedPage - 1) * validatedLimit
-
-    // 🔄 MODIFIED: Base where clause without stock filter
-    // We'll filter by stock availability after calculating shared stock
-    const whereConditions: any = {
-      status: status,
-      isActive: true
-      // 🔄 REMOVED: stockQuantity: { gt: 0 } - now calculated dynamically
-    }
-
-    if (category) {
-      whereConditions.category = {
-        slug: category
-      }
-    }
+    // Build where conditions
+    const whereConditions: any = {}
 
     if (search) {
       whereConditions.OR = [
         { name: { contains: search, mode: 'insensitive' } },
-        { description: { contains: search, mode: 'insensitive' } },
-        { shortDescription: { contains: search, mode: 'insensitive' } },
-        { tags: { hasSome: search.split(' ') } }
+        { sku: { contains: search, mode: 'insensitive' } },
+        { description: { contains: search, mode: 'insensitive' } }
       ]
     }
 
-    if (featured) {
-      whereConditions.isFeatured = true
+    if (categoryId) whereConditions.categoryId = categoryId
+    if (countryId) whereConditions.countryId = countryId
+    if (featured) whereConditions.isFeatured = true
+    if (status) whereConditions.status = status
+    if (isActive !== null && isActive !== undefined) {
+      whereConditions.isActive = isActive === 'true'
     }
 
-    // Build sort order
-    let orderBy: any = { createdAt: 'desc' } // Default
+    const orderBy = { createdAt: 'desc' as const }
 
-    switch (sort) {
-      case 'price_low':
-        orderBy = { sellingPriceUSD: 'asc' }
-        break
-      case 'price_high':
-        orderBy = { sellingPriceUSD: 'desc' }
-        break
-      case 'name':
-        orderBy = { name: 'asc' }
-        break
-      case 'newest':
-        orderBy = { createdAt: 'desc' }
-        break
-      case 'featured':
-        orderBy = [{ isFeatured: 'desc' }, { createdAt: 'desc' }]
-        break
-    }
-
-    // 🔄 ENHANCED: Get all products first, then filter by shared stock availability
-    const allProducts = await db.product.findMany({
-      where: whereConditions,
-      include: {
-        category: {
-          select: { 
-            id: true, 
-            name: true, 
-            slug: true 
-          }
-        },
-        country: {
-          select: { 
-            id: true, 
-            name: true, 
-            currency: true, 
-            currencySymbol: true 
-          }
-        },
-        productSizes: {
-          where: { isActive: true },
-          select: {
-            id: true,
-            size: true,
-            sku: true,
-            stockQuantity: true,
-            sortOrder: true
+    // Get total count and products
+    const [totalAvailableCount, allProducts] = await Promise.all([
+      db.product.count({ where: whereConditions }),
+      db.product.findMany({
+        where: whereConditions,
+        skip: validatedSkip,
+        take: validatedLimit,
+        include: {
+          category: {
+            select: { 
+              id: true, 
+              name: true, 
+              slug: true 
+            }
           },
-          orderBy: { sortOrder: 'asc' }
-        }
-      },
-      orderBy
-    })
+          country: {
+            select: { 
+              id: true, 
+              name: true, 
+              currency: true, 
+              currencySymbol: true 
+            }
+          },
+          productSizes: {
+            where: { isActive: true },
+            select: {
+              id: true,
+              size: true,
+              sku: true,
+              stockQuantity: true,
+              sortOrder: true
+            },
+            orderBy: { sortOrder: 'asc' }
+          }
+        },
+        orderBy
+      })
+    ])
 
-    console.log(`🔄 SHARED STOCK: Found ${allProducts.length} products before stock filtering`)
-
-    // 🔄 NEW: Calculate shared stock availability for each product
+    // Calculate shared stock availability for each product
     const productsWithSharedStock = await Promise.all(
       allProducts.map(async (product) => {
         const sharedAvailableStock = await calculateSharedAvailableStock(
@@ -200,54 +309,32 @@ export async function GET(request: NextRequest) {
           product.productSizes
         )
 
-        // 🔄 ENHANCED: Add shared stock information to product
         return {
           ...product,
-          // Keep original stockQuantity for reference
           originalStockQuantity: product.stockQuantity,
-          // 🔄 NEW: Override stockQuantity with shared available stock
           stockQuantity: sharedAvailableStock,
-          // 🔄 NEW: Add shared stock analytics
           sharedStockInfo: {
             totalInventory: product.requiresSizes 
               ? product.productSizes.reduce((sum, size) => sum + size.stockQuantity, 0)
               : product.stockQuantity,
-            availableForCustomers: sharedAvailableStock,
-            isSharedStock: true,
-            lastCalculated: new Date().toISOString()
+            availableStock: sharedAvailableStock,
+            pendingOrders: product.stockQuantity - sharedAvailableStock
           }
         }
       })
     )
 
-    // 🔄 NEW: Filter products that have available shared stock
-    const availableProducts = productsWithSharedStock.filter(product => {
-      const hasStock = product.stockQuantity > 0
-      console.log(`🔄 Product ${product.name}: Original=${product.originalStockQuantity}, Shared=${product.stockQuantity}, Available=${hasStock}`)
-      return hasStock
-    })
-
-    console.log(`🔄 SHARED STOCK: ${availableProducts.length} products available after shared stock filtering`)
-
-    // 🔄 ENHANCED: Calculate total count with shared stock consideration
-    const totalAvailableCount = availableProducts.length
-
-    // Apply pagination to filtered results
-    const paginatedProducts = availableProducts.slice(skip, skip + validatedLimit)
-
-    // 🔄 ENHANCED: Add shared stock summary to response
+    // Calculate shared stock summary
     const sharedStockSummary = {
-      totalProductsInCatalog: allProducts.length,
-      totalAvailableProducts: totalAvailableCount,
-      totalOutOfStock: allProducts.length - totalAvailableCount,
-      sharedStockEnabled: true,
-      calculatedAt: new Date().toISOString()
+      totalProducts: allProducts.length,
+      inStock: productsWithSharedStock.filter(p => p.stockQuantity > 0).length,
+      lowStock: productsWithSharedStock.filter(p => p.stockQuantity > 0 && p.stockQuantity <= p.lowStockAlert).length,
+      outOfStock: productsWithSharedStock.filter(p => p.stockQuantity === 0).length
     }
 
-    // Return enhanced response
     return NextResponse.json({
       success: true,
-      products: paginatedProducts,
+      products: productsWithSharedStock,
       pagination: {
         page: validatedPage,
         limit: validatedLimit,
@@ -256,7 +343,6 @@ export async function GET(request: NextRequest) {
         hasNext: validatedPage * validatedLimit < totalAvailableCount,
         hasPrev: validatedPage > 1
       },
-      // 🔄 NEW: Shared stock analytics
       sharedStockSummary,
       systemInfo: {
         stockSystem: 'shared_stock_v1',
@@ -265,7 +351,7 @@ export async function GET(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('🔄 SHARED STOCK: Error fetching customer products:', error)
+    console.error('🔄 SHARED STOCK: Error fetching products:', error)
     return NextResponse.json(
       { 
         success: false,
@@ -286,109 +372,231 @@ export async function GET(request: NextRequest) {
 }
 
 // =====================================
-// 🔄 NEW: SHARED STOCK VALIDATION ENDPOINT
+// POST HANDLER - DUAL FUNCTIONALITY
 // =====================================
 
-/**
- * POST endpoint for real-time stock validation during checkout
- * This ensures stock availability before order creation
- */
 export async function POST(request: NextRequest) {
   try {
-    const { items } = await request.json()
+    const session = await getSession()
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
 
-    if (!items || !Array.isArray(items)) {
+    const body = await request.json()
+
+    // ✅ INTELLIGENT REQUEST DETECTION
+    // Check if this is a stock validation request or product creation request
+    if (body.items && Array.isArray(body.items)) {
+      // This is a STOCK VALIDATION REQUEST
+      return handleStockValidation(body as StockValidationRequest)
+    } else if (body.name && body.sku) {
+      // This is a PRODUCT CREATION REQUEST
+      return handleProductCreation(body as ProductCreateRequest)
+    } else {
       return NextResponse.json(
-        { error: 'Items array is required' },
+        { error: 'Invalid request format. Expected either product creation data or stock validation items.' },
         { status: 400 }
       )
     }
 
-    console.log('🔄 SHARED STOCK: Validating stock for items:', items)
+  } catch (error) {
+    console.error('Error in POST handler:', error)
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    )
+  }
+}
 
-    const validationResults = await Promise.all(
-      items.map(async (item: any) => {
-        const { productId, productSizeId, quantity } = item
+// =====================================
+// STOCK VALIDATION HANDLER (EXISTING)
+// =====================================
 
-        // Get product info
-        const product = await db.product.findUnique({
-          where: { id: productId },
-          select: {
-            id: true,
-            name: true,
-            requiresSizes: true,
-            stockQuantity: true,
+async function handleStockValidation(body: StockValidationRequest) {
+  const { items } = body
+
+  if (!items || !Array.isArray(items)) {
+    return NextResponse.json(
+      { error: 'Items array is required' },
+      { status: 400 }
+    )
+  }
+
+  console.log('🔄 SHARED STOCK: Validating stock for items:', items)
+
+  const validationResults = await Promise.all(
+    items.map(async (item: any) => {
+      const { productId, productSizeId, quantity } = item
+
+      // Get product with stock information
+      const stockResult = await checkSharedStockForItem(productId, quantity, productSizeId)
+
+      return {
+        productId,
+        productSizeId: productSizeId || null,
+        requestedQuantity: quantity,
+        availableQuantity: stockResult.availableQuantity,
+        isAvailable: stockResult.isAvailable,
+        maxAllowedQuantity: stockResult.availableQuantity,
+        message: stockResult.isAvailable 
+          ? `${stockResult.availableQuantity} available`
+          : 'Out of stock'
+      }
+    })
+  )
+
+  const allItemsValid = validationResults.every(result => result.isAvailable)
+
+  return NextResponse.json({
+    success: true,
+    isValid: allItemsValid,
+    items: validationResults,
+    systemInfo: {
+      stockSystem: 'shared_stock_v1',
+      validatedAt: new Date().toISOString()
+    }
+  })
+}
+
+// =====================================
+// PRODUCT CREATION HANDLER (NEW)
+// =====================================
+
+async function handleProductCreation(productData: ProductCreateRequest) {
+  console.log('🎯 Creating new product:', productData.name)
+
+  // Validate required fields
+  if (!productData.name || !productData.sku) {
+    return NextResponse.json({ 
+      error: 'Name and SKU are required' 
+    }, { status: 400 })
+  }
+
+  // Check for duplicate SKU
+  const duplicateSku = await db.product.findFirst({
+    where: { sku: productData.sku }
+  })
+
+  if (duplicateSku) {
+    return NextResponse.json({ 
+      error: 'SKU already exists' 
+    }, { status: 409 })
+  }
+
+  // Check for duplicate barcode if provided
+  if (productData.barcode) {
+    const duplicateBarcode = await db.product.findFirst({
+      where: { barcode: productData.barcode }
+    })
+
+    if (duplicateBarcode) {
+      return NextResponse.json({ 
+        error: 'Barcode already exists' 
+      }, { status: 409 })
+    }
+  }
+
+  // Prepare product data for database
+  const dbProductData = {
+    sku: productData.sku,
+    name: productData.name,
+    description: productData.description || '',
+    shortDescription: productData.shortDescription || '',
+    categoryId: productData.categoryId,
+    countryId: productData.countryId,
+    supplierId: productData.supplierId,
+    barcode: productData.barcode || null,
+    barcodeType: productData.barcodeType || 'CODE128',
+    originalPrice: Number(productData.originalPrice),
+    originalCurrency: productData.originalCurrency,
+    quantity: Number(productData.quantity),
+    gstPercentage: Number(productData.gstPercentage),
+    shippingCost: Number(productData.shippingCost),
+    conversionCharges: Number(productData.conversionCharges),
+    additionalExpenses: Number(productData.additionalExpenses),
+    costPriceUSD: Number(productData.costPriceUSD),
+    piecePriceUSD: Number(productData.piecePriceUSD),
+    profitMargin: Number(productData.profitMargin),
+    discountPercentage: Number(productData.discountPercentage),
+    showDiscountToCustomers: productData.showDiscountToCustomers ?? true,
+    sellingPriceUSD: Number(productData.sellingPriceUSD),
+    stockQuantity: Number(productData.stockQuantity),
+    lowStockAlert: Number(productData.lowStockAlert),
+    tags: productData.tags || [],
+    images: productData.images || [],
+    seoTitle: productData.seoTitle || '',
+    seoDescription: productData.seoDescription || '',
+    purchaseDate: productData.purchaseDate ? new Date(productData.purchaseDate) : null,
+    invoiceNumber: productData.invoiceNumber || '',
+    isActive: productData.isActive ?? true,
+    isFeatured: productData.isFeatured ?? false,
+    status: productData.status || ProductStatus.DRAFT,
+    publishedAt: productData.status === ProductStatus.PUBLISHED ? new Date() : null,
+    requiresSizes: productData.requiresSizes || false,
+    createdAt: new Date(),
+    updatedAt: new Date()
+  }
+
+  try {
+    // Create product with potential sizes in a transaction
+    const result = await db.$transaction(async (tx) => {
+      // Create the main product
+      const createdProduct = await tx.product.create({
+        data: dbProductData,
+        include: {
+          category: true,
+          country: true,
+          supplier: true
+        }
+      })
+
+      // Create product sizes if provided
+      if (productData.requiresSizes && productData.productSizes && productData.productSizes.length > 0) {
+        const sizesData = productData.productSizes.map((size, index) => ({
+          productId: createdProduct.id,
+          size: size.size,
+          sku: size.sku,
+          stockQuantity: Number(size.stockQuantity),
+          lowStockAlert: Number(size.lowStockAlert),
+          isActive: size.isActive ?? true,
+          sortOrder: size.sortOrder ?? index
+        }))
+
+        await tx.productSize.createMany({
+          data: sizesData
+        })
+
+        // Fetch the product with sizes for response
+        const productWithSizes = await tx.product.findUnique({
+          where: { id: createdProduct.id },
+          include: {
+            category: true,
+            country: true,
+            supplier: true,
             productSizes: {
-              where: { id: productSizeId || undefined },
-              select: { stockQuantity: true, size: true }
+              orderBy: { sortOrder: 'asc' }
             }
           }
         })
 
-        if (!product) {
-          return {
-            productId,
-            available: false,
-            message: 'Product not found',
-            availableQuantity: 0
-          }
-        }
+        return productWithSizes
+      }
 
-        // Calculate shared available stock
-        let availableQuantity: number
-        
-        if (product.requiresSizes && productSizeId) {
-          const size = product.productSizes[0]
-          if (!size) {
-            return {
-              productId,
-              productSizeId,
-              available: false,
-              message: 'Size not found',
-              availableQuantity: 0
-            }
-          }
-          
-          availableQuantity = await calculateSizeSharedStock(productId, productSizeId, size.stockQuantity)
-        } else {
-          const totalSold = await calculateTotalSoldAllChannels(productId)
-          availableQuantity = Math.max(0, product.stockQuantity - totalSold)
-        }
+      return createdProduct
+    })
 
-        const isAvailable = availableQuantity >= quantity
-
-        return {
-          productId,
-          productSizeId,
-          available: isAvailable,
-          requestedQuantity: quantity,
-          availableQuantity,
-          message: isAvailable 
-            ? `${availableQuantity} available` 
-            : availableQuantity === 0 
-              ? 'Out of stock' 
-              : `Only ${availableQuantity} available`,
-          productName: product.name
-        }
-      })
-    )
-
-    const allAvailable = validationResults.every(result => result.available)
+    console.log('✅ Product created successfully:', result.id)
 
     return NextResponse.json({
       success: true,
-      allAvailable,
-      items: validationResults,
-      systemInfo: {
-        stockSystem: 'shared_stock_v1',
-        validatedAt: new Date().toISOString()
-      }
-    })
+      message: 'Product created successfully',
+      product: result
+    }, { status: 201 })
 
   } catch (error) {
-    console.error('🔄 SHARED STOCK: Stock validation error:', error)
+    console.error('❌ Error creating product:', error)
     return NextResponse.json(
-      { error: 'Failed to validate stock' },
+      { error: 'Failed to create product' },
       { status: 500 }
     )
   }

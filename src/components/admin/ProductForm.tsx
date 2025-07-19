@@ -1,6 +1,7 @@
 // =====================================
 // src/components/admin/ProductForm.tsx - WITH ENHANCED AI CONTENT GENERATION
 // Complete ProductForm with Image Upload + Enhanced AI Generation + Clean Configuration
+// ✅ FIXED: Removed duplicate inventory section
 // =====================================
 
 'use client'
@@ -30,6 +31,8 @@ import ProductSizeManager from '@/components/admin/ProductSizeManager'
 import ProductBarcodeGenerator from '@/components/admin/ProductBarcodeGenerator'
 import ProductSEO from '@/components/admin/ProductSEO'
 import ImageUpload from '@/components/admin/ImageUpload'
+// ✅ REMOVED: ProductInventory import (causing duplicate sections)
+// import ProductInventory from '@/components/admin/ProductInventory'
 
 // ✅ AI Components
 import AIGenerateButton from '@/components/admin/AIGenerateButton'
@@ -908,7 +911,8 @@ export default function ProductForm({
           onToggleCustomerPreview={() => setShowCustomerPreview(!showCustomerPreview)}
         />
 
-        {/* 5. Size Management */}
+        {/* ✅ FIXED: ProductSizeManager with Traditional Inventory support */}
+        {/* 5. Size Management & Inventory (ProductSizeManager handles both cases) */}
         <ProductSizeManager
           requiresSizes={formData.requiresSizes}
           productSizes={formData.productSizes}
@@ -918,6 +922,11 @@ export default function ProductForm({
           onSizesChange={handleSizesChange}
           onError={setError}
           onClearError={clearError}
+          // ✅ ADDED: Traditional inventory props
+          stockQuantity={formData.stockQuantity}
+          lowStockAlert={formData.lowStockAlert}
+          onStockQuantityChange={(value) => handleInputChange('stockQuantity', value)}
+          onLowStockAlertChange={(value) => handleInputChange('lowStockAlert', value)}
         />
 
         {/* 6. Barcode Generation */}
@@ -926,14 +935,13 @@ export default function ProductForm({
           barcode={formData.barcode}
           barcodeType={formData.barcodeType}
           barcodeNeedsUpdate={barcodeNeedsUpdate}
-          requiresSizes={formData.requiresSizes}           // ✅ ADDED - Missing prop
-          productSizes={formData.productSizes}             // ✅ ADDED - Missing prop
+          requiresSizes={formData.requiresSizes}
+          productSizes={formData.productSizes}
           onBarcodeChange={(barcode) => handleInputChange('barcode', barcode)}
           onBarcodeTypeChange={(type) => handleInputChange('barcodeType', type)}
           onBarcodeGenerated={handleBarcodeGenerated}
           onUpdateNeeded={setBarcodeNeedsUpdate}
-          onSizeBarcodeGenerated={(sizeIndex, barcode) => {  // ✅ ADDED - Optional handler
-            // Handle size-specific barcode generation if needed
+          onSizeBarcodeGenerated={(sizeIndex, barcode) => {
             console.log(`Size ${sizeIndex} barcode generated:`, barcode)
           }}
         />
@@ -1030,3 +1038,4 @@ export default function ProductForm({
 // ✅ Material and fabric input for AI
 // ✅ Cultural context and target audience specification
 // ✅ Image analysis ready integration
+// ✅ FIXED: Removed duplicate inventory management sections - ProductSizeManager handles all inventory
