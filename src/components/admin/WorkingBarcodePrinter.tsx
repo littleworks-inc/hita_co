@@ -1,5 +1,5 @@
 // src/components/admin/WorkingBarcodePrinter.tsx
-// 🔧 ENHANCED: Working barcode printer with size variant support
+// 🔧 ENHANCED: Working barcode printer with individual size printing
 "use client"
 
 import React, { useState, useRef, useEffect } from 'react'
@@ -60,6 +60,7 @@ const WorkingBarcodePrinter: React.FC<WorkingBarcodePrinterProps> = ({
   const [selectedSizes, setSelectedSizes] = useState<string[]>([])
   const [status, setStatus] = useState('')
   const [isPrinting, setIsPrinting] = useState(false)
+  const [printingSize, setPrintingSize] = useState<string | null>(null) // Track which size is being printed
   const [barcodeDataUrls, setBarcodeDataUrls] = useState<{[key: string]: string}>({})
   const [isGenerating, setIsGenerating] = useState(false)
   
@@ -75,108 +76,83 @@ const WorkingBarcodePrinter: React.FC<WorkingBarcodePrinterProps> = ({
 
   // Generate main barcode on mount
   useEffect(() => {
-    if (mainBarcode && canvasRef.current) {
+    if (mainBarcode) {
       generateBarcodeForCode('main', mainBarcode)
     }
   }, [mainBarcode])
 
-  // Generate barcode for specific code
-  const generateBarcodeForCode = async (key: string, barcodeText: string) => {
-    if (isGenerating) return
-    
+  // Generate barcode using canvas and CODE128 encoding
+  const generateBarcodeForCode = async (key: string, barcodeValue: string) => {
+    if (!canvasRef.current || isGenerating) return
+
     setIsGenerating(true)
-
     try {
-      console.log(`🔄 Generating barcode for ${key}:`, barcodeText)
-
-      const canvas = document.createElement('canvas')
-      const ctx = canvas.getContext('2d')
-
-      if (!ctx) {
-        throw new Error('Canvas context not available')
-      }
-
-      // Set canvas size
-      canvas.width = 400
-      canvas.height = 120
-
-      // Clear with white background
-      ctx.fillStyle = '#ffffff'
+      const canvas = canvasRef.current
+      const ctx = canvas.getContext('2d')!
+      
+      // Setup canvas
+      canvas.width = 300
+      canvas.height = 100
+      ctx.fillStyle = 'white'
       ctx.fillRect(0, 0, canvas.width, canvas.height)
+      ctx.fillStyle = 'black'
 
-      // Generate barcode pattern based on text
-      ctx.fillStyle = '#000000'
-      
+      // Simple CODE128 pattern generation
+      const barWidth = 2
+      let x = 20
       const barHeight = 60
-      const startX = 30
       const startY = 20
-      
-      let x = startX
-      
-      // Start pattern
-      ctx.fillRect(x, startY, 3, barHeight); x += 5
-      ctx.fillRect(x, startY, 1, barHeight); x += 3
-      ctx.fillRect(x, startY, 3, barHeight); x += 6
-      
-      // Encode each character
-      for (let i = 0; i < barcodeText.length && x < canvas.width - 50; i++) {
-        const char = barcodeText[i]
-        const code = char.charCodeAt(0)
+
+      // Generate barcode pattern
+      for (let i = 0; i < barcodeValue.length; i++) {
+        const char = barcodeValue[i]
+        const pattern = CODE128_CHARS[char] || CODE128_CHARS['A'] // fallback
         
-        // Create pattern based on character code
-        const pattern = [
-          (code % 7) + 1,  // Variable width bars
-          2,               // Space
-          (code % 5) + 1,  // Variable width bars
-          1,               // Space
-          (code % 3) + 2,  // Variable width bars
-          2                // Space
-        ]
-        
-        for (let j = 0; j < pattern.length && x < canvas.width - 50; j++) {
-          if (j % 2 === 0) { // Draw bars on even indices
-            ctx.fillRect(x, startY, pattern[j], barHeight)
+        for (let j = 0; j < pattern.length; j++) {
+          if (pattern[j] === '1') {
+            ctx.fillRect(x, startY, barWidth, barHeight)
           }
-          x += pattern[j]
+          x += barWidth
         }
-        x += 2 // Character spacing
       }
-      
-      // End pattern
-      ctx.fillRect(x, startY, 3, barHeight); x += 5
-      ctx.fillRect(x, startY, 1, barHeight); x += 3
-      ctx.fillRect(x, startY, 3, barHeight)
-      
-      // Add text below
-      ctx.font = 'bold 14px monospace'
+
+      // Add text below barcode
+      ctx.font = '12px Arial'
       ctx.textAlign = 'center'
-      ctx.fillText(barcodeText, canvas.width / 2, startY + barHeight + 25)
+      ctx.fillText(barcodeValue, canvas.width / 2, startY + barHeight + 20)
 
       // Convert to data URL
-      const dataUrl = canvas.toDataURL('image/png', 1.0)
-      setBarcodeDataUrls(prev => ({ ...prev, [key]: dataUrl }))
-      
-      console.log(`✅ Barcode generated for ${key}`)
+      const dataUrl = canvas.toDataURL('image/png')
+      setBarcodeDataUrls(prev => ({
+        ...prev,
+        [key]: dataUrl
+      }))
 
+      if (key === 'main' && onBarcodeGenerated) {
+        onBarcodeGenerated(barcodeValue)
+      }
     } catch (error) {
-      console.error(`❌ Barcode generation failed for ${key}:`, error)
+      console.error('Error generating barcode:', error)
+      setStatus('Error generating barcode')
     } finally {
       setIsGenerating(false)
     }
   }
 
-  // Generate all size barcodes
-  const generateAllSizeBarcodes = async () => {
+  // Generate barcodes for all sizes
+  const generateAllSizeBarcodes = () => {
     if (!product.requiresSizes || !product.productSizes) return
-    
-    setStatus('Generating size barcodes...')
     
     for (const size of product.productSizes) {
       const sizeBarcode = `${product.sku}-${size.size.toUpperCase()}`
-      await generateBarcodeForCode(`size-${size.size}`, sizeBarcode)
+      generateBarcodeForCode(`size-${size.size}`, sizeBarcode)
     }
-    
-    setStatus('✅ All size barcodes generated!')
+  }
+
+  // Copy barcode to clipboard
+  const copyBarcode = (barcode: string) => {
+    navigator.clipboard.writeText(barcode)
+    setStatus(`Copied: ${barcode}`)
     setTimeout(() => setStatus(''), 2000)
   }
 
@@ -199,7 +175,131 @@ const WorkingBarcodePrinter: React.FC<WorkingBarcodePrinterProps> = ({
     )
   }
 
-  // Print labels based on mode
+  // 🆕 ENHANCED: Print individual size label
+  const printSizeLabel = async (size: string) => {
+    const sizeKey = `size-${size}`
+    const sizeBarcode = `${product.sku}-${size.toUpperCase()}`
+    const dataUrl = barcodeDataUrls[sizeKey]
+
+    if (!dataUrl) {
+      setStatus(`No barcode available for size ${size} - generate first`)
+      return
+    }
+
+    setPrintingSize(size)
+    setStatus(`Printing size ${size} label...`)
+
+    try {
+      // Create HTML for individual size label
+      const printContent = `<!DOCTYPE html>
+<html>
+<head>
+<title>Size ${size} Label - ${product.name}</title>
+<style>
+@page { 
+  margin: 0; 
+  size: 60mm 40mm; 
+}
+body {
+  margin: 0;
+  padding: 0;
+  font-family: Arial, sans-serif;
+  font-size: 8px;
+}
+.label {
+  width: 60mm;
+  height: 40mm;
+  padding: 2mm;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  border: 1px solid #ddd;
+}
+.name { 
+  font-weight: bold; 
+  font-size: 9px; 
+  margin-bottom: 1mm;
+  max-height: 8mm;
+  overflow: hidden;
+  line-height: 1.1;
+}
+.size-info {
+  font-weight: bold;
+  font-size: 11px;
+  color: #2563eb;
+  margin-bottom: 1mm;
+}
+.barcode { 
+  margin: 1mm 0;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.barcode img { 
+  width: auto; 
+  height: auto; 
+  max-width: 54mm; 
+  max-height: 15mm;
+}
+.info { 
+  font-size: 7px; 
+  margin: 0.5mm 0; 
+  color: #555;
+}
+.price { 
+  font-weight: bold; 
+  color: #059669; 
+  font-size: 8px; 
+}
+@media print {
+  body { margin: 0; }
+  .label { border: none; margin: 0; }
+}
+</style>
+</head>
+<body>
+<div class="label">
+  ${includeName ? `<div class="name">${product.name}</div>` : ''}
+  <div class="size-info">Size: ${size.toUpperCase()}</div>
+  <div class="barcode">
+    <img src="${dataUrl}" alt="Size ${size} barcode">
+  </div>
+  ${includeSku ? `<div class="info">SKU: ${sizeBarcode}</div>` : ''}
+  ${includePrice ? `<div class="price">$${product.sellingPriceUSD.toFixed(2)}</div>` : ''}
+</div>
+</body>
+</html>`
+
+      // Open print dialog
+      const printWindow = window.open('', '_blank')
+      if (printWindow) {
+        printWindow.document.write(printContent)
+        printWindow.document.close()
+        printWindow.focus()
+        
+        setTimeout(() => {
+          printWindow.print()
+          printWindow.close()
+        }, 250)
+      }
+
+      setStatus(`Size ${size} label sent to printer`)
+      setTimeout(() => setStatus(''), 3000)
+
+    } catch (error) {
+      console.error('Error printing size label:', error)
+      setStatus(`Failed to print size ${size} label`)
+      setTimeout(() => setStatus(''), 3000)
+    } finally {
+      setPrintingSize(null)
+    }
+  }
+
+  // Print labels based on mode (existing bulk functionality)
   const printLabels = async () => {
     if (isPrinting) return
 
@@ -303,6 +403,12 @@ body {
   overflow: hidden;
   line-height: 1.1;
 }
+.size-info {
+  font-weight: bold;
+  font-size: 11px;
+  color: #2563eb;
+  margin-bottom: 1mm;
+}
 .barcode { 
   margin: 1mm 0;
   flex: 1;
@@ -314,7 +420,7 @@ body {
   width: auto; 
   height: auto; 
   max-width: 54mm; 
-  max-height: 18mm;
+  max-height: 15mm;
 }
 .info { 
   font-size: 7px; 
@@ -326,11 +432,6 @@ body {
   color: #059669; 
   font-size: 8px; 
 }
-.size-info {
-  font-weight: bold;
-  color: #2563eb;
-  font-size: 7px;
-}
 @media print {
   body { margin: 0; }
   .label { border: none; margin: 0; }
@@ -340,20 +441,20 @@ body {
 <body>`
 
       // Generate labels for each item and copy
-      for (const item of itemsToPrint) {
-        for (let copy = 1; copy <= copies; copy++) {
-          const isMainProduct = item.key === 'main'
-          const productNameToShow = isMainProduct ? product.name : `${product.name} - ${item.label}`
+      for (let copy = 1; copy <= copies; copy++) {
+        for (const item of itemsToPrint) {
+          const isSize = item.key.startsWith('size-')
+          const sizeLabel = isSize ? item.key.replace('size-', '').toUpperCase() : ''
           
           printContent += `
 <div class="label">
-  ${includeName ? `<div class="name">${productNameToShow}</div>` : ''}
+  ${includeName ? `<div class="name">${product.name}</div>` : ''}
+  ${isSize ? `<div class="size-info">Size: ${sizeLabel}</div>` : ''}
   <div class="barcode">
-    <img src="${item.dataUrl}" alt="Barcode ${item.barcode}">
+    <img src="${item.dataUrl}" alt="${item.label} barcode">
   </div>
   ${includeSku ? `<div class="info">SKU: ${item.barcode}</div>` : ''}
-  ${!isMainProduct ? `<div class="size-info">${item.label}</div>` : ''}
-  ${includePrice ? `<div class="info price">$${product.sellingPriceUSD.toFixed(2)}</div>` : ''}
+  ${includePrice ? `<div class="price">$${product.sellingPriceUSD.toFixed(2)}</div>` : ''}
 </div>`
         }
       }
@@ -362,46 +463,39 @@ body {
 </body>
 </html>`
 
-      const printWindow = window.open('', '_blank', 'width=400,height=600')
+      // Open print dialog
+      const printWindow = window.open('', '_blank')
       if (printWindow) {
         printWindow.document.write(printContent)
         printWindow.document.close()
+        printWindow.focus()
         
-        printWindow.onload = () => {
-          setTimeout(() => {
-            printWindow.print()
-            setStatus('✅ Print dialog opened')
-            setTimeout(() => setStatus(''), 2000)
-          }, 500)
-        }
-      } else {
-        setStatus('❌ Failed to open print window')
-        setTimeout(() => setStatus(''), 3000)
+        setTimeout(() => {
+          printWindow.print()
+          printWindow.close()
+        }, 250)
       }
 
+      setStatus(`${itemsToPrint.length * copies} label(s) sent to printer`)
+      setTimeout(() => setStatus(''), 3000)
+
     } catch (error) {
-      console.error('Print error:', error)
-      setStatus('❌ Print failed')
+      console.error('Error printing labels:', error)
+      setStatus('Failed to print labels')
       setTimeout(() => setStatus(''), 3000)
     } finally {
       setIsPrinting(false)
     }
   }
 
-  const copyBarcode = (barcode: string) => {
-    navigator.clipboard.writeText(barcode)
-    setStatus(`Copied: ${barcode}`)
-    setTimeout(() => setStatus(''), 2000)
-  }
-
   return (
     <Card className="w-full">
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-lg flex items-center gap-2">
-            <Printer className="h-5 w-5" />
-            Working Barcode Printer
-          </CardTitle>
+      <CardHeader>
+        <CardTitle className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Printer className="h-5 w-5 text-blue-600" />
+            <span>Working Barcode Printer</span>
+          </div>
           <Button
             variant="ghost"
             size="sm"
@@ -409,22 +503,21 @@ body {
           >
             {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
           </Button>
-        </div>
+        </CardTitle>
         {status && (
-          <div className={`text-sm font-medium ${
-            status.includes('✅') || status.includes('generated') || status.includes('ready') ? 'text-green-600' :
-            status.includes('❌') || status.includes('failed') ? 'text-red-600' :
-            'text-blue-600'
-          }`}>
+          <div className="text-sm text-blue-600 bg-blue-50 p-2 rounded">
             {status}
           </div>
         )}
       </CardHeader>
+      
+      <CardContent className="space-y-6">
+        {/* Hidden canvas for barcode generation */}
+        <canvas ref={canvasRef} style={{ display: 'none' }} />
 
-      <CardContent className="space-y-4">
-        {/* Main Barcode Display */}
-        <div className="bg-white border rounded-lg p-4 text-center">
-          <div className="text-sm font-medium text-gray-700 mb-2">Main Product Barcode</div>
+        {/* Main Product Barcode */}
+        <div className="text-center space-y-3">
+          <h4 className="font-medium">Main Product Barcode</h4>
           
           {isGenerating ? (
             <div className="py-4">
@@ -488,6 +581,7 @@ body {
                 const sizeBarcode = `${product.sku}-${size.size.toUpperCase()}`
                 const hasBarcode = !!barcodeDataUrls[sizeKey]
                 const isSelected = selectedSizes.includes(size.size)
+                const isPrintingThis = printingSize === size.size
 
                 return (
                   <div key={size.size} className={`border rounded-lg p-3 ${isSelected ? 'border-blue-500 bg-blue-50' : 'border-gray-200'}`}>
@@ -509,19 +603,42 @@ body {
                           className="mx-auto border border-gray-200 rounded mb-2"
                           style={{ maxHeight: '60px', maxWidth: '100%' }}
                         />
-                        <div className="text-xs text-gray-600 font-mono">{sizeBarcode}</div>
-                        <Button
-                          onClick={() => copyBarcode(sizeBarcode)}
-                          variant="ghost"
-                          size="sm"
-                          className="mt-1 h-6 text-xs"
-                        >
-                          <Copy className="h-3 w-3" />
-                        </Button>
+                        <div className="text-xs text-gray-600 font-mono mb-2">{sizeBarcode}</div>
+                        
+                        {/* 🆕 ENHANCED: Individual size print and copy buttons */}
+                        <div className="flex gap-1 justify-center">
+                          <Button
+                            onClick={() => printSizeLabel(size.size)}
+                            variant="outline"
+                            size="sm"
+                            className="h-6 text-xs px-2"
+                            disabled={isPrintingThis}
+                          >
+                            <Printer className="h-3 w-3 mr-1" />
+                            {isPrintingThis ? 'Printing...' : 'Print'}
+                          </Button>
+                          <Button
+                            onClick={() => copyBarcode(sizeBarcode)}
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 text-xs px-2"
+                          >
+                            <Copy className="h-3 w-3" />
+                          </Button>
+                        </div>
                       </div>
                     ) : (
                       <div className="text-center py-4 text-gray-400">
                         <div className="text-xs">No barcode</div>
+                        <Button
+                          onClick={() => generateBarcodeForCode(sizeKey, sizeBarcode)}
+                          variant="outline"
+                          size="sm"
+                          className="mt-2 h-6 text-xs"
+                          disabled={isGenerating}
+                        >
+                          Generate
+                        </Button>
                       </div>
                     )}
                   </div>
@@ -536,7 +653,7 @@ body {
           <div className="space-y-4 pt-4 border-t">
             <div className="flex items-center gap-2 text-sm font-medium">
               <Settings className="h-4 w-4" />
-              Print Settings
+              Bulk Print Settings
             </div>
 
             {/* Print Mode */}
@@ -592,7 +709,7 @@ body {
               </div>
               <div className="flex items-end">
                 <div className="text-xs text-gray-600">
-                  Custom barcode generation with size variant support
+                  Individual size printing + bulk options
                 </div>
               </div>
             </div>
