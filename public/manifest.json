@@ -1,0 +1,141 @@
+{
+  "name": "Hita&Co Mobile Admin & POS",
+  "short_name": "Hita&Co Mobile",
+  "description": "Mobile admin panel and exhibition POS system for Hita&Co eCommerce platform",
+  "start_url": "/admin/mobile",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#8b5cf6",
+  "orientation": "portrait-primary",
+  "scope": "/",
+  "lang": "en",
+  "categories": ["business", "productivity", "shopping"],
+  "icons": [
+    {
+      "src": "/icons/icon-72x72.png",
+      "sizes": "72x72",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "/icons/icon-96x96.png",
+      "sizes": "96x96",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "/icons/icon-128x128.png",
+      "sizes": "128x128",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "/icons/icon-144x144.png",
+      "sizes": "144x144",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "/icons/icon-152x152.png",
+      "sizes": "152x152",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "/icons/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "/icons/icon-384x384.png",
+      "sizes": "384x384",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "/icons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable any"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Admin Dashboard",
+      "short_name": "Admin",
+      "description": "Access the mobile admin dashboard",
+      "url": "/admin/mobile",
+      "icons": [
+        {
+          "src": "/icons/admin-shortcut.png",
+          "sizes": "96x96"
+        }
+      ]
+    },
+    {
+      "name": "Exhibition POS",
+      "short_name": "POS",
+      "description": "Quick access to exhibition point-of-sale",
+      "url": "/exhibition",
+      "icons": [
+        {
+          "src": "/icons/pos-shortcut.png",
+          "sizes": "96x96"
+        }
+      ]
+    },
+    {
+      "name": "Add Product",
+      "short_name": "Add Product",
+      "description": "Quick add new product",
+      "url": "/admin/products/new",
+      "icons": [
+        {
+          "src": "/icons/add-product-shortcut.png",
+          "sizes": "96x96"
+        }
+      ]
+    },
+    {
+      "name": "Inventory",
+      "short_name": "Inventory",
+      "description": "Check inventory levels",
+      "url": "/admin/inventory",
+      "icons": [
+        {
+          "src": "/icons/inventory-shortcut.png",
+          "sizes": "96x96"
+        }
+      ]
+    }
+  ],
+  "related_applications": [],
+  "prefer_related_applications": false,
+  "screenshots": [
+    {
+      "src": "/screenshots/admin-dashboard-mobile.png",
+      "type": "image/png",
+      "sizes": "540x720",
+      "form_factor": "narrow"
+    },
+    {
+      "src": "/screenshots/pos-mobile.png",
+      "type": "image/png",
+      "sizes": "540x720",
+      "form_factor": "narrow"
+    },
+    {
+      "src": "/screenshots/admin-dashboard-tablet.png",
+      "type": "image/png",
+      "sizes": "1024x768",
+      "form_factor": "wide"
+    }
+  ],
+  "features": [
+    "offline-support",
+    "barcode-scanning",
+    "touch-optimized",
+    "real-time-sync"
+  ]
+}
