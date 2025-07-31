@@ -1,8 +1,6 @@
 // src/app/api/admin/barcode-labels/route.ts
-// =====================================
-// 🚀 Admin Barcode Printing API
+// 🔧 SIMPLIFIED: Only CODE128 barcode format - removed multiple format handling
 // Handle barcode label printing for admin product management
-// =====================================
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth'
@@ -54,7 +52,7 @@ const PRINT_DENSITIES = {
   '600': { dpi: 600, name: '600 DPI (Ultra High)' }
 }
 
-// Generate ZPL code for thermal printers
+// Generate ZPL code for thermal printers (CODE128 only)
 function generateZPLCode(product: ProductLabelData, settings: AdminLabelRequest): string {
   const labelDimensions = LABEL_SIZES[settings.labelSize as keyof typeof LABEL_SIZES]
   const dpi = PRINT_DENSITIES[settings.printDensity as keyof typeof PRINT_DENSITIES].dpi
@@ -80,44 +78,43 @@ function generateZPLCode(product: ProductLabelData, settings: AdminLabelRequest)
     const maxNameLength = settings.labelSize === '30x20' ? 15 : 
                          settings.labelSize === '40x30' ? 20 : 25
     const displayName = product.name.length > maxNameLength 
-      ? product.name.substring(0, maxNameLength) + '...'
+      ? product.name.substring(0, maxNameLength) + '...' 
       : product.name
-    zpl += `^FO${centerX - 100},${yPos}^A0N,25,25^FD${displayName}^FS\n`
-    yPos += 40
-  }
-
-  // Barcode
-  if (product.barcode) {
-    zpl += `^FO${centerX - 100},${yPos}^BY2^BCN,40,Y,N,N^FD${product.barcode}^FS\n`
-    yPos += 60
-  } else {
-    // Use SKU as fallback barcode
-    zpl += `^FO${centerX - 100},${yPos}^BY2^BCN,40,Y,N,N^FD${product.sku}^FS\n`
-    yPos += 60
-  }
-
-  // SKU
-  if (settings.includeSku && product.sku) {
-    zpl += `^FO${centerX - 80},${yPos}^A0N,20,20^FDSKU: ${product.sku}^FS\n`
+    zpl += `^FO${centerX - 80},${yPos}^A0N,20,20^FD${displayName}^FS\n`
     yPos += 30
   }
 
+  // CODE128 Barcode - always use CODE128 format
+  const barcodeData = product.barcode || product.sku
+  const barcodeWidth = settings.labelSize === '30x20' ? width - 20 : width - 40
+  const barcodeHeight = Math.min(60, height - yPos - 40)
+  
+  zpl += `^FO${centerX - Math.floor(barcodeWidth/2)},${yPos}^BCN,${barcodeHeight},Y,N,N^FD${barcodeData}^FS\n`
+  yPos += barcodeHeight + 10
+
   // Price
   if (settings.includePrice) {
-    zpl += `^FO${centerX - 60},${yPos}^A0N,30,30^FD${product.sellingPriceUSD.toFixed(2)}^FS\n`
-    yPos += 40
-  }
-
-  // Category
-  if (settings.includeCategory && product.category.name) {
-    zpl += `^FO${centerX - 50},${yPos}^A0N,18,18^FD${product.category.name}^FS\n`
+    zpl += `^FO${centerX - 40},${yPos}^A0N,18,18^FD$${product.sellingPriceUSD.toFixed(2)}^FS\n`
     yPos += 25
   }
 
-  // Size information
+  // SKU
+  if (settings.includeSku) {
+    zpl += `^FO${centerX - 60},${yPos}^A0N,16,16^FDSKU: ${product.sku}^FS\n`
+    yPos += 20
+  }
+
+  // Category
+  if (settings.includeCategory) {
+    zpl += `^FO${centerX - 60},${yPos}^A0N,16,16^FD${product.category.name}^FS\n`
+    yPos += 20
+  }
+
+  // Sizes (if product has sizes)
   if (settings.includeSizes && product.requiresSizes && product.productSizes?.length) {
     const sizeText = product.productSizes.map(s => s.size).join(', ')
-    const truncatedSizes = sizeText.length > 20 ? sizeText.substring(0, 20) + '...' : sizeText
+    const truncatedSizes = sizeText.length > 20 ? 
+      sizeText.substring(0, 20) + '...' : sizeText
     zpl += `^FO${centerX - 60},${yPos}^A0N,16,16^FDSizes: ${truncatedSizes}^FS\n`
     yPos += 25
   }
@@ -130,6 +127,9 @@ function generateZPLCode(product: ProductLabelData, settings: AdminLabelRequest)
   if (settings.customText && settings.customText.trim()) {
     zpl += `^FO${centerX - 80},${yPos}^A0N,18,18^FD${settings.customText}^FS\n`
   }
+
+  // Barcode format indicator
+  zpl += `^FO10,${height - 20}^A0N,12,12^FDCODE128^FS\n`
 
   zpl += `^XZ\n` // End of label
   return zpl
@@ -209,7 +209,8 @@ export async function GET(request: NextRequest) {
       totalProducts: products.length,
       inStockProducts: products.filter(p => p.stockQuantity > 0).length,
       productsWithBarcodes: products.filter(p => p.barcode).length,
-      categoriesCount: categories.length
+      categoriesCount: categories.length,
+      barcodeFormat: 'CODE128' // Always CODE128
     }
 
     return NextResponse.json({
@@ -224,7 +225,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST - Generate barcode labels
+// POST - Generate CODE128 barcode labels
 export async function POST(request: NextRequest) {
   try {
     const session = await getSession()
@@ -280,116 +281,38 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No valid products found' }, { status: 404 })
     }
 
-    // Generate ZPL code for each product
-    const labelData = []
-    let combinedZPL = ''
+    // Generate ZPL code for all products
+    let zplContent = ''
     let totalLabels = 0
 
     for (const product of products) {
-      const productLabel = {
-        id: product.id,
-        name: product.name,
-        sku: product.sku,
-        barcode: product.barcode,
-        sellingPriceUSD: product.sellingPriceUSD,
-        stockQuantity: product.stockQuantity,
-        category: product.category,
-        requiresSizes: product.requiresSizes,
-        productSizes: product.productSizes
+      for (let copy = 0; copy < labelRequest.copies; copy++) {
+        try {
+          zplContent += generateZPLCode(product, labelRequest) + '\n'
+          totalLabels++
+        } catch (error) {
+          console.error(`Error generating ZPL for product ${product.id}:`, error)
+        }
       }
+    }
 
-      // Generate ZPL for each copy
-      for (let copy = 1; copy <= labelRequest.copies; copy++) {
-        const zplCode = generateZPLCode(productLabel, labelRequest)
-        combinedZPL += zplCode + '\n'
-        totalLabels++
-      }
-
-      labelData.push({
-        product: productLabel,
-        zplCode: generateZPLCode(productLabel, labelRequest),
-        copies: labelRequest.copies
-      })
+    if (zplContent === '') {
+      return NextResponse.json({ error: 'Failed to generate any labels' }, { status: 500 })
     }
 
     return NextResponse.json({
       success: true,
-      labelData,
-      combinedZPL,
-      stats: {
-        productsProcessed: products.length,
-        totalLabels,
-        labelSize: LABEL_SIZES[labelRequest.labelSize as keyof typeof LABEL_SIZES].name,
-        printDensity: PRINT_DENSITIES[labelRequest.printDensity as keyof typeof PRINT_DENSITIES].name
-      }
+      zplContent,
+      totalLabels,
+      format: 'CODE128',
+      labelSize: labelRequest.labelSize,
+      printDensity: labelRequest.printDensity,
+      productsProcessed: products.length,
+      generatedAt: new Date().toISOString()
     })
 
   } catch (error) {
     console.error('Error generating barcode labels:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
-  }
-}
-
-// PUT - Update single product barcode and regenerate
-export async function PUT(request: NextRequest) {
-  try {
-    const session = await getSession()
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const { productId, generateNewBarcode } = await request.json()
-
-    if (!productId) {
-      return NextResponse.json({ error: 'Product ID is required' }, { status: 400 })
-    }
-
-    const product = await db.product.findUnique({
-      where: { id: productId },
-      include: {
-        category: true,
-        productSizes: true
-      }
-    })
-
-    if (!product) {
-      return NextResponse.json({ error: 'Product not found' }, { status: 404 })
-    }
-
-    // Generate new barcode if requested
-    if (generateNewBarcode && !product.barcode) {
-      // Use the barcode generation logic from your existing system
-      const generatedBarcode = product.sku // Fallback to SKU for now
-      
-      await db.product.update({
-        where: { id: productId },
-        data: { barcode: generatedBarcode }
-      })
-
-      return NextResponse.json({
-        success: true,
-        message: 'Barcode generated successfully',
-        barcode: generatedBarcode
-      })
-    }
-
-    return NextResponse.json({
-      success: true,
-      product: {
-        id: product.id,
-        name: product.name,
-        sku: product.sku,
-        barcode: product.barcode,
-        sellingPriceUSD: product.sellingPriceUSD,
-        stockQuantity: product.stockQuantity,
-        category: product.category,
-        requiresSizes: product.requiresSizes,
-        productSizes: product.productSizes
-      }
-    })
-
-  } catch (error) {
-    console.error('Error updating product barcode:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

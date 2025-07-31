@@ -1,9 +1,10 @@
-// =====================================
-// src/components/admin/ProductBarcode.tsx - FIXED
-// =====================================
+// src/components/admin/ProductBarcode.tsx
+// 🔧 SIMPLIFIED: Only CODE128 barcode format - removed format selection dropdown
 'use client'
 
-import { Card, CardContent, CardHeader, CardTitle, Input, Label } from '@/components/ui'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { Search } from 'lucide-react'
 
 interface Product {
@@ -23,6 +24,15 @@ export default function ProductBarcode({
   onInputChange, 
   mode 
 }: ProductBarcodeProps) {
+  // Always set barcodeType to CODE128 when barcode changes
+  const handleBarcodeChange = (value: string) => {
+    onInputChange('barcode', value)
+    // Automatically set the type to CODE128
+    if (formData.barcodeType !== 'CODE128') {
+      onInputChange('barcodeType', 'CODE128')
+    }
+  }
+
   return (
     <Card>
       <CardHeader>
@@ -32,29 +42,51 @@ export default function ProductBarcode({
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="space-y-2">
-          <Label htmlFor="barcodeType">Barcode Format</Label>
-          <select
-            id="barcodeType"
-            value={formData.barcodeType}
-            onChange={(e) => onInputChange('barcodeType', e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="CODE128">CODE128 - Internal Tracking</option>
-            <option value="UPC">UPC - US Retail Standard</option>
-            <option value="EAN13">EAN13 - International Standard</option>
-            <option value="CODE39">CODE39 - Simple Format</option>
-          </select>
+        {/* Barcode Format Info - Read Only */}
+        <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+          <div className="text-sm text-blue-800">
+            <div className="font-medium">Barcode Format: CODE128</div>
+            <div className="text-xs text-blue-700 mt-1">
+              Universal format supporting letters, numbers & symbols. 
+              Most compatible with all barcode scanners.
+            </div>
+          </div>
         </div>
 
+        {/* Barcode Value Input */}
         <div className="space-y-2">
           <Label htmlFor="barcode">Barcode Value</Label>
           <Input
             id="barcode"
             value={formData.barcode}
-            onChange={(e) => onInputChange('barcode', e.target.value)}
-            placeholder="Enter or generate barcode"
+            onChange={(e) => handleBarcodeChange(e.target.value)}
+            placeholder="Enter barcode or leave empty to auto-generate from SKU"
           />
+          <div className="text-xs text-gray-600">
+            {formData.barcode ? (
+              <>
+                Current barcode: <span className="font-mono">{formData.barcode}</span> (CODE128)
+              </>
+            ) : (
+              'Will auto-generate CODE128 barcode from SKU if left empty'
+            )}
+          </div>
+        </div>
+
+        {/* Hidden field to maintain barcodeType in form data */}
+        <input
+          type="hidden"
+          value="CODE128"
+          onChange={() => {}} // Keep form consistent
+        />
+
+        {/* Benefits Info */}
+        <div className="text-xs text-gray-500 p-2 bg-gray-50 rounded">
+          <div className="font-medium text-gray-700 mb-1">CODE128 Benefits:</div>
+          <div>• Works with any SKU format (letters, numbers, symbols)</div>
+          <div>• Compatible with all modern barcode scanners</div>
+          <div>• Efficient encoding - compact barcode size</div>
+          <div>• Perfect for inventory tracking and POS systems</div>
         </div>
       </CardContent>
     </Card>

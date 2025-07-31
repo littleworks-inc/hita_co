@@ -1,4 +1,5 @@
-// Updated src/components/admin/AdminNavigation.tsx - ADD BARCODE PRINTING MENU ITEM
+// src/components/admin/AdminNavigation.tsx
+// 🗑️ REMOVED: "Print Labels" menu item - barcode printing now handled within product pages
 
 'use client'
 
@@ -22,20 +23,20 @@ import {
   FolderTree,
   Share2,
   Truck,
-  ImageIcon, // ✅ EXISTING - Hero Slides icon
-  Printer // ✅ NEW - Barcode printing icon
+  ImageIcon
+  // 🗑️ REMOVED: Printer icon - no longer needed
 } from 'lucide-react'
 
-// ✅ UPDATED NAVIGATION ARRAY - Add barcode printing menu item
+// 🗑️ CLEANED NAVIGATION ARRAY - Removed Print Labels menu item
 const navigation = [
   { name: 'Dashboard', href: '/admin/dashboard', icon: LayoutDashboard },
   { name: 'Products', href: '/admin/products', icon: Package },
-  { name: 'Print Labels', href: '/admin/barcode-printing', icon: Printer }, // ✅ NEW - Barcode printing menu item
+  // 🗑️ REMOVED: { name: 'Print Labels', href: '/admin/barcode-printing', icon: Printer },
   { name: 'Categories', href: '/admin/categories', icon: FolderTree },
   { name: 'Suppliers', href: '/admin/suppliers', icon: Building2 },
   { name: 'Orders', href: '/admin/orders', icon: ShoppingCart },
   { name: 'Shipping', href: '/admin/shipping', icon: Truck },
-  { name: 'Hero Slides', href: '/admin/hero-slides', icon: ImageIcon }, // ✅ EXISTING - Hero Slides menu item
+  { name: 'Hero Slides', href: '/admin/hero-slides', icon: ImageIcon },
   { name: 'Exhibitions', href: '/admin/exhibitions', icon: Calendar },
   { name: 'Social Media', href: '/admin/social', icon: Share2 },
   { name: 'Analytics', href: '/admin/analytics', icon: BarChart3 },
@@ -46,47 +47,34 @@ const navigation = [
 interface StoreSettings {
   storeName: string
   logo?: string | null
-  primaryColor?: string
-}
-
-function getCompanyInitials(companyName: string): string {
-  return companyName
-    .split(' ')
-    .map(word => word.charAt(0))
-    .join('')
-    .toUpperCase()
-    .substring(0, 3)
+  primaryColor?: string | null
+  favicon?: string | null
 }
 
 export default function AdminNavigation() {
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [storeSettings, setStoreSettings] = useState<StoreSettings>({
+    storeName: 'Hita&Co Admin'
+  })
   const router = useRouter()
   const pathname = usePathname()
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const [isLoading, setIsLoading] = useState(true)
-  const [storeSettings, setStoreSettings] = useState<StoreSettings>({
-    storeName: 'LittleWorks Inc', // Updated default as per user request
-    primaryColor: '#1f2937'
-  })
 
-  // Fetch store settings on component mount
+  // Load store settings
   useEffect(() => {
-    async function fetchStoreSettings() {
-      try {
-        const response = await fetch('/api/admin/settings')
-        const data = await response.json()
-        
-        if (data.success && data.storeSettings) {
-          setStoreSettings(data.storeSettings)
-        }
-      } catch (error) {
-        console.error('Failed to fetch store settings:', error)
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
-    fetchStoreSettings()
+    loadStoreSettings()
   }, [])
+
+  const loadStoreSettings = async () => {
+    try {
+      const response = await fetch('/api/admin/settings/store')
+      if (response.ok) {
+        const settings = await response.json()
+        setStoreSettings(settings)
+      }
+    } catch (error) {
+      console.error('Failed to load store settings:', error)
+    }
+  }
 
   const handleLogout = async () => {
     try {
@@ -96,228 +84,189 @@ export default function AdminNavigation() {
 
       if (response.ok) {
         router.push('/admin/login')
-      } else {
-        console.error('Logout failed')
       }
     } catch (error) {
-      console.error('Logout error:', error)
+      console.error('Logout failed:', error)
     }
   }
 
   return (
     <>
-      {/* Desktop sidebar */}
-      <div className="hidden lg:fixed lg:inset-y-0 lg:flex lg:w-64 lg:flex-col">
-        <div className="flex grow flex-col overflow-y-auto border-r border-gray-200 bg-white dark:bg-gray-900 dark:border-gray-700 pt-5 pb-4">
-          <div className="flex flex-shrink-0 items-center justify-between px-4">
-            <div className="flex items-center gap-3">
-              {/* Company Logo/Icon */}
-              {storeSettings.logo ? (
-                <img
-                  src={storeSettings.logo}
-                  alt={storeSettings.storeName}
-                  className="h-8 w-8 rounded object-cover"
-                />
-              ) : (
-                <div 
-                  className="w-8 h-8 rounded flex items-center justify-center text-white font-bold text-sm"
-                  style={{ backgroundColor: storeSettings.primaryColor }}
-                >
-                  {getCompanyInitials(storeSettings.storeName)}
-                </div>
-              )}
-              
-              {/* Company Name */}
-              <div>
-                <h1 className="text-lg font-bold text-gray-900 dark:text-white">
-                  {isLoading ? 'Loading...' : storeSettings.storeName}
-                </h1>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  Admin Panel
-                </p>
-              </div>
-            </div>
-            
-            {/* Theme Toggle */}
-            <ThemeToggle size="sm" />
-          </div>
-          
-          <nav className="mt-8 flex-1 space-y-1 px-2">
-            {navigation.map((item) => {
-              const Icon = item.icon
-              const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
-              return (
-                <Link
-                  key={item.name}
-                  href={item.href}
-                  className={`group flex items-center px-2 py-2 text-sm font-medium rounded-md transition-colors ${
-                    isActive
-                      ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white'
-                      : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white'
-                  }`}
-                >
-                  <Icon
-                    className={`mr-3 h-5 w-5 flex-shrink-0 ${
-                      isActive 
-                        ? 'text-gray-500 dark:text-gray-400' 
-                        : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-500 dark:group-hover:text-gray-400'
-                    }`}
-                  />
-                  {item.name}
-                </Link>
-              )
-            })}
-          </nav>
+      {/* Mobile sidebar backdrop */}
+      {sidebarOpen && (
+        <div 
+          className="fixed inset-0 z-40 bg-gray-600 bg-opacity-75 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
 
-          {/* Logout Button */}
-          <div className="flex-shrink-0 px-2 pb-2">
+      {/* Mobile sidebar */}
+      <div className={`fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg transform transition-transform duration-300 ease-in-out lg:hidden ${
+        sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+      }`}>
+        <div className="flex items-center justify-between p-4 border-b">
+          <div className="flex items-center gap-3">
+            {storeSettings.logo ? (
+              <img 
+                src={storeSettings.logo} 
+                alt={storeSettings.storeName}
+                className="h-8 w-8 rounded object-cover"
+              />
+            ) : (
+              <div className="h-8 w-8 bg-blue-600 rounded flex items-center justify-center">
+                <span className="text-white font-bold text-sm">
+                  {storeSettings.storeName.charAt(0)}
+                </span>
+              </div>
+            )}
+            <span className="font-semibold text-gray-900 truncate">
+              {storeSettings.storeName}
+            </span>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setSidebarOpen(false)}
+          >
+            <X className="h-5 w-5" />
+          </Button>
+        </div>
+
+        <nav className="flex-1 px-4 py-4 space-y-1">
+          {navigation.map((item) => {
+            const isActive = pathname === item.href || 
+              (item.href !== '/admin/dashboard' && pathname.startsWith(item.href))
+            
+            return (
+              <Link
+                key={item.name}
+                href={item.href}
+                className={`group flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                  isActive
+                    ? 'bg-blue-100 text-blue-900'
+                    : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
+                }`}
+                onClick={() => setSidebarOpen(false)}
+              >
+                <item.icon
+                  className={`mr-3 h-5 w-5 ${
+                    isActive ? 'text-blue-500' : 'text-gray-400 group-hover:text-gray-500'
+                  }`}
+                />
+                {item.name}
+              </Link>
+            )
+          })}
+        </nav>
+
+        <div className="border-t p-4">
+          <div className="flex items-center justify-between">
+            <ThemeToggle />
             <Button
+              variant="outline"
+              size="sm"
               onClick={handleLogout}
-              variant="ghost"
-              className="group flex w-full items-center px-2 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 rounded-md hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white"
+              className="flex items-center gap-2"
             >
-              <LogOut className="mr-3 h-5 w-5 text-gray-400 group-hover:text-gray-500 dark:group-hover:text-gray-400" />
-              Sign out
+              <LogOut className="h-4 w-4" />
+              Logout
             </Button>
           </div>
         </div>
       </div>
 
-      {/* Mobile menu */}
-      <div className="lg:hidden">
-        {/* Mobile menu header */}
-        <div className="flex items-center justify-between bg-white dark:bg-gray-900 px-4 py-2 shadow-sm">
-          <div className="flex items-center gap-3">
-            {/* Mobile logo */}
-            {storeSettings.logo ? (
-              <img
-                src={storeSettings.logo}
-                alt={storeSettings.storeName}
-                className="h-6 w-6 rounded object-cover"
-              />
-            ) : (
-              <div 
-                className="w-6 h-6 rounded flex items-center justify-center text-white font-bold text-xs"
-                style={{ backgroundColor: storeSettings.primaryColor }}
-              >
-                {getCompanyInitials(storeSettings.storeName)}
-              </div>
-            )}
+      {/* Desktop sidebar */}
+      <div className="hidden lg:fixed lg:inset-y-0 lg:left-0 lg:z-50 lg:block lg:w-64 lg:bg-white lg:border-r lg:border-gray-200">
+        <div className="flex h-16 items-center gap-3 px-6 border-b border-gray-200">
+          {storeSettings.logo ? (
+            <img 
+              src={storeSettings.logo} 
+              alt={storeSettings.storeName}
+              className="h-8 w-8 rounded object-cover"
+            />
+          ) : (
+            <div className="h-8 w-8 bg-blue-600 rounded flex items-center justify-center">
+              <span className="text-white font-bold text-sm">
+                {storeSettings.storeName.charAt(0)}
+              </span>
+            </div>
+          )}
+          <span className="font-semibold text-gray-900 truncate">
+            {storeSettings.storeName}
+          </span>
+        </div>
+
+        <nav className="flex-1 px-6 py-4 space-y-1">
+          {navigation.map((item) => {
+            const isActive = pathname === item.href || 
+              (item.href !== '/admin/dashboard' && pathname.startsWith(item.href))
             
-            <h1 className="text-lg font-bold text-gray-900 dark:text-white">
-              {isLoading ? 'Loading...' : storeSettings.storeName}
-            </h1>
-          </div>
-          
-          <div className="flex items-center gap-2">
-            {/* Mobile theme toggle */}
-            <ThemeToggle size="sm" showTooltip={false} />
+            return (
+              <Link
+                key={item.name}
+                href={item.href}
+                className={`group flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                  isActive
+                    ? 'bg-blue-100 text-blue-900'
+                    : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
+                }`}
+              >
+                <item.icon
+                  className={`mr-3 h-5 w-5 ${
+                    isActive ? 'text-blue-500' : 'text-gray-400 group-hover:text-gray-500'
+                  }`}
+                />
+                {item.name}
+              </Link>
+            )
+          })}
+        </nav>
+
+        <div className="border-t border-gray-200 p-6">
+          <div className="flex items-center justify-between">
+            <ThemeToggle />
             <Button
-              variant="ghost"
+              variant="outline"
               size="sm"
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="text-gray-600 dark:text-gray-300"
+              onClick={handleLogout}
+              className="flex items-center gap-2"
             >
-              {mobileMenuOpen ? (
-                <X className="h-6 w-6" />
-              ) : (
-                <Menu className="h-6 w-6" />
-              )}
+              <LogOut className="h-4 w-4" />
+              Logout
             </Button>
           </div>
         </div>
+      </div>
 
-        {/* Mobile menu overlay */}
-        {mobileMenuOpen && (
-          <div className="fixed inset-0 z-40 lg:hidden">
-            <div className="fixed inset-0 bg-gray-600 bg-opacity-75" />
-            <div className="relative flex w-full max-w-xs flex-1 flex-col bg-white dark:bg-gray-900">
-              <div className="absolute top-0 right-0 -mr-12 pt-2">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  <X className="h-6 w-6 text-white" />
-                </Button>
-              </div>
-              
-              {/* Mobile menu header */}
-              <div className="flex flex-shrink-0 items-center justify-between px-4 py-4 border-b border-gray-200 dark:border-gray-700">
-                <div className="flex items-center gap-3">
-                  {/* Mobile menu logo */}
-                  {storeSettings.logo ? (
-                    <img
-                      src={storeSettings.logo}
-                      alt={storeSettings.storeName}
-                      className="h-6 w-6 rounded object-cover"
-                    />
-                  ) : (
-                    <div 
-                      className="w-6 h-6 rounded flex items-center justify-center text-white font-bold text-xs"
-                      style={{ backgroundColor: storeSettings.primaryColor }}
-                    >
-                      {getCompanyInitials(storeSettings.storeName)}
-                    </div>
-                  )}
-                  
-                  <div>
-                    <h1 className="text-sm font-bold text-gray-900 dark:text-white">
-                      {isLoading ? 'Loading...' : storeSettings.storeName}
-                    </h1>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                      Admin Panel
-                    </p>
-                  </div>
-                </div>
-                <ThemeToggle size="sm" />
-              </div>
-              
-              {/* Mobile menu navigation */}
-              <div className="mt-5 h-0 flex-1 overflow-y-auto">
-                <nav className="space-y-1 px-2">
-                  {navigation.map((item) => {
-                    const Icon = item.icon
-                    const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
-                    return (
-                      <Link
-                        key={item.name}
-                        href={item.href}
-                        onClick={() => setMobileMenuOpen(false)}
-                        className={`group flex items-center px-2 py-2 text-base font-medium rounded-md transition-colors ${
-                          isActive
-                            ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white'
-                            : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white'
-                        }`}
-                      >
-                        <Icon
-                          className={`mr-3 h-5 w-5 flex-shrink-0 ${
-                            isActive 
-                              ? 'text-gray-500 dark:text-gray-400' 
-                              : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-500 dark:group-hover:text-gray-400'
-                          }`}
-                        />
-                        {item.name}
-                      </Link>
-                    )
-                  })}
-                </nav>
-              </div>
+      {/* Mobile header */}
+      <div className="sticky top-0 z-40 flex h-16 shrink-0 items-center gap-x-4 border-b border-gray-200 bg-white px-4 shadow-sm sm:gap-x-6 sm:px-6 lg:hidden">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setSidebarOpen(true)}
+        >
+          <Menu className="h-6 w-6" />
+          <span className="sr-only">Open sidebar</span>
+        </Button>
 
-              {/* Mobile logout */}
-              <div className="flex-shrink-0 px-2 pb-4">
-                <Button
-                  onClick={handleLogout}
-                  variant="ghost"
-                  className="group flex w-full items-center px-2 py-2 text-base font-medium text-gray-600 dark:text-gray-300 rounded-md hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white"
-                >
-                  <LogOut className="mr-3 h-5 w-5 text-gray-400 group-hover:text-gray-500 dark:group-hover:text-gray-400" />
-                  Sign out
-                </Button>
-              </div>
+        <div className="flex items-center gap-3">
+          {storeSettings.logo ? (
+            <img 
+              src={storeSettings.logo} 
+              alt={storeSettings.storeName}
+              className="h-8 w-8 rounded object-cover"
+            />
+          ) : (
+            <div className="h-8 w-8 bg-blue-600 rounded flex items-center justify-center">
+              <span className="text-white font-bold text-sm">
+                {storeSettings.storeName.charAt(0)}
+              </span>
             </div>
-          </div>
-        )}
+          )}
+          <span className="font-semibold text-gray-900 truncate">
+            {storeSettings.storeName}
+          </span>
+        </div>
       </div>
     </>
   )

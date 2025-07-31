@@ -1,4 +1,5 @@
-// ✅ FIXED: src/lib/barcode-utils.ts - Add Missing shouldUpdateBarcode Function
+// src/lib/barcode-utils.ts
+// 🔧 SIMPLIFIED: Only CODE128 barcode format - removed multi-format logic
 
 /**
  * Determine if barcode should be updated when SKU changes
@@ -31,94 +32,139 @@ export function shouldUpdateBarcode(
 }
 
 /**
- * Generate barcode from SKU for different formats
+ * Generate CODE128 barcode from SKU
  */
-export function generateBarcodeFromSKU(sku: string, format: string): string {
+export function generateBarcodeFromSKU(sku: string): string {
   if (!sku || sku.trim() === '') {
     return ''
   }
 
-  const cleanSKU = sku.replace(/[^A-Z0-9]/g, '').toUpperCase()
+  // Clean and format the SKU for CODE128
+  const cleanSKU = sku.trim().toUpperCase()
   const timestamp = Date.now().toString().slice(-6)
-  const randomSuffix = Math.floor(Math.random() * 1000).toString().padStart(3, '0')
 
-  switch (format.toUpperCase()) {
-    case 'UPC':
-      // Generate 11 digits for UPC
-      let upcBase = cleanSKU.replace(/[^0-9]/g, '')
-      if (upcBase.length < 11) {
-        upcBase = (upcBase + timestamp + randomSuffix).replace(/[^0-9]/g, '').slice(0, 11).padStart(11, '0')
-      } else {
-        upcBase = upcBase.slice(0, 11)
-      }
-      return upcBase
-      
-    case 'EAN13':
-      // Generate 12 digits for EAN13
-      let eanBase = cleanSKU.replace(/[^0-9]/g, '')
-      if (eanBase.length < 12) {
-        eanBase = (eanBase + timestamp + randomSuffix).replace(/[^0-9]/g, '').slice(0, 12).padStart(12, '0')
-      } else {
-        eanBase = eanBase.slice(0, 12)
-      }
-      return eanBase
-      
-    case 'CODE39':
-      // Use SKU directly (limited to valid CODE39 characters)
-      return cleanSKU.replace(/[^A-Z0-9\-\.\ \$\/\+\%]/g, '').slice(0, 20)
-      
-    case 'CODE128':
-    default:
-      // Most flexible - use SKU with timestamp
-      return `${cleanSKU}-${timestamp}`.slice(0, 30)
+  // For CODE128, we can be flexible with the format
+  let generatedBarcode = cleanSKU
+
+  // If SKU is very short, add timestamp for uniqueness
+  if (cleanSKU.length < 8) {
+    generatedBarcode = `${cleanSKU}-${timestamp}`
   }
+
+  // Ensure reasonable length for scanning
+  if (generatedBarcode.length > 30) {
+    generatedBarcode = generatedBarcode.slice(0, 30)
+  }
+
+  return generatedBarcode
 }
 
 /**
- * Validate barcode format
+ * Validate CODE128 barcode format
  */
-export function validateBarcodeFormat(code: string, format: string): { isValid: boolean; error?: string } {
+export function validateBarcodeFormat(code: string): { isValid: boolean; error?: string } {
   if (!code || code.trim() === '') {
     return { isValid: false, error: 'Barcode cannot be empty' }
   }
 
-  switch (format.toUpperCase()) {
-    case 'UPC':
-      const upcClean = code.replace(/[\s\-]/g, '')
-      if (!/^\d+$/.test(upcClean)) {
-        return { isValid: false, error: 'UPC must contain only numbers' }
-      }
-      if (upcClean.length !== 11 && upcClean.length !== 12) {
-        return { isValid: false, error: 'UPC must be 11 or 12 digits' }
-      }
-      return { isValid: true }
-      
-    case 'EAN13':
-      const eanClean = code.replace(/[\s\-]/g, '')
-      if (!/^\d+$/.test(eanClean)) {
-        return { isValid: false, error: 'EAN13 must contain only numbers' }
-      }
-      if (eanClean.length !== 12 && eanClean.length !== 13) {
-        return { isValid: false, error: 'EAN13 must be 12 or 13 digits' }
-      }
-      return { isValid: true }
-      
-    case 'CODE39':
-      if (!/^[A-Z0-9\-\.\ \$\/\+\%]*$/.test(code)) {
-        return { isValid: false, error: 'CODE39 contains invalid characters' }
-      }
-      if (code.length > 43) {
-        return { isValid: false, error: 'CODE39 too long (max 43 characters)' }
-      }
-      return { isValid: true }
-      
-    case 'CODE128':
-      if (code.length > 80) {
-        return { isValid: false, error: 'CODE128 too long (max 80 characters)' }
-      }
-      return { isValid: true }
-      
-    default:
-      return { isValid: false, error: `Unknown barcode format: ${format}` }
+  // CODE128 accepts most ASCII characters
+  if (code.length > 80) {
+    return { isValid: false, error: 'CODE128 too long (max 80 characters)' }
   }
+
+  // Check for valid ASCII characters (0-127)
+  const invalidChars = code.split('').filter(char => char.charCodeAt(0) > 127)
+  
+  if (invalidChars.length > 0) {
+    return { 
+      isValid: false, 
+      error: `Contains invalid characters: ${invalidChars.join(', ')}`
+    }
+  }
+
+  return { isValid: true }
 }
+
+/**
+ * Format barcode for display
+ */
+export function formatBarcodeForDisplay(barcode: string): string {
+  if (!barcode) return ''
+  
+  // For CODE128, we can display as-is since it's human readable
+  return barcode.trim()
+}
+
+/**
+ * Check if barcode needs regeneration
+ */
+export function needsBarcodeRegeneration(
+  sku: string, 
+  currentBarcode: string, 
+  originalSku?: string
+): boolean {
+  // No barcode exists
+  if (!currentBarcode || currentBarcode.trim() === '') {
+    return true
+  }
+
+  // SKU changed significantly
+  if (originalSku && shouldUpdateBarcode(originalSku, sku, currentBarcode)) {
+    return true
+  }
+
+  // Barcode is invalid
+  const validation = validateBarcodeFormat(currentBarcode)
+  if (!validation.isValid) {
+    return true
+  }
+
+  return false
+}
+
+/**
+ * Generate barcode options for product sizes
+ */
+export function generateSizeBarcodes(baseSku: string, sizes: string[]): Record<string, string> {
+  if (!baseSku || !sizes.length) {
+    return {}
+  }
+
+  const sizeBarcodes: Record<string, string> = {}
+
+  sizes.forEach(size => {
+    const sizeBarcode = generateBarcodeFromSKU(`${baseSku}-${size.toUpperCase()}`)
+    if (sizeBarcode) {
+      sizeBarcodes[size] = sizeBarcode
+    }
+  })
+
+  return sizeBarcodes
+}
+
+/**
+ * Barcode constants for CODE128
+ */
+export const BARCODE_CONFIG = {
+  FORMAT: 'CODE128' as const,
+  MAX_LENGTH: 80,
+  MIN_LENGTH: 1,
+  SUPPORTS_LETTERS: true,
+  SUPPORTS_NUMBERS: true,
+  SUPPORTS_SYMBOLS: true,
+  DESCRIPTION: 'Universal format supporting letters, numbers & symbols'
+} as const
+
+/**
+ * Default barcode generation settings
+ */
+export const DEFAULT_BARCODE_SETTINGS = {
+  format: BARCODE_CONFIG.FORMAT,
+  width: 2,
+  height: 60,
+  displayValue: true,
+  fontSize: 12,
+  margin: 10,
+  background: '#ffffff',
+  lineColor: '#000000'
+} as const

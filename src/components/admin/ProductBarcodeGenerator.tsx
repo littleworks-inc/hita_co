@@ -1,10 +1,14 @@
+// src/components/admin/ProductBarcodeGenerator.tsx
+// 🔧 SIMPLIFIED: Only CODE128 barcode format - removed multiple format buttons
 'use client'
 
-import { Card, CardContent, CardHeader, CardTitle, Button, Input, Label } from '@/components/ui'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import {
   Tag,
   RefreshCw,
-  Info,
   AlertTriangle,
   Package,
   Copy
@@ -48,101 +52,51 @@ export default function ProductBarcodeGenerator({
   onSizeBarcodeGenerated
 }: ProductBarcodeGeneratorProps) {
 
-  // Calculate UPC check digit
-  const calculateUPCCheckDigit = (code: string): string => {
-    let sum = 0
-    for (let i = 0; i < code.length; i++) {
-      const digit = parseInt(code[i])
-      sum += i % 2 === 0 ? digit * 3 : digit
-    }
-    const checkDigit = (10 - (sum % 10)) % 10
-    return checkDigit.toString()
-  }
+  // Generate CODE128 barcode from SKU (simplified)
+  const generateCODE128FromSKU = (sourceSku: string, sizeVariant?: string): string => {
+    if (!sourceSku) return ''
 
-  // Calculate EAN13 check digit
-  const calculateEAN13CheckDigit = (code: string): string => {
-    let sum = 0
-    for (let i = 0; i < code.length; i++) {
-      const digit = parseInt(code[i])
-      sum += i % 2 === 0 ? digit : digit * 3
-    }
-    const checkDigit = (10 - (sum % 10)) % 10
-    return checkDigit.toString()
-  }
-
-  // Generate barcode with specified type and optional size variant
-  const generateBarcodeWithType = (type: string, sizeSku?: string, sizeVariant?: string) => {
-    let targetSku = sizeSku || sku
+    let targetSku = sourceSku.trim().toUpperCase()
     
     // If we have a size variant, append it to the base SKU
-    if (sizeVariant && !sizeSku) {
-      targetSku = `${sku}-${sizeVariant.toUpperCase()}`
-    }
-    
-    if (!targetSku) {
-      return ''
+    if (sizeVariant) {
+      targetSku = `${sourceSku}-${sizeVariant.toUpperCase()}`
     }
 
-    const cleanSKU = targetSku.replace(/[^A-Z0-9]/g, '').toUpperCase()
+    // For CODE128, we can use the SKU directly with some enhancements
     const timestamp = Date.now().toString().slice(-6)
-    const randomSuffix = Math.floor(Math.random() * 1000).toString().padStart(3, '0')
     
-    let generatedBarcode = ''
-
-    switch (type.toUpperCase()) {
-      case 'UPC':
-        let upcBase = cleanSKU.replace(/[^0-9]/g, '')
-        if (upcBase.length < 11) {
-          upcBase = (upcBase + timestamp + randomSuffix).replace(/[^0-9]/g, '').slice(0, 11).padStart(11, '0')
-        } else {
-          upcBase = upcBase.slice(0, 11)
-        }
-        const upcCheckDigit = calculateUPCCheckDigit(upcBase)
-        generatedBarcode = upcBase + upcCheckDigit
-        break
-        
-      case 'EAN13':
-        let eanBase = cleanSKU.replace(/[^0-9]/g, '')
-        if (eanBase.length < 12) {
-          eanBase = (eanBase + timestamp + randomSuffix).replace(/[^0-9]/g, '').slice(0, 12).padStart(12, '0')
-        } else {
-          eanBase = eanBase.slice(0, 12)
-        }
-        const eanCheckDigit = calculateEAN13CheckDigit(eanBase)
-        generatedBarcode = eanBase + eanCheckDigit
-        break
-        
-      case 'CODE39':
-        generatedBarcode = cleanSKU.slice(0, 20)
-        break
-        
-      case 'CODE128':
-      default:
-        // For CODE128, keep the readable format with dashes
-        generatedBarcode = targetSku.length > 20 ? targetSku.slice(0, 20) : targetSku
-        break
+    // If SKU is very short, add timestamp for uniqueness
+    if (targetSku.length < 8) {
+      targetSku = `${targetSku}-${timestamp}`
+    }
+    
+    // Limit length for practical scanning
+    if (targetSku.length > 30) {
+      targetSku = targetSku.slice(0, 30)
     }
 
-    return generatedBarcode
+    return targetSku
   }
 
-  // Generate barcode using current type for main product
+  // Generate barcode using CODE128 for main product
   const generateBarcodeFromSKU = () => {
-    const generated = generateBarcodeWithType(barcodeType)
+    const generated = generateCODE128FromSKU(sku)
     if (generated) {
-      onBarcodeGenerated(generated, barcodeType)
+      onBarcodeGenerated(generated, 'CODE128')
+      onBarcodeTypeChange('CODE128')
       onUpdateNeeded(false)
-      console.log('Main barcode generated:', { sku, type: barcodeType, barcode: generated })
+      console.log('Main CODE128 barcode generated:', { sku, barcode: generated })
     }
   }
 
-  // Generate barcodes for all size variants
+  // Generate CODE128 barcodes for all size variants
   const generateAllSizeBarcodes = () => {
     if (!requiresSizes || !productSizes.length) return
 
     productSizes.forEach((size, index) => {
       // Use base SKU + size suffix format
-      const sizeBarcode = generateBarcodeWithType(barcodeType, undefined, size.size)
+      const sizeBarcode = generateCODE128FromSKU(sku, size.size)
       if (sizeBarcode && onSizeBarcodeGenerated) {
         onSizeBarcodeGenerated(index, sizeBarcode)
       }
@@ -154,61 +108,41 @@ export default function ProductBarcodeGenerator({
     navigator.clipboard.writeText(text)
   }
 
-  // Enhanced barcode visualization component
+  // Simple barcode visualization component for CODE128
   const BarcodeVisualization = ({ barcodeValue, label }: { barcodeValue: string, label?: string }) => (
     <div className="bg-white p-3 rounded border">
       {label && <div className="text-xs font-medium text-gray-700 mb-1">{label}</div>}
       <div className="font-mono text-sm font-bold mb-1">{barcodeValue}</div>
       <div className="mx-auto w-full max-w-64 h-12 bg-white border flex items-end justify-center overflow-hidden">
-        {(() => {
-          const bars = []
-          const barcodeString = barcodeValue
+        {/* Simple CODE128 visualization */}
+        <div className="flex items-end justify-center gap-px">
+          {/* Start pattern */}
+          <div className="bg-black" style={{ width: '2px', height: '36px' }} />
+          <div className="bg-white" style={{ width: '1px', height: '36px' }} />
+          <div className="bg-black" style={{ width: '2px', height: '36px' }} />
           
-          // Create start pattern
-          bars.push(
-            <div key="start1" className="bg-black" style={{ width: '2px', height: '36px' }} />,
-            <div key="start2" className="bg-white" style={{ width: '1px', height: '36px' }} />,
-            <div key="start3" className="bg-black" style={{ width: '2px', height: '36px' }} />
-          )
-          
-          // Generate bars for each character
-          for (let i = 0; i < Math.min(barcodeString.length, 15); i++) {
-            const char = barcodeString[i]
+          {/* Data bars - simplified representation */}
+          {barcodeValue.split('').slice(0, 15).map((char, i) => {
             const charCode = char.charCodeAt(0)
-            
             const patterns = [
               [3, 1, 2, 1], [2, 2, 2, 2], [1, 3, 1, 3], [2, 1, 3, 1], [1, 2, 1, 4]
             ]
-            
             const pattern = patterns[charCode % patterns.length]
             
-            pattern.forEach((width, patternIndex) => {
-              const isBlack = patternIndex % 2 === 0
-              bars.push(
-                <div
-                  key={`char-${i}-${patternIndex}`}
-                  className={isBlack ? 'bg-black' : 'bg-white'}
-                  style={{ width: `${width}px`, height: '36px' }}
-                />
-              )
-            })
-            
-            if (i < Math.min(barcodeString.length - 1, 14)) {
-              bars.push(
-                <div key={`sep-${i}`} className="bg-white" style={{ width: '1px', height: '36px' }} />
-              )
-            }
-          }
+            return pattern.map((width, patternIndex) => (
+              <div
+                key={`char-${i}-${patternIndex}`}
+                className={patternIndex % 2 === 0 ? 'bg-black' : 'bg-white'}
+                style={{ width: `${width}px`, height: '36px' }}
+              />
+            ))
+          })}
           
-          // Create end pattern
-          bars.push(
-            <div key="end1" className="bg-black" style={{ width: '2px', height: '36px' }} />,
-            <div key="end2" className="bg-white" style={{ width: '1px', height: '36px' }} />,
-            <div key="end3" className="bg-black" style={{ width: '2px', height: '36px' }} />
-          )
-          
-          return bars
-        })()}
+          {/* End pattern */}
+          <div className="bg-black" style={{ width: '2px', height: '36px' }} />
+          <div className="bg-white" style={{ width: '1px', height: '36px' }} />
+          <div className="bg-black" style={{ width: '2px', height: '36px' }} />
+        </div>
       </div>
       <Button
         type="button"
@@ -228,7 +162,7 @@ export default function ProductBarcodeGenerator({
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Tag className="h-5 w-5" />
-          Barcode Management
+          CODE128 Barcode Management
           {requiresSizes && (
             <span className="text-sm bg-blue-100 text-blue-700 px-2 py-1 rounded-full">
               Size Variants: {productSizes.length}
@@ -239,21 +173,32 @@ export default function ProductBarcodeGenerator({
       <CardContent>
         <div className="space-y-6">
           
+          {/* Barcode Format Info */}
+          <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+            <div className="text-sm text-blue-800">
+              <div className="font-medium">Barcode Format: CODE128</div>
+              <div className="text-xs text-blue-700 mt-1">
+                Universal format supporting letters, numbers & symbols. 
+                Most compatible with all barcode scanners and POS systems.
+              </div>
+            </div>
+          </div>
+          
           {/* Main Product Barcode */}
           <div className="space-y-4">
             <h4 className="font-medium text-gray-900">
-              {requiresSizes ? 'Master Product Barcode' : 'Product Barcode'}
+              {requiresSizes ? 'Master Product Barcode (CODE128)' : 'Product Barcode (CODE128)'}
             </h4>
             
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="barcode">Barcode</Label>
+                <Label htmlFor="barcode">Barcode Value</Label>
                 <div className="flex gap-2">
                   <Input
                     id="barcode"
                     value={barcode}
                     onChange={(e) => onBarcodeChange(e.target.value)}
-                    placeholder="Barcode value"
+                    placeholder="CODE128 barcode value"
                     className="flex-1"
                   />
                   <Button
@@ -262,34 +207,46 @@ export default function ProductBarcodeGenerator({
                     size="sm"
                     onClick={generateBarcodeFromSKU}
                     disabled={!sku}
-                    title="Generate barcode from SKU"
+                    title="Generate CODE128 barcode from SKU"
                   >
                     <RefreshCw className="h-4 w-4" />
                   </Button>
                 </div>
+                <div className="text-xs text-gray-600">
+                  Supports any letters, numbers, and symbols
+                </div>
               </div>
+
+              {/* Hidden field to maintain barcodeType consistency */}
+              <input type="hidden" value="CODE128" />
+              
               <div className="space-y-2">
-                <Label htmlFor="barcodeType">Barcode Type</Label>
-                <select
-                  id="barcodeType"
-                  value={barcodeType}
-                  onChange={(e) => onBarcodeTypeChange(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="CODE128">CODE128 (Recommended)</option>
-                  <option value="EAN13">EAN13</option>
-                  <option value="UPC">UPC</option>
-                  <option value="CODE39">CODE39</option>
-                </select>
+                <Label>Generation Options</Label>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={generateBarcodeFromSKU}
+                    disabled={!sku}
+                    className="flex-1"
+                  >
+                    <RefreshCw className="h-4 w-4 mr-1" />
+                    Generate CODE128
+                  </Button>
+                </div>
+                <div className="text-xs text-gray-600">
+                  Auto-generates from SKU using CODE128 format
+                </div>
               </div>
             </div>
 
             {/* Main Barcode Preview */}
             {barcode && (
               <div className="p-4 bg-gray-50 rounded-lg border">
-                <h5 className="font-medium text-gray-900 mb-3">Main Product Barcode</h5>
+                <h5 className="font-medium text-gray-900 mb-3">Main Product Barcode (CODE128)</h5>
                 <BarcodeVisualization barcodeValue={barcode} />
-                <div className="text-sm text-gray-600 mt-2">Type: {barcodeType}</div>
+                <div className="text-sm text-gray-600 mt-2">Format: CODE128 • Length: {barcode.length} chars</div>
               </div>
             )}
           </div>
@@ -298,7 +255,7 @@ export default function ProductBarcodeGenerator({
           {requiresSizes && productSizes.length > 0 && (
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <h4 className="font-medium text-gray-900">Size Variant Barcodes</h4>
+                <h4 className="font-medium text-gray-900">Size Variant Barcodes (CODE128)</h4>
                 <Button
                   type="button"
                   variant="outline"
@@ -315,96 +272,42 @@ export default function ProductBarcodeGenerator({
                 <div className="flex items-start gap-2 mb-3">
                   <Package className="h-4 w-4 text-blue-600 mt-0.5" />
                   <div className="text-sm text-blue-800">
-                    <strong>Size Variant Tracking:</strong> Each size gets its own unique barcode for individual inventory tracking.
+                    <strong>Size Variant Tracking:</strong> Each size gets its own unique CODE128 barcode for individual inventory tracking.
                     This allows you to scan and track stock levels for each size separately.
                   </div>
                 </div>
-
-                <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+                
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                   {productSizes.map((size, index) => {
-                    // Generate readable size barcodes with suffix format
-                    const sizeBarcode = generateBarcodeWithType(barcodeType, undefined, size.size)
-                    const displaySku = `${sku}-${size.size.toUpperCase()}`
-                    
+                    const sizeBarcode = generateCODE128FromSKU(sku, size.size)
                     return (
-                      <BarcodeVisualization
-                        key={index}
-                        barcodeValue={sizeBarcode}
-                        label={`Size ${size.size} (${displaySku})`}
-                      />
+                      <div key={index} className="bg-white p-3 rounded border">
+                        <div className="text-sm font-medium text-gray-900 mb-1">
+                          Size: {size.size}
+                        </div>
+                        <div className="font-mono text-xs text-gray-600 mb-2">
+                          {sizeBarcode}
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          Stock: {size.stockQuantity} • SKU: {size.sku}
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => copyToClipboard(sizeBarcode)}
+                          className="text-xs mt-1 p-1 h-auto"
+                        >
+                          <Copy className="h-3 w-3 mr-1" />
+                          Copy
+                        </Button>
+                      </div>
                     )
                   })}
-                </div>
-
-                <div className="mt-4 p-3 bg-white rounded border">
-                  <h6 className="font-medium text-gray-800 mb-2">Size Barcode Format:</h6>
-                  <div className="text-sm text-gray-600 space-y-1">
-                    <div><strong>Base Product:</strong> {sku}</div>
-                    <div><strong>Size Variants:</strong></div>
-                    <div className="ml-4 space-y-1 font-mono text-xs">
-                      {productSizes.map(size => (
-                        <div key={size.size}>• {sku}-{size.size.toUpperCase()}</div>
-                      ))}
-                    </div>
-                    <div className="mt-2 pt-2 border-t">
-                      <strong>Usage:</strong> Scan size-specific barcodes for individual inventory tracking
-                    </div>
-                  </div>
                 </div>
               </div>
             </div>
           )}
-
-          {/* Auto-Generation Options */}
-          <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-            <div className="flex items-start gap-2">
-              <Info className="h-4 w-4 text-blue-600 mt-0.5" />
-              <div className="flex-1">
-                <h4 className="font-medium text-blue-800 mb-2">Auto-Generate Barcode</h4>
-                <p className="text-sm text-blue-700 mb-3">
-                  Generate unique barcodes automatically from your product SKU for inventory tracking.
-                </p>
-                <div className="flex gap-2 flex-wrap">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      const generated = generateBarcodeWithType('CODE128')
-                      if (generated) onBarcodeGenerated(generated, 'CODE128')
-                    }}
-                    disabled={!sku}
-                  >
-                    Generate CODE128
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      const generated = generateBarcodeWithType('EAN13')
-                      if (generated) onBarcodeGenerated(generated, 'EAN13')
-                    }}
-                    disabled={!sku}
-                  >
-                    Generate EAN13
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      const generated = generateBarcodeWithType('UPC')
-                      if (generated) onBarcodeGenerated(generated, 'UPC')
-                    }}
-                    disabled={!sku}
-                  >
-                    Generate UPC
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </div>
 
           {/* SKU Change Detection */}
           {barcodeNeedsUpdate && (
@@ -427,32 +330,13 @@ export default function ProductBarcodeGenerator({
             </div>
           )}
 
-          {/* Barcode Type Information */}
+          {/* CODE128 Information */}
           <div className="text-xs text-gray-600">
-            {barcodeType === 'CODE128' && (
-              <div className="bg-blue-50 p-3 rounded">
-                <strong>CODE128:</strong> Perfect for readable size variants like "{sku}-XS", "{sku}-M", "{sku}-L", "{sku}-XL".
-                Maintains human-readable format while supporting barcode scanning. Ideal for size tracking.
-              </div>
-            )}
-            {barcodeType === 'EAN13' && (
-              <div className="bg-green-50 p-3 rounded">
-                <strong>EAN13:</strong> 13-digit international standard. Each size gets a unique EAN13 for retail systems.
-                Check digit automatically calculated for validation.
-              </div>
-            )}
-            {barcodeType === 'UPC' && (
-              <div className="bg-yellow-50 p-3 rounded">
-                <strong>UPC:</strong> 12-digit US retail standard. Perfect for size variants in North American retail.
-                Each size receives its own valid UPC with check digit.
-              </div>
-            )}
-            {barcodeType === 'CODE39' && (
-              <div className="bg-purple-50 p-3 rounded">
-                <strong>CODE39:</strong> Simple format supporting size codes. Works well with basic barcode scanners.
-                Clear size identification in the barcode itself.
-              </div>
-            )}
+            <div className="bg-blue-50 p-3 rounded">
+              <strong>CODE128 Benefits:</strong> Perfect for readable size variants like "{sku}-XS", "{sku}-M", "{sku}-L", "{sku}-XL".
+              Maintains human-readable format while supporting barcode scanning. Ideal for size tracking and inventory management.
+              Works with any POS system and barcode scanner.
+            </div>
           </div>
         </div>
       </CardContent>

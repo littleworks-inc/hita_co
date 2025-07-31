@@ -1,8 +1,6 @@
 // src/app/api/exhibition/[id]/barcode-labels/route.ts
-// =====================================
-// 🚀 Thermal Label Printing API
+// 🔧 SIMPLIFIED: Only CODE128 barcode format - removed multiple format handling
 // Generate and manage barcode labels for exhibition products
-// =====================================
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth'
@@ -48,7 +46,7 @@ const PRINT_DENSITIES = {
   '600': { dpi: 600, name: '600 DPI (Ultra High)' }
 }
 
-// Generate ZPL code for thermal printers
+// Generate ZPL code for thermal printers (CODE128 only)
 function generateZPLCode(product: LabelData, settings: LabelRequest): string {
   const labelDimensions = LABEL_SIZES[settings.labelSize as keyof typeof LABEL_SIZES]
   const dpi = PRINT_DENSITIES[settings.printDensity as keyof typeof PRINT_DENSITIES].dpi
@@ -76,33 +74,34 @@ function generateZPLCode(product: LabelData, settings: LabelRequest): string {
     const displayName = product.name.length > maxNameLength 
       ? product.name.substring(0, maxNameLength) + '...' 
       : product.name
-    zpl += `^FO${centerX - 100},${yPos}^A0N,25,25^FD${displayName}^FS\n`
-    yPos += 40
-  }
-
-  // Barcode
-  if (product.barcode) {
-    zpl += `^FO${centerX - 100},${yPos}^BY2^BCN,40,Y,N,N^FD${product.barcode}^FS\n`
-    yPos += 60
-  }
-
-  // SKU
-  if (settings.includeSku && product.sku) {
-    zpl += `^FO${centerX - 80},${yPos}^A0N,20,20^FDSKU: ${product.sku}^FS\n`
+    zpl += `^FO${centerX - 80},${yPos}^A0N,20,20^FD${displayName}^FS\n`
     yPos += 30
   }
 
-  // Price (use exhibition price if available, otherwise regular price)
+  // CODE128 Barcode (hardcoded format)
+  const barcodeData = product.barcode
+  const barcodeWidth = width - 40
+  const barcodeHeight = Math.min(60, height - yPos - 40)
+  
+  zpl += `^FO${centerX - Math.floor(barcodeWidth/2)},${yPos}^BCN,${barcodeHeight},Y,N,N^FD${barcodeData}^FS\n`
+  yPos += barcodeHeight + 10
+
+  // Price
   if (settings.includePrice) {
-    const displayPrice = product.finalPrice || product.price
-    zpl += `^FO${centerX - 60},${yPos}^A0N,30,30^FD${displayPrice.toFixed(2)}^FS\n`
-    yPos += 40
+    zpl += `^FO${centerX - 40},${yPos}^A0N,18,18^FD$${product.finalPrice.toFixed(2)}^FS\n`
+    yPos += 25
+  }
+
+  // SKU
+  if (settings.includeSku) {
+    zpl += `^FO${centerX - 60},${yPos}^A0N,16,16^FDSKU: ${product.sku}^FS\n`
+    yPos += 20
   }
 
   // Category
-  if (settings.includeCategory && product.category) {
-    zpl += `^FO${centerX - 50},${yPos}^A0N,18,18^FD${product.category}^FS\n`
-    yPos += 25
+  if (settings.includeCategory) {
+    zpl += `^FO${centerX - 60},${yPos}^A0N,16,16^FD${product.category}^FS\n`
+    yPos += 20
   }
 
   // Custom text
@@ -110,12 +109,82 @@ function generateZPLCode(product: LabelData, settings: LabelRequest): string {
     zpl += `^FO${centerX - 80},${yPos}^A0N,18,18^FD${settings.customText}^FS\n`
   }
 
-  zpl += `^XZ\n` // End of label
+  // Format indicator
+  zpl += `^FO10,${height - 20}^A0N,12,12^FDCODE128^FS\n`
 
+  zpl += `^XZ\n` // End of label
   return zpl
 }
 
-// POST - Generate barcode labels for selected products
+// GET - Fetch exhibition products for barcode printing
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const session = await getSession()
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const exhibitionId = params.id
+
+    // Verify exhibition exists
+    const exhibition = await db.exhibition.findUnique({
+      where: { id: exhibitionId },
+      select: { id: true, title: true }
+    })
+
+    if (!exhibition) {
+      return NextResponse.json({ error: 'Exhibition not found' }, { status: 404 })
+    }
+
+    // Fetch exhibition products
+    const exhibitionProducts = await db.exhibitionProduct.findMany({
+      where: { exhibitionId },
+      include: {
+        product: {
+          include: {
+            category: {
+              select: { name: true }
+            }
+          }
+        }
+      }
+    })
+
+    // Transform to label format
+    const products = exhibitionProducts.map(ep => ({
+      id: ep.id,
+      name: ep.product.name,
+      sku: ep.product.sku,
+      barcode: ep.product.barcode || ep.product.sku, // Use SKU as fallback
+      price: ep.product.sellingPriceUSD,
+      category: ep.product.category.name,
+      exhibitionPrice: ep.exhibitionPrice,
+      finalPrice: ep.exhibitionPrice || ep.product.sellingPriceUSD,
+      quantityTaken: ep.quantityTaken,
+      quantitySold: ep.quantitySold,
+      available: ep.quantityTaken - ep.quantitySold
+    }))
+
+    return NextResponse.json({
+      exhibition,
+      products,
+      stats: {
+        totalProducts: products.length,
+        productsWithBarcodes: products.filter(p => p.barcode !== p.sku).length,
+        barcodeFormat: 'CODE128'
+      }
+    })
+
+  } catch (error) {
+    console.error('Error fetching exhibition products:', error)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  }
+}
+
+// POST - Generate CODE128 barcode labels for exhibition
 export async function POST(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -134,25 +203,11 @@ export async function POST(
       return NextResponse.json({ error: 'Product IDs are required' }, { status: 400 })
     }
 
-    if (labelRequest.productIds.length > 100) {
-      return NextResponse.json({ error: 'Maximum 100 products per request' }, { status: 400 })
-    }
-
-    // Validate exhibition exists
-    const exhibition = await db.exhibition.findUnique({
-      where: { id: exhibitionId },
-      select: { id: true, title: true, isActive: true }
-    })
-
-    if (!exhibition) {
-      return NextResponse.json({ error: 'Exhibition not found' }, { status: 404 })
-    }
-
-    // Get exhibition products with full product details
+    // Fetch exhibition products
     const exhibitionProducts = await db.exhibitionProduct.findMany({
       where: {
-        exhibitionId,
-        id: { in: labelRequest.productIds }
+        id: { in: labelRequest.productIds },
+        exhibitionId
       },
       include: {
         product: {
@@ -169,208 +224,50 @@ export async function POST(
       return NextResponse.json({ error: 'No valid products found' }, { status: 404 })
     }
 
-    // Transform to label data format
-    const labelData: LabelData[] = exhibitionProducts.map(ep => {
-      const product = ep.product
-      
-      // Calculate final price with exhibition discounts
-      const originalPrice = ep.originalPrice || product.sellingPriceUSD
-      const exhibitionPrice = ep.exhibitionPrice || originalPrice
-      const discountPercentage = ep.discountPercentage || 0
-      const finalPrice = discountPercentage > 0
-        ? exhibitionPrice * (1 - discountPercentage / 100)
-        : exhibitionPrice
+    // Transform to label format
+    const labelData: LabelData[] = exhibitionProducts.map(ep => ({
+      id: ep.id,
+      name: ep.product.name,
+      sku: ep.product.sku,
+      barcode: ep.product.barcode || ep.product.sku,
+      price: ep.product.sellingPriceUSD,
+      category: ep.product.category.name,
+      exhibitionPrice: ep.exhibitionPrice,
+      finalPrice: ep.exhibitionPrice || ep.product.sellingPriceUSD
+    }))
 
-      return {
-        id: ep.id,
-        name: product.name,
-        sku: product.sku,
-        barcode: product.barcode || `SKU${product.sku}`, // Fallback barcode
-        price: originalPrice,
-        category: product.category?.name || 'Uncategorized',
-        exhibitionPrice,
-        finalPrice
-      }
-    })
+    // Generate ZPL code for all products
+    let zplContent = ''
+    let totalLabels = 0
 
-    // Generate ZPL codes for all products
-    const zplCodes: { productId: string; productName: string; zplCode: string; copies: number }[] = []
-    
     for (const product of labelData) {
-      try {
-        const zplCode = generateZPLCode(product, labelRequest)
-        zplCodes.push({
-          productId: product.id,
-          productName: product.name,
-          zplCode,
-          copies: labelRequest.copies
-        })
-      } catch (error) {
-        console.error(`Error generating ZPL for product ${product.id}:`, error)
-        // Continue with other products instead of failing completely
+      for (let copy = 0; copy < labelRequest.copies; copy++) {
+        try {
+          zplContent += generateZPLCode(product, labelRequest) + '\n'
+          totalLabels++
+        } catch (error) {
+          console.error(`Error generating ZPL for product ${product.id}:`, error)
+        }
       }
     }
 
-    // Generate combined ZPL file content
-    let combinedZPL = ''
-    zplCodes.forEach(item => {
-      for (let copy = 1; copy <= item.copies; copy++) {
-        combinedZPL += item.zplCode + '\n\n'
-      }
-    })
-
-    const totalLabels = zplCodes.reduce((sum, item) => sum + item.copies, 0)
+    if (zplContent === '') {
+      return NextResponse.json({ error: 'Failed to generate any labels' }, { status: 500 })
+    }
 
     return NextResponse.json({
       success: true,
-      exhibition: {
-        id: exhibition.id,
-        title: exhibition.title
-      },
-      labelSettings: {
-        labelSize: labelRequest.labelSize,
-        printDensity: labelRequest.printDensity,
-        copies: labelRequest.copies
-      },
-      products: labelData,
-      zplCodes,
-      combinedZPL,
-      stats: {
-        totalProducts: labelData.length,
-        totalLabels,
-        generatedSuccessfully: zplCodes.length,
-        failed: labelData.length - zplCodes.length
-      }
+      zplContent,
+      totalLabels,
+      format: 'CODE128',
+      labelSize: labelRequest.labelSize,
+      printDensity: labelRequest.printDensity,
+      productsProcessed: labelData.length,
+      generatedAt: new Date().toISOString()
     })
 
   } catch (error) {
-    console.error('Barcode label generation error:', error)
-    return NextResponse.json(
-      { error: 'Failed to generate barcode labels' },
-      { status: 500 }
-    )
+    console.error('Error generating exhibition barcode labels:', error)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
-
-// GET - Get exhibition products suitable for label printing
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
-  try {
-    const session = await getSession()
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const exhibitionId = params.id
-    const { searchParams } = new URL(request.url)
-    const category = searchParams.get('category')
-    const inStock = searchParams.get('inStock') === 'true'
-    const hasBarcode = searchParams.get('hasBarcode') === 'true'
-
-    // Validate exhibition exists
-    const exhibition = await db.exhibition.findUnique({
-      where: { id: exhibitionId },
-      select: { id: true, title: true, isActive: true }
-    })
-
-    if (!exhibition) {
-      return NextResponse.json({ error: 'Exhibition not found' }, { status: 404 })
-    }
-
-    // Build filter conditions
-    const whereConditions: any = {
-      exhibitionId
-    }
-
-    if (inStock) {
-      whereConditions.quantityTaken = { gt: 0 }
-      whereConditions.quantitySold = { lt: { $ref: 'quantityTaken' } }
-    }
-
-    if (hasBarcode) {
-      whereConditions.product = {
-        barcode: { not: null }
-      }
-    }
-
-    if (category) {
-      whereConditions.product = {
-        ...whereConditions.product,
-        category: { name: category }
-      }
-    }
-
-    // Get exhibition products
-    const exhibitionProducts = await db.exhibitionProduct.findMany({
-      where: whereConditions,
-      include: {
-        product: {
-          include: {
-            category: {
-              select: { name: true }
-            }
-          }
-        }
-      },
-      orderBy: [
-        { product: { category: { name: 'asc' } } },
-        { product: { name: 'asc' } }
-      ]
-    })
-
-    // Transform for label printing interface
-    const productsForLabels = exhibitionProducts.map(ep => {
-      const product = ep.product
-      const availableStock = ep.quantityTaken - ep.quantitySold
-      
-      // Calculate pricing
-      const originalPrice = ep.originalPrice || product.sellingPriceUSD
-      const exhibitionPrice = ep.exhibitionPrice || originalPrice
-      const discountPercentage = ep.discountPercentage || 0
-      const finalPrice = discountPercentage > 0
-        ? exhibitionPrice * (1 - discountPercentage / 100)
-        : exhibitionPrice
-
-      return {
-        id: ep.id,
-        name: product.name,
-        sku: product.sku,
-        barcode: product.barcode || `SKU${product.sku}`,
-        price: originalPrice,
-        finalPrice,
-        category: product.category?.name || 'Uncategorized',
-        availableStock,
-        hasDiscount: discountPercentage > 0,
-        discountPercentage,
-        canPrint: true // All products can have labels printed
-      }
-    })
-
-    // Get available categories for filtering
-    const categories = [...new Set(productsForLabels.map(p => p.category))].sort()
-
-    return NextResponse.json({
-      success: true,
-      exhibition: {
-        id: exhibition.id,
-        title: exhibition.title
-      },
-      products: productsForLabels,
-      categories,
-      stats: {
-        totalProducts: productsForLabels.length,
-        inStockProducts: productsForLabels.filter(p => p.availableStock > 0).length,
-        productsWithBarcodes: productsForLabels.filter(p => p.barcode && !p.barcode.startsWith('SKU')).length,
-        categoriesCount: categories.length
-      }
-    })
-
-  } catch (error) {
-    console.error('Get products for labels error:', error)
-    return NextResponse.json(
-      { error: 'Failed to fetch products for label printing' },
-      { status: 500 }
-    )
-  }
