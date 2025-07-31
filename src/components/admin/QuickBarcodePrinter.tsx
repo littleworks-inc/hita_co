@@ -1,11 +1,11 @@
 // src/components/admin/QuickBarcodePrinter.tsx
-// 🔧 FIXED: Replace the custom barcode generation with proper JsBarcode implementation
+// 🔧 SIMPLIFIED: Only CODE128 barcode format - removed multiple format options
 "use client"
 
 import React, { useState, useRef, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Printer, Copy, RefreshCw, Tag, ChevronDown, ChevronUp, Settings, AlertCircle } from 'lucide-react'
+import { Printer, Copy, RefreshCw, Tag, ChevronDown, ChevronUp, Settings, AlertCircle, CheckCircle } from 'lucide-react'
 
 interface Product {
   id: string
@@ -37,7 +37,6 @@ const QuickBarcodePrinter: React.FC<QuickBarcodePrinterProps> = ({
   const [includePrice, setIncludePrice] = useState(true)
   const [includeName, setIncludeName] = useState(true)
   const [includeSku, setIncludeSku] = useState(true)
-  const [barcodeFormat, setBarcodeFormat] = useState<'CODE128' | 'CODE39' | 'EAN13'>('CODE128')
   const [status, setStatus] = useState('')
   const [isPrinting, setIsPrinting] = useState(false)
   const [barcodeDataUrl, setBarcodeDataUrl] = useState('')
@@ -52,9 +51,9 @@ const QuickBarcodePrinter: React.FC<QuickBarcodePrinterProps> = ({
     if (barcodeText && canvasRef.current) {
       generateJsBarcodeImage()
     }
-  }, [barcodeText, barcodeFormat])
+  }, [barcodeText])
 
-  // 🔧 FIXED: Proper JsBarcode implementation with all required canvas methods
+  // Generate CODE128 barcode using JsBarcode
   const generateJsBarcodeImage = async () => {
     if (isGenerating || !canvasRef.current) return
     
@@ -63,7 +62,7 @@ const QuickBarcodePrinter: React.FC<QuickBarcodePrinterProps> = ({
     setError('')
 
     try {
-      console.log('🔄 Starting JsBarcode generation:', { barcodeText, barcodeFormat })
+      console.log('🔄 Generating CODE128 barcode:', barcodeText)
 
       const canvas = canvasRef.current
       const ctx = canvas.getContext('2d')
@@ -72,17 +71,7 @@ const QuickBarcodePrinter: React.FC<QuickBarcodePrinterProps> = ({
         throw new Error('Cannot get canvas 2D context')
       }
 
-      // ✅ CRITICAL FIX: Verify canvas context has all required methods
-      const requiredMethods = ['save', 'restore', 'scale', 'translate', 'fillRect', 'fillText', 'measureText']
-      for (const method of requiredMethods) {
-        if (typeof (ctx as any)[method] !== 'function') {
-          throw new Error(`Canvas context missing required method: ${method}`)
-        }
-      }
-
-      console.log('✅ Canvas context verified with all required methods')
-
-      // Set canvas dimensions BEFORE using JsBarcode
+      // Set canvas dimensions
       canvas.width = 400
       canvas.height = 100
 
@@ -95,109 +84,49 @@ const QuickBarcodePrinter: React.FC<QuickBarcodePrinterProps> = ({
       const JsBarcode = (await import('jsbarcode')).default
 
       if (!JsBarcode || typeof JsBarcode !== 'function') {
-        throw new Error('JsBarcode failed to load or is not a function')
+        throw new Error('JsBarcode failed to load')
       }
 
       console.log('✅ JsBarcode loaded successfully')
 
-      // Prepare barcode data based on format
-      let processedBarcode = barcodeText.trim()
-      
-      // Format-specific processing
-      switch (barcodeFormat) {
-        case 'CODE39':
-          processedBarcode = processedBarcode.toUpperCase().replace(/[^A-Z0-9\-\.\ \$\/\+\%]/g, '')
-          if (processedBarcode.length === 0) {
-            throw new Error('No valid CODE39 characters found')
-          }
-          break
-        case 'EAN13':
-          processedBarcode = processedBarcode.replace(/[^0-9]/g, '')
-          if (processedBarcode.length < 13) {
-            processedBarcode = processedBarcode.padStart(13, '0')
-          } else if (processedBarcode.length > 13) {
-            processedBarcode = processedBarcode.slice(0, 13)
-          }
-          break
-        case 'CODE128':
-        default:
-          // CODE128 accepts most characters
-          break
-      }
-
-      console.log('📝 Processing barcode:', processedBarcode)
-
-      // ✅ FIXED: Generate barcode with proper error handling
-      let barcodeValid = false
-
-      JsBarcode(canvas, processedBarcode, {
-        format: barcodeFormat,
-        width: barcodeFormat === 'CODE39' ? 1.5 : 2,
+      // Generate CODE128 barcode (accepts any alphanumeric content)
+      JsBarcode(canvas, barcodeText, {
+        format: "CODE128",
+        width: 2,
         height: 60,
         displayValue: true,
         fontSize: 12,
-        textMargin: 8,
         margin: 10,
-        background: '#ffffff',
-        lineColor: '#000000',
-        fontOptions: 'bold',
-        font: 'monospace',
-        textAlign: 'center',
-        textPosition: 'bottom',
-        valid: (valid: boolean) => {
-          console.log('🔍 JsBarcode validation result:', valid)
-          barcodeValid = valid
-          if (!valid) {
-            throw new Error(`Invalid barcode: ${processedBarcode} for format ${barcodeFormat}`)
-          }
-        }
+        background: "#ffffff",
+        lineColor: "#000000"
       })
 
-      // Wait a moment for the barcode to be fully rendered
-      await new Promise(resolve => setTimeout(resolve, 100))
+      console.log('✅ CODE128 barcode generated successfully')
 
-      if (!barcodeValid) {
-        throw new Error('Barcode generation failed validation')
-      }
-
-      // Convert to data URL
-      const dataUrl = canvas.toDataURL('image/png', 1.0)
-      
-      if (!dataUrl || dataUrl.length < 100) {
-        throw new Error('Failed to generate image data URL')
-      }
-
+      // Get image data URL
+      const dataUrl = canvas.toDataURL('image/png')
       setBarcodeDataUrl(dataUrl)
-      setStatus('✅ Barcode generated successfully!')
-      console.log('✅ JsBarcode generation completed successfully')
-      
-      setTimeout(() => setStatus(''), 2000)
 
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred'
-      console.error('❌ JsBarcode generation failed:', errorMessage)
-      setError(errorMessage)
-      setStatus('❌ Barcode generation failed')
+      console.log('✅ Barcode image ready:', dataUrl.length, 'characters')
+
+    } catch (error) {
+      console.error('❌ Barcode generation error:', error)
+      setError(error instanceof Error ? error.message : 'Unknown error')
       
-      // Draw error message on canvas
+      // Fallback: Create error canvas
       const canvas = canvasRef.current
       if (canvas) {
         const ctx = canvas.getContext('2d')
         if (ctx) {
-          canvas.width = 400
-          canvas.height = 100
-          
-          ctx.fillStyle = '#ffffff'
+          ctx.fillStyle = '#f3f4f6'
           ctx.fillRect(0, 0, canvas.width, canvas.height)
-          
           ctx.fillStyle = '#ef4444'
-          ctx.font = 'bold 14px Arial'
+          ctx.font = '12px Arial'
           ctx.textAlign = 'center'
-          ctx.fillText('⚠️ Barcode Generation Failed', canvas.width / 2, canvas.height / 2 - 10)
-          
-          ctx.font = '11px Arial'
-          ctx.fillStyle = '#666666'
-          const shortError = errorMessage.length > 50 ? errorMessage.substring(0, 50) + '...' : errorMessage
+          ctx.fillText('Barcode Error', canvas.width / 2, canvas.height / 2)
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+          const shortError = errorMessage.length > 50 ? 
+            errorMessage.substring(0, 50) + '...' : errorMessage
           ctx.fillText(shortError, canvas.width / 2, canvas.height / 2 + 15)
         }
       }
@@ -219,7 +148,7 @@ const QuickBarcodePrinter: React.FC<QuickBarcodePrinterProps> = ({
     if (onBarcodeGenerated) {
       onBarcodeGenerated(newBarcode)
     }
-    setStatus(`Generated barcode: ${newBarcode}`)
+    setStatus(`Generated CODE128 barcode: ${newBarcode}`)
     setTimeout(() => setStatus(''), 3000)
   }
 
@@ -229,7 +158,7 @@ const QuickBarcodePrinter: React.FC<QuickBarcodePrinterProps> = ({
     setTimeout(() => setStatus(''), 2000)
   }
 
-  // Enhanced print function with multiple copies
+  // Enhanced print function with CODE128 labels
   const printLabels = async () => {
     if (!barcodeDataUrl) {
       setStatus('No barcode image available - please wait for generation')
@@ -237,14 +166,14 @@ const QuickBarcodePrinter: React.FC<QuickBarcodePrinterProps> = ({
     }
 
     setIsPrinting(true)
-    setStatus(`Printing ${copies} ${copies === 1 ? 'copy' : 'copies'}...`)
+    setStatus(`Printing ${copies} CODE128 ${copies === 1 ? 'label' : 'labels'}...`)
 
     try {
       // Create optimized print HTML for thermal labels
       let printContent = `<!DOCTYPE html>
 <html>
 <head>
-<title>Barcode Labels - ${product.name}</title>
+<title>CODE128 Barcode Labels - ${product.name}</title>
 <style>
 @page { 
   margin: 0; 
@@ -305,6 +234,11 @@ body {
   color: #059669; 
   font-size: 8px; 
 }
+.format-info {
+  font-size: 6px;
+  color: #6b7280;
+  margin-top: 0.5mm;
+}
 @media print {
   body { margin: 0; }
   .label { border: none; margin: 0; }
@@ -319,10 +253,11 @@ body {
 <div class="label">
   ${includeName ? `<div class="name">${product.name}</div>` : ''}
   <div class="barcode">
-    <img src="${barcodeDataUrl}" alt="Barcode ${barcodeText}">
+    <img src="${barcodeDataUrl}" alt="CODE128 Barcode ${barcodeText}">
   </div>
   ${includeSku ? `<div class="info">SKU: ${product.sku}</div>` : ''}
-  ${includePrice ? `<div class="info price">$${product.sellingPriceUSD.toFixed(2)}</div>` : ''}
+  ${includePrice ? `<div class="price">$${product.sellingPriceUSD.toFixed(2)}</div>` : ''}
+  <div class="format-info">CODE128</div>
 </div>`
       }
 
@@ -331,41 +266,39 @@ body {
 </html>`
 
       // Open print window
-      const printWindow = window.open('', '_blank', 'width=400,height=600')
+      const printWindow = window.open('', '_blank', 'width=600,height=400')
       if (printWindow) {
         printWindow.document.write(printContent)
         printWindow.document.close()
         
-        // Wait for images to load then print
-        printWindow.onload = () => {
-          setTimeout(() => {
-            printWindow.print()
-            setStatus('Print dialog opened')
-            setTimeout(() => setStatus(''), 2000)
-          }, 500)
-        }
+        // Auto-print after short delay
+        setTimeout(() => {
+          printWindow.print()
+          printWindow.close()
+        }, 500)
+        
+        setStatus(`✅ ${copies} CODE128 ${copies === 1 ? 'label' : 'labels'} sent to printer`)
       } else {
-        setStatus('Failed to open print window - check popup blocker')
-        setTimeout(() => setStatus(''), 3000)
+        setStatus('❌ Could not open print window - check popup blocker')
       }
 
     } catch (error) {
       console.error('Print error:', error)
-      setStatus('Print failed - please try again')
-      setTimeout(() => setStatus(''), 3000)
+      setStatus('❌ Print failed - see console for details')
     } finally {
       setIsPrinting(false)
+      setTimeout(() => setStatus(''), 3000)
     }
   }
 
   return (
     <Card className="w-full">
       <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-lg flex items-center gap-2">
-            <Printer className="h-5 w-5" />
-            Quick Barcode Printer
-          </CardTitle>
+        <CardTitle className="flex items-center justify-between text-lg">
+          <div className="flex items-center gap-2">
+            <Tag className="h-5 w-5" />
+            Quick CODE128 Barcode Printer
+          </div>
           <Button
             variant="ghost"
             size="sm"
@@ -373,90 +306,37 @@ body {
           >
             {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
           </Button>
-        </div>
-        {status && (
-          <div className={`text-sm font-medium ${
-            status.includes('✅') || status.includes('successfully') || status.includes('ready') ? 'text-green-600' :
-            status.includes('❌') || status.includes('failed') ? 'text-red-600' :
-            'text-blue-600'
-          }`}>
-            {status}
-          </div>
-        )}
+        </CardTitle>
       </CardHeader>
 
       <CardContent className="space-y-4">
-        {/* Error Display */}
-        {error && (
-          <div className="flex items-start gap-3 p-3 bg-red-50 border border-red-200 rounded-lg">
-            <AlertCircle className="h-4 w-4 text-red-500 flex-shrink-0 mt-0.5" />
-            <div className="flex-1">
-              <div className="font-medium text-red-800">Barcode Generation Error</div>
-              <div className="text-sm text-red-700">{error}</div>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={regenerateBarcode}
-                className="mt-2"
-              >
-                <RefreshCw className="h-3 w-3 mr-1" />
-                Retry
-              </Button>
-            </div>
+        {/* Status Display */}
+        {status && (
+          <div className={`p-2 rounded text-sm flex items-center gap-2 ${
+            status.includes('❌') || error ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'
+          }`}>
+            {status.includes('❌') || error ? <AlertCircle className="h-4 w-4" /> : <CheckCircle className="h-4 w-4" />}
+            {status}
           </div>
         )}
 
-        {/* Barcode Display */}
-        <div className="bg-white border rounded-lg p-4 text-center">
-          {isGenerating ? (
-            <div className="py-4">
-              <RefreshCw className="h-6 w-6 mx-auto mb-2 animate-spin text-blue-500" />
-              <div className="text-sm text-gray-600">Generating JsBarcode...</div>
-            </div>
-          ) : barcodeDataUrl ? (
-            <div>
-              <img 
-                src={barcodeDataUrl} 
-                alt={`Barcode: ${barcodeText}`}
-                className="mx-auto border border-gray-200 rounded"
-                style={{ maxHeight: '120px', maxWidth: '100%' }}
-              />
-              <div className="text-xs text-green-600 mt-2 flex items-center justify-center gap-1">
-                <span className="w-2 h-2 bg-green-500 rounded-full"></span>
-                Ready for printing ({barcodeFormat})
-              </div>
-            </div>
-          ) : (
-            <div className="py-4 text-gray-400">
-              <Tag className="h-6 w-6 mx-auto mb-2" />
-              <div className="text-sm">No barcode generated</div>
-            </div>
-          )}
-          
-          <Button onClick={regenerateBarcode} variant="outline" size="sm" className="mt-2">
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Regenerate
-          </Button>
-          
-          {/* Hidden canvas for barcode generation */}
-          <canvas ref={canvasRef} style={{ display: 'none' }} />
-        </div>
+        {/* Barcode Canvas (Hidden) */}
+        <canvas
+          ref={canvasRef}
+          style={{ display: 'none' }}
+          width={400}
+          height={100}
+        />
 
         {/* Product Info */}
-        <div className="grid grid-cols-2 gap-4 text-sm bg-gray-50 p-3 rounded-lg">
+        <div className="grid grid-cols-2 gap-2 text-sm bg-gray-50 p-3 rounded">
           <div><strong>Product:</strong> {product.name}</div>
+          <div><strong>SKU:</strong> {product.sku}</div>
           <div><strong>Price:</strong> ${product.sellingPriceUSD.toFixed(2)}</div>
-          <div>
-            <strong>SKU:</strong> {product.sku}
-            <button onClick={copyBarcode} className="ml-2 text-blue-600 hover:text-blue-800">
-              <Copy className="h-3 w-3 inline" />
-            </button>
-          </div>
           <div><strong>Stock:</strong> {product.stockQuantity}</div>
           {product.barcode && (
             <div className="col-span-2">
-              <strong>Barcode:</strong> {product.barcode}
+              <strong>Current Barcode:</strong> {product.barcode} (CODE128)
             </div>
           )}
         </div>
@@ -466,7 +346,7 @@ body {
           <div className="space-y-4 pt-4 border-t">
             <div className="flex items-center gap-2 text-sm font-medium">
               <Settings className="h-4 w-4" />
-              Print Settings
+              Print Settings (CODE128 Format)
             </div>
 
             {/* Print Options */}
@@ -483,17 +363,12 @@ body {
                 />
               </div>
 
-              <div>
-                <label className="block text-sm font-medium mb-1">Barcode Format</label>
-                <select
-                  value={barcodeFormat}
-                  onChange={(e) => setBarcodeFormat(e.target.value as any)}
-                  className="w-full px-3 py-1 border border-gray-300 rounded text-sm"
-                >
-                  <option value="CODE128">CODE128 (Recommended)</option>
-                  <option value="CODE39">CODE39</option>
-                  <option value="EAN13">EAN13</option>
-                </select>
+              <div className="flex items-end">
+                <div className="text-xs text-gray-600">
+                  <div className="font-medium text-blue-600">CODE128 Format</div>
+                  <div>Universal • Letters + Numbers</div>
+                  <div>Most compatible barcode format</div>
+                </div>
               </div>
             </div>
 
@@ -541,51 +416,42 @@ body {
             {isPrinting ? 'Printing...' : `Print ${copies > 1 ? `${copies} Labels` : 'Label'}`}
           </Button>
 
-          {!product.barcode && (
-            <Button
-              variant="outline"
-              onClick={generateBarcodeFromSKU}
-              className="flex items-center gap-2"
-            >
-              Generate Barcode
-            </Button>
-          )}
-
           <Button
             variant="outline"
             onClick={copyBarcode}
+            disabled={!barcodeText}
             className="flex items-center gap-2"
           >
             <Copy className="h-4 w-4" />
-            Copy Code
+            Copy Barcode
           </Button>
+
+          <Button
+            variant="outline"
+            onClick={generateBarcodeFromSKU}
+            className="flex items-center gap-2"
+          >
+            <RefreshCw className="h-4 w-4" />
+            Generate from SKU
+          </Button>
+
+          {error && (
+            <Button
+              variant="outline"
+              onClick={regenerateBarcode}
+              className="flex items-center gap-2 text-red-600"
+            >
+              <RefreshCw className="h-4 w-4" />
+              Retry Generation
+            </Button>
+          )}
         </div>
 
-        {/* Size Variants (if applicable) */}
-        {product.requiresSizes && product.productSizes && product.productSizes.length > 0 && (
-          <div className="mt-4 pt-4 border-t">
-            <h4 className="text-sm font-medium mb-2">Size Variants</h4>
-            <div className="grid grid-cols-1 gap-2">
-              {product.productSizes.map((size, index) => (
-                <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded text-sm">
-                  <div>
-                    <strong>Size {size.size}:</strong> {size.sku}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-gray-600">Stock: {size.stockQuantity}</span>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => navigator.clipboard.writeText(size.sku)}
-                    >
-                      <Copy className="h-3 w-3" />
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+        {/* Help Text */}
+        <div className="text-xs text-gray-500 mt-4 p-2 bg-blue-50 rounded">
+          <strong>CODE128 Benefits:</strong> Works with any letters, numbers, and symbols. 
+          Most widely supported barcode format. Perfect for SKUs, product codes, and inventory tracking.
+        </div>
       </CardContent>
     </Card>
   )
