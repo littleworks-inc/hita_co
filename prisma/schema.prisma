@@ -209,21 +209,26 @@ model Product {
 model ProductSize {
   id                    String                 @id @default(cuid())
   productId             String
-  size                  String                 // "XS", "S", "M", "L", "XL", "XXL", "6", "7", "8", etc.
+  size                  String                 // "XS", "S", "M", "L", "XL", "XXL", etc.
   sku                   String                 @unique // "KURTA-001-S", "KURTA-001-M"
+  
+  // ✅ NEW: Individual barcode for each size variant
+  barcode               String?                @unique // "HC-BLUE-100941-XXL", "HC-BLUE-100941-XL"
+  barcodeType           String?                @default("CODE128")
+  
   stockQuantity         Int                    @default(0)
   lowStockAlert         Int                    @default(5)
   isActive              Boolean                @default(true)
-  sortOrder             Int                    @default(0)  // For custom size ordering
+  sortOrder             Int                    @default(0)
   createdAt             DateTime               @default(now())
   updatedAt             DateTime               @updatedAt
   
-  // Relations
+  // Relations remain the same
   product               Product                @relation(fields: [productId], references: [id], onDelete: Cascade)
   exhibitionSizes       ExhibitionProductSize[]
   orderItems            OrderItem[]
   cartItems             CartItem[]
-  exhibitionSaleItems   ExhibitionSaleItem[]   // ✅ NEW: Exhibition sale items
+  exhibitionSaleItems   ExhibitionSaleItem[]
 
   @@map("product_sizes")
 }
