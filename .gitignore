@@ -1,5 +1,5 @@
 # ==========================================
-# AI Interview Coach - .gitignore
+# Hita&Co Ecommerce - .gitignore
 # ==========================================
 
 # Environment Variables & Configuration
@@ -45,8 +45,6 @@ out/
 coverage/
 *.tsbuildinfo
 .nyc_output
-scripts/
-scripts_test/
 
 # Runtime & Process Files
 # ==========================================
@@ -65,45 +63,21 @@ yarn-error.log*
 lerna-debug.log*
 .pnpm-debug.log*
 
-# AI Interview Coach Specific
+# Ecommerce Specific Files
 # ==========================================
-# Interview recordings and media
-recordings/
-audio/
-video/
+# Product images and uploads
 uploads/
 media/
-*.mp3
+images/local/
+product-images/
+*.jpeg
+*.jpg
+*.png
+*.gif
+*.webp
 *.mp4
-*.wav
-*.m4a
-*.webm
-
-# AI model files and caches
-# models/
-*.model
-*.pkl
-*.joblib
-embeddings/
-vector-store/
-.chroma/
-.pinecone-cache/
-ai-cache/
-
-# User data and sessions
-user-data/
-sessions/
-interview-data/
-transcripts/
-*.transcript
-user-profiles/
-
-# Training data and datasets
-datasets/
-training-data/
-*.csv
-*.json.gz
-annotations/
+*.avi
+*.mov
 
 # Database Files
 # ==========================================
@@ -112,6 +86,10 @@ annotations/
 *.sqlite3
 db.json
 database/
+*.sql.backup
+*.dump
+.env.local
+*.backup
 
 # IDE & Editor Files
 # ==========================================
@@ -199,9 +177,6 @@ temp/
 .tmp/
 .cache/
 .parcel-cache/
-.next/
-.nuxt/
-.vite/
 
 # Docker
 # ==========================================
@@ -244,39 +219,20 @@ business/
 financials/
 projections/
 
-# testing scripts and files
-test-analytics-api.js
-test-large-content.js
-test-validation.js
-test-all-endpoints.js
+# Ecommerce Business Files
+# ==========================================
+inventory-reports/
+sales-data/
+customer-data/
+export-reports/
+analytics-data/
 
-debug-env.js
-
-test-api-key.js
-test-admin-routes.js
-test-db-connection.js
-migrate-sqlite-to-postgresql.js
-verify-migration.js
-test-frontend.html
-test-routes-now.js
-
-# Database data files (keep local only)
-backend/database/data/
-backend/database/backups/
-backend/database/logs/
-*.sql.backup
-*.dump
-.env.local
-*.backup
-
-
-# Testing and debug files
+# Remove any remaining debug files
 *-test.js
 *-debug.js
 *-fix.js
-test-*.js
 debug-*.js
 *.backup
 .backup-*/
 
-CLAUDE.md
+scripts/
