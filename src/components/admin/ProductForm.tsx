@@ -2,6 +2,7 @@
 // src/components/admin/ProductForm.tsx - WITH ENHANCED AI CONTENT GENERATION
 // Complete ProductForm with Image Upload + Enhanced AI Generation + Clean Configuration
 // ✅ FIXED: Removed duplicate inventory section
+// ✅ UPDATED: Removed barcode input section - barcode management moved to sidebar printer tool
 // =====================================
 
 'use client'
@@ -28,11 +29,10 @@ import ProductBasicInfo from '@/components/admin/ProductBasicInfo'
 import ProductDescriptions from '@/components/admin/ProductDescriptions'
 import ProductPricing from '@/components/admin/ProductPricing'
 import ProductSizeManager from '@/components/admin/ProductSizeManager'
-import ProductBarcodeGenerator from '@/components/admin/ProductBarcodeGenerator'
+// ✅ REMOVED: ProductBarcodeGenerator import - barcode management moved to sidebar
+// import ProductBarcodeGenerator from '@/components/admin/ProductBarcodeGenerator'
 import ProductSEO from '@/components/admin/ProductSEO'
 import ImageUpload from '@/components/admin/ImageUpload'
-// ✅ REMOVED: ProductInventory import (causing duplicate sections)
-// import ProductInventory from '@/components/admin/ProductInventory'
 
 // ✅ AI Components
 import AIGenerateButton from '@/components/admin/AIGenerateButton'
@@ -148,7 +148,7 @@ export default function ProductForm({
   const [showCostBreakdown, setShowCostBreakdown] = useState(false)
   const [pricingMode, setPricingMode] = useState<'basic' | 'advanced'>('basic')
   const [showCustomerPreview, setShowCustomerPreview] = useState(false)
-  const [barcodeNeedsUpdate, setBarcodeNeedsUpdate] = useState(false)
+  // ✅ REMOVED: barcodeNeedsUpdate state - no longer needed
 
   // ✅ AI STATE
   const [showAiPanel, setShowAiPanel] = useState(false)
@@ -209,12 +209,7 @@ export default function ProductForm({
     }
   }, [formData.name, product?.sku])
 
-  // Auto-generate barcode when SKU changes
-  useEffect(() => {
-    if (formData.sku && !formData.barcode) {
-      setBarcodeNeedsUpdate(true)
-    }
-  }, [formData.sku, formData.barcode])
+  // ✅ REMOVED: Auto-generate barcode effect - barcode management moved to sidebar
 
   // =====================================
   // CLEAN CONFIGURATION
@@ -248,237 +243,84 @@ export default function ProductForm({
       return {
         profitMargin: 100,
         lowStockAlert: 5,
-        message: `Standard recommendations for ${category?.name}. Adjust based on your own pricing strategy`
+        message: `Standard recommendations for ${category?.name}`
       }
     }
   }
 
-  const pricingSuggestions = useMemo(() => getPricingSuggestions(), [formData.categoryId, categories])
-
   // =====================================
-  // AI GENERATION HANDLERS
+  // AI CONTEXT GENERATION
   // =====================================
 
-  // ✅ Basic AI context for generation
   const getAIContext = () => {
     const category = categories.find(c => c.id === formData.categoryId)
     const country = countries.find(c => c.id === formData.countryId)
-
+    
     return {
-      productName: formData.name,
+      product_name: formData.name,
       category: category?.name || '',
-      price: formData.sellingPriceUSD || formData.originalPrice,
-      currency: formData.originalCurrency || 'USD',
-      country: country?.name || '',
+      country_origin: country?.name || '',
+      price_usd: formData.sellingPriceUSD,
+      existing_description: formData.description,
+      existing_short_description: formData.shortDescription,
       tags: formData.tags,
-      features: [],
-      shortDescription: formData.shortDescription,
-      description: formData.description,
-      images: formData.images || []
+      is_featured: formData.isFeatured
     }
   }
 
-  // ✅ Enhanced AI context for detailed generation
-  const getEnhancedAIContext = () => {
-    const category = categories.find(c => c.id === formData.categoryId)
-    const country = countries.find(c => c.id === formData.countryId)
+  // =====================================
+  // AI HANDLERS
+  // =====================================
 
-    // Basic context (existing)
-    const basicContext = {
-      productName: formData.name,
-      category: category?.name || '',
-      price: formData.sellingPriceUSD || formData.originalPrice,
-      currency: formData.originalCurrency || 'USD',
-      country: country?.name || '',
-      tags: formData.tags,
-      features: [],
-      shortDescription: formData.shortDescription,
-      description: formData.description,
-      images: formData.images || []
-    }
-
-    // Enhanced context (new)
-    if (enhancedAIData) {
-      return {
-        ...basicContext,
-        // Material & Fabric
-        primaryMaterial: enhancedAIData.primaryMaterial,
-        secondaryMaterials: enhancedAIData.secondaryMaterials,
-        fabricWeight: enhancedAIData.fabricWeight,
-        fabricTexture: enhancedAIData.fabricTexture,
-
-        // Design & Colors
-        designStyle: enhancedAIData.designStyle,
-        patterns: enhancedAIData.patterns,
-        embellishments: enhancedAIData.embellishments,
-        dominantColors: enhancedAIData.dominantColors,
-        colorScheme: enhancedAIData.colorScheme,
-
-        // Cultural Context
-        culturalOrigin: enhancedAIData.culturalOrigin,
-        traditionalName: enhancedAIData.traditionalName,
-        occasions: enhancedAIData.occasions,
-        significance: enhancedAIData.significance,
-
-        // Target Audience
-        targetAge: enhancedAIData.targetAge,
-        targetGender: enhancedAIData.targetGender,
-        targetOccasion: enhancedAIData.targetOccasion,
-
-        // Unique Features
-        uniqueFeatures: enhancedAIData.uniqueFeatures,
-        craftmanship: enhancedAIData.craftmanship,
-        careInstructions: enhancedAIData.careInstructions,
-
-        // AI Preferences
-        tone: enhancedAIData.tone,
-        length: enhancedAIData.length,
-        keywords: enhancedAIData.keywords,
-        includeHistory: enhancedAIData.includeHistory,
-        includeCare: enhancedAIData.includeCare
-      }
-    }
-
-    return basicContext
-  }
-
-  // ✅ Handle AI-generated content
   const handleAIGenerated = (type: string, content: any) => {
-    setAiGenerating(false)
-
-    try {
-      if (type === 'short_description') {
-        // Handle short description generation
-        if (typeof content === 'string') {
-          handleInputChange('shortDescription', content)
-        }
-      } else if (type === 'product_description') {
-        // Handle full description generation
-        if (typeof content === 'string') {
-          handleInputChange('description', content)
-        } else if (content.description) {
-          handleInputChange('description', content.description)
-          if (content.shortDescription) {
-            handleInputChange('shortDescription', content.shortDescription)
-          }
-          if (content.tags && Array.isArray(content.tags)) {
-            handleInputChange('tags', content.tags)
-          }
-        }
-      } else if (type === 'both_descriptions') {
-        // ✅ NEW: Handle generating both descriptions at once
-        if (content.shortDescription) {
-          handleInputChange('shortDescription', content.shortDescription)
-        }
-        if (content.description) {
-          handleInputChange('description', content.description)
-        }
-        if (content.tags && Array.isArray(content.tags)) {
-          handleInputChange('tags', content.tags)
-        }
-      } else if (type === 'seo_content') {
-        if (content.title) {
-          handleInputChange('seoTitle', content.title)
-        }
-        if (content.description) {
-          handleInputChange('seoDescription', content.description)
-        }
-      }
-    } catch (error) {
-      console.error('Error handling AI generated content:', error)
-    }
-  }
-
-  const handleBothDescriptionsAI = async () => {
-    setAiGenerating(true)
-
-    try {
-      // Generate short description first
-      const shortDescResponse = await fetch('/api/admin/ai/generate', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          type: 'short_description',
-          context: getAIContext()
-        })
-      })
-
-      const shortDescData = await shortDescResponse.json()
-
-      // Generate full description
-      const fullDescResponse = await fetch('/api/admin/ai/generate', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          type: 'product_description',
-          context: getAIContext()
-        })
-      })
-
-      const fullDescData = await fullDescResponse.json()
-
-      // Apply both results
-      if (shortDescData.success && shortDescData.content) {
-        handleInputChange('shortDescription', shortDescData.content)
-      }
-
-      if (fullDescData.success && fullDescData.content) {
-        if (typeof fullDescData.content === 'string') {
-          handleInputChange('description', fullDescData.content)
-        } else if (fullDescData.content.description) {
-          handleInputChange('description', fullDescData.content.description)
-        }
-      }
-
-      setSuccessMessage('Both descriptions generated successfully!')
-      setTimeout(() => setSuccessMessage(''), 3000)
-
-    } catch (error) {
-      console.error('Enhanced AI generation error:', error)
-      setErrors(prev => ({
+    if (type === 'basic_content') {
+      setFormData(prev => ({
         ...prev,
-        submit: error instanceof Error ? error.message : 'AI generation failed'
+        description: content.description || prev.description,
+        shortDescription: content.short_description || prev.shortDescription,
+        tags: content.tags || prev.tags
       }))
-    } finally {
-      setAiGenerating(false)
+      setSuccessMessage('✨ AI content generated successfully!')
+      setTimeout(() => setSuccessMessage(''), 3000)
+    } else if (type === 'seo_content') {
+      setFormData(prev => ({
+        ...prev,
+        seoTitle: content.title || prev.seoTitle,
+        seoDescription: content.description || prev.seoDescription
+      }))
+      setSuccessMessage('✨ AI SEO content generated successfully!')
+      setTimeout(() => setSuccessMessage(''), 3000)
     }
   }
 
-  // ✅ Enhanced AI generation handler
-  const handleEnhancedAIGeneration = async (type: string, enhancedData: any) => {
+  const handleEnhancedAISubmit = async (aiInputs: any) => {
     setAiGenerating(true)
-    setEnhancedAIData(enhancedData)
+    setErrors({})
 
     try {
-      const context = getEnhancedAIContext()
-
-      const response = await fetch('/api/admin/ai/generate', {
+      const response = await fetch('/api/admin/ai/enhanced-generate', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          type,
-          context,
-          options: {
-            tone: enhancedData.tone,
-            length: enhancedData.length,
-            keywords: enhancedData.keywords,
-            includeHistory: enhancedData.includeHistory,
-            includeCare: enhancedData.includeCare
-          }
+          ...getAIContext(),
+          enhanced_inputs: aiInputs
         })
       })
 
       const data = await response.json()
 
-      if (data.success) {
-        handleAIGenerated(type, data.content)
-        setSuccessMessage('AI content generated successfully!')
+      if (response.ok && data.success) {
+        setEnhancedAIData(data.content)
+        setFormData(prev => ({
+          ...prev,
+          name: data.content.name || prev.name,
+          description: data.content.description || prev.description,
+          shortDescription: data.content.short_description || prev.shortDescription,
+          tags: data.content.tags || prev.tags,
+          seoTitle: data.content.seo_title || prev.seoTitle,
+          seoDescription: data.content.seo_description || prev.seoDescription
+        }))
+        setSuccessMessage('✨ Enhanced AI content generated successfully!')
         setTimeout(() => setSuccessMessage(''), 3000)
       } else {
         throw new Error(data.error || 'AI generation failed')
@@ -583,10 +425,7 @@ export default function ProductForm({
     setErrors(prev => ({ ...prev, [field]: '' }))
   }
 
-  const handleBarcodeGenerated = (barcode: string) => {
-    handleInputChange('barcode', barcode)
-    setBarcodeNeedsUpdate(false)
-  }
+  // ✅ REMOVED: handleBarcodeGenerated function - no longer needed
 
   // =====================================
   // FORM SUBMISSION
@@ -605,7 +444,7 @@ export default function ProductForm({
         ? `/api/admin/products/${product.id}`
         : '/api/admin/products'
 
-      const method = mode === 'edit' ? 'PUT' : 'POST'
+      const method = mode === 'edit' ? 'PATCH' : 'POST'
 
       const response = await fetch(url, {
         method,
@@ -618,21 +457,27 @@ export default function ProductForm({
       const data = await response.json()
 
       if (response.ok) {
-        setSuccessMessage(data.message || `Product ${mode === 'edit' ? 'updated' : 'created'} successfully!`)
-
-        if (mode === 'create') {
-          setTimeout(() => {
-            router.push('/admin/products')
-          }, 1500)
-        }
+        setSuccessMessage(
+          mode === 'edit'
+            ? 'Product updated successfully!'
+            : 'Product created successfully!'
+        )
+        setTimeout(() => {
+          router.push('/admin/products')
+        }, 1500)
       } else {
-        setErrors({
-          submit: data.error || `Failed to ${mode} product`
-        })
+        if (data.errors) {
+          setErrors(data.errors)
+        } else {
+          setErrors({
+            submit: data.error || 'Something went wrong. Please try again.'
+          })
+        }
       }
     } catch (error) {
+      console.error('Form submission error:', error)
       setErrors({
-        submit: error instanceof Error ? error.message : 'Failed to save product'
+        submit: 'Network error. Please check your connection and try again.'
       })
     } finally {
       setLoading(false)
@@ -640,158 +485,16 @@ export default function ProductForm({
   }
 
   // =====================================
-  // RENDER COMPONENT
+  // RENDER
   // =====================================
 
   return (
-    <div className="max-w-7xl mx-auto p-6 space-y-8">
-      {/* Header with AI Toggle */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">
-            {mode === 'edit' ? 'Edit Product' : 'Add New Product'}
-          </h1>
-          <p className="text-gray-600 mt-1">
-            {mode === 'edit' ? 'Update product information' : 'Create a new product with AI-powered content generation'}
-          </p>
-        </div>
-
-        {/* ✅ AI Panel Toggle */}
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2 text-sm text-gray-500">
-            <CheckCircle className="h-4 w-4 text-green-500" />
-            Clean configuration system
-          </div>
-
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => setShowAiPanel(!showAiPanel)}
-            className="flex items-center gap-2"
-          >
-            <Brain className="h-4 w-4" />
-            {showAiPanel ? 'Hide AI Panel' : (showEnhancedAI ? 'Show Enhanced AI' : 'Show AI Panel')}
-          </Button>
-        </div>
-      </div>
-
-      {/* ✅ ENHANCED: AI Content Generation Panel */}
-      {showAiPanel && (
-        <div className="bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-lg p-4">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-purple-600" />
-              <h3 className="font-medium text-purple-900">AI Content Generation</h3>
-            </div>
-
-            <div className="flex items-center gap-2">
-              {!isAIReady() && (
-                <div className="text-sm text-amber-600 flex items-center gap-1">
-                  <AlertTriangle className="h-4 w-4" />
-                  Add product name and category first
-                </div>
-              )}
-
-              {/* AI Mode Toggle */}
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setShowEnhancedAI(false)}
-                  className={`px-3 py-1 text-sm rounded-lg transition-colors ${!showEnhancedAI
-                    ? 'bg-purple-600 text-white'
-                    : 'bg-white text-purple-600 hover:bg-purple-50'
-                    }`}
-                >
-                  Quick AI
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowEnhancedAI(true)}
-                  className={`px-3 py-1 text-sm rounded-lg transition-colors ${showEnhancedAI
-                    ? 'bg-purple-600 text-white'
-                    : 'bg-white text-purple-600 hover:bg-purple-50'
-                    }`}
-                >
-                  Enhanced AI
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* AI Generation Content */}
-          {showEnhancedAI ? (
-            // Enhanced AI Input Form
-            <EnhancedAIInputForm
-              productName={formData.name}
-              categoryName={categories.find(c => c.id === formData.categoryId)?.name || ''}
-              images={formData.images}
-              onGenerate={handleEnhancedAIGeneration}
-              isGenerating={aiGenerating}
-            />
-          ) : (
-            // Quick AI Buttons (existing)
-            isAIReady() && (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                {/* ✅ NEW: Short Description AI */}
-                <div className="space-y-2">
-                  <div className="text-sm font-medium text-gray-700">Short Description</div>
-                  <AIGenerateButton
-                    type="short_description"
-                    context={getAIContext()}
-                    onGenerated={(content) => handleAIGenerated('short_description', content)}
-                    disabled={!isAIReady() || aiGenerating}
-                    size="sm"
-                  />
-                </div>
-
-                {/* Product Description AI */}
-                <div className="space-y-2">
-                  <div className="text-sm font-medium text-gray-700">Full Description</div>
-                  <AIGenerateButton
-                    type="product_description"
-                    context={getAIContext()}
-                    onGenerated={(content) => handleAIGenerated('product_description', content)}
-                    disabled={!isAIReady() || aiGenerating}
-                    size="sm"
-                  />
-                </div>
-
-                {/* SEO Content AI */}
-                <div className="space-y-2">
-                  <div className="text-sm font-medium text-gray-700">SEO Content</div>
-                  <AIGenerateButton
-                    type="seo_content"
-                    context={getAIContext()}
-                    onGenerated={(content) => handleAIGenerated('seo_content', content)}
-                    disabled={!isAIReady() || aiGenerating}
-                    size="sm"
-                  />
-                </div>
-
-                {/* Social Caption AI */}
-                <div className="space-y-2">
-                  <div className="text-sm font-medium text-gray-700">Social Media</div>
-                  <AIGenerateButton
-                    type="social_caption"
-                    context={getAIContext()}
-                    onGenerated={(content) => {
-                      console.log('Social caption generated:', content)
-                    }}
-                    disabled={!isAIReady() || aiGenerating}
-                    size="sm"
-                  />
-                </div>
-              </div>
-            )
-          )}
-        </div>
-      )}
-
+    <div className="bg-white rounded-lg shadow">
       {/* Success Message */}
       {successMessage && (
-        <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-          <div className="flex items-center gap-2">
-            <CheckCircle className="h-5 w-5 text-green-600" />
+        <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+          <div className="flex items-center">
+            <CheckCircle className="h-5 w-5 text-green-600 mr-2" />
             <span className="text-green-800">{successMessage}</span>
           </div>
         </div>
@@ -799,176 +502,241 @@ export default function ProductForm({
 
       {/* Error Message */}
       {errors.submit && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-          <div className="flex items-center gap-2">
-            <AlertTriangle className="h-5 w-5 text-red-600" />
+        <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+          <div className="flex items-center">
+            <AlertTriangle className="h-5 w-5 text-red-600 mr-2" />
             <span className="text-red-800">{errors.submit}</span>
           </div>
         </div>
       )}
 
-      {/* Form */}
-      <form onSubmit={handleSubmit} className="space-y-8">
-
-        {/* 1. PRODUCT IMAGES & VIDEOS - TOP PRIORITY */}
-        <ImageUpload
-          label="Product Images & Videos"
-          description="Upload high-quality images and videos to showcase your product. First image will be the main product image."
-          images={formData.images}
-          onImagesChange={handleImagesChange}
-          maxImages={8}
-          maxVideos={2}
-          multiple={true}
-          disabled={loading}
-        />
-
-        {/* 2. Basic Information */}
-        <ProductBasicInfo
-          formData={formData}
-          categories={categories}
-          countries={countries}
-          suppliers={suppliers}
-          errors={errors}
-          onInputChange={handleInputChange}
-        />
-
-        {/* 3. Product Descriptions with AI */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-medium text-gray-900">Product Descriptions</h3>
-            {isAIReady() && !showAiPanel && (
-              <div className="flex gap-2">
-                {/* ✅ NEW: Generate Both Descriptions Button */}
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={handleBothDescriptionsAI}
-                  disabled={!isAIReady() || aiGenerating}
-                  className="text-blue-600 border-blue-200 hover:bg-blue-50"
+      {/* ✅ Enhanced AI Input Form Modal */}
+      {showEnhancedAI && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg max-w-4xl max-h-[90vh] overflow-y-auto m-4">
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-semibold">Enhanced AI Content Generation</h2>
+                <button
+                  onClick={() => setShowEnhancedAI(false)}
+                  className="text-gray-500 hover:text-gray-700"
                 >
-                  <FileText className={`h-4 w-4 mr-2 ${aiGenerating ? 'animate-spin' : ''}`} />
-                  {aiGenerating ? 'Generating...' : 'Generate Descriptions'}
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setShowAiPanel(!showAiPanel)}
-                  className="text-purple-600"
-                >
-                  <Settings className="h-3 w-3" />
-                </Button>
+                  ×
+                </button>
               </div>
-            )}
+              <EnhancedAIInputForm
+                productName={formData.name}
+                categoryName={categories.find(c => c.id === formData.categoryId)?.name || ''}
+                images={formData.images}
+                onGenerate={handleEnhancedAISubmit}
+                isGenerating={aiGenerating}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      <form onSubmit={handleSubmit} className="p-6 space-y-8">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900">
+              {mode === 'edit' ? 'Edit Product' : 'Create New Product'}
+            </h2>
+            <p className="mt-1 text-sm text-gray-600">
+              {mode === 'edit' 
+                ? 'Update your product information and settings.'
+                : 'Add a new product to your inventory.'
+              }
+            </p>
           </div>
 
-          <ProductDescriptions
-            formData={formData}
-            onInputChange={handleInputChange}
-          />
+          {/* AI Toggle Controls */}
+          <div className="flex items-center gap-3">
+            {/* Enhanced AI Button */}
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setShowEnhancedAI(true)}
+              disabled={!isAIReady() || aiGenerating}
+              className="flex items-center gap-2"
+            >
+              <Brain className="h-4 w-4" />
+              Enhanced AI
+            </Button>
 
-          {/* ✅ Individual AI Buttons for specific descriptions */}
-          {isAIReady() && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-gray-200">
-              <div className="space-y-2">
-                <div className="text-sm font-medium text-gray-700">Generate Individual Descriptions</div>
-                <div className="flex gap-2">
-                  <AIGenerateButton
-                    type="short_description"
-                    context={getAIContext()}
-                    onGenerated={(content) => handleAIGenerated('short_description', content)}
-                    disabled={!isAIReady() || aiGenerating}
-                    size="sm"
-                    variant="outline"
-                  />
-                  <AIGenerateButton
-                    type="product_description"
-                    context={getAIContext()}
-                    onGenerated={(content) => handleAIGenerated('product_description', content)}
-                    disabled={!isAIReady() || aiGenerating}
-                    size="sm"
-                    variant="outline"
-                  />
-                </div>
-              </div>
-            </div>
-          )}
+            {/* Quick AI Panel Toggle */}
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setShowAiPanel(!showAiPanel)}
+              disabled={!isAIReady()}
+              className="flex items-center gap-2"
+            >
+              <Sparkles className="h-4 w-4" />
+              Quick AI {showAiPanel ? '(Hide)' : '(Show)'}
+            </Button>
+          </div>
         </div>
 
-        {/* 4. Pricing with Clean Configuration */}
-        <ProductPricing
-          formData={formData}
-          selectedCountry={countries.find(c => c.id === formData.countryId)}
-          exchangeRate={countries.find(c => c.id === formData.countryId)?.exchangeRate || 1}
-          errors={errors}
-          onInputChange={handleInputChange}
-          showCostBreakdown={showCostBreakdown}
-          onToggleCostBreakdown={() => setShowCostBreakdown(!showCostBreakdown)}
-          pricingMode={pricingMode}
-          onPricingModeChange={setPricingMode}
-          showCustomerPreview={showCustomerPreview}
-          onToggleCustomerPreview={() => setShowCustomerPreview(!showCustomerPreview)}
-        />
-
-        {/* ✅ FIXED: ProductSizeManager with Traditional Inventory support */}
-        {/* 5. Size Management & Inventory (ProductSizeManager handles both cases) */}
-        <ProductSizeManager
-          requiresSizes={formData.requiresSizes}
-          productSizes={formData.productSizes}
-          baseSku={formData.sku}
-          errors={errors}
-          onRequiresSizesChange={handleRequiresSizesChange}
-          onSizesChange={handleSizesChange}
-          onError={setError}
-          onClearError={clearError}
-          // ✅ ADDED: Traditional inventory props
-          stockQuantity={formData.stockQuantity}
-          lowStockAlert={formData.lowStockAlert}
-          onStockQuantityChange={(value) => handleInputChange('stockQuantity', value)}
-          onLowStockAlertChange={(value) => handleInputChange('lowStockAlert', value)}
-        />
-
-        {/* 6. Barcode Generation */}
-        <ProductBarcodeGenerator
-          sku={formData.sku}
-          barcode={formData.barcode}
-          barcodeType={formData.barcodeType}
-          barcodeNeedsUpdate={barcodeNeedsUpdate}
-          requiresSizes={formData.requiresSizes}
-          productSizes={formData.productSizes}
-          onBarcodeChange={(barcode) => handleInputChange('barcode', barcode)}
-          onBarcodeTypeChange={(type) => handleInputChange('barcodeType', type)}
-          onBarcodeGenerated={handleBarcodeGenerated}
-          onUpdateNeeded={setBarcodeNeedsUpdate}
-          onSizeBarcodeGenerated={(sizeIndex, barcode) => {
-            console.log(`Size ${sizeIndex} barcode generated:`, barcode)
-          }}
-        />
-
-        {/* 7. SEO Settings with AI */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-medium text-gray-900">SEO Settings</h3>
-            {isAIReady() && !showAiPanel && (
+        {/* ✅ Quick AI Panel */}
+        {showAiPanel && isAIReady() && (
+          <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-medium text-blue-900">Quick AI Content Generation</h3>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowAiPanel(false)}
+              >
+                ×
+              </Button>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <AIGenerateButton
+                type="product_description"
+                context={getAIContext()}
+                onGenerated={(content) => handleAIGenerated('basic_content', content)}
+                disabled={aiGenerating}
+                variant="outline"
+              />
               <AIGenerateButton
                 type="seo_content"
                 context={getAIContext()}
                 onGenerated={(content) => handleAIGenerated('seo_content', content)}
-                disabled={!isAIReady() || aiGenerating}
-                size="sm"
+                disabled={aiGenerating}
                 variant="outline"
               />
-            )}
+            </div>
+            <div className="text-xs text-blue-700 mt-2">
+              AI will enhance your content based on product name and category. 
+              Use Enhanced AI for more detailed customization.
+            </div>
           </div>
+        )}
 
-          <ProductSEO
+        {/* Form Sections */}
+        <div className="space-y-8">
+          
+          {/* 1. Basic Information */}
+          <ProductBasicInfo
             formData={formData}
+            categories={categories}
+            suppliers={suppliers}
+            countries={countries}
+            errors={errors}
             onInputChange={handleInputChange}
           />
+
+          {/* 2. Descriptions with AI */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-medium text-gray-900">Product Descriptions</h3>
+              {isAIReady() && !showAiPanel && (
+                <AIGenerateButton
+                  type="product_description"
+                  context={getAIContext()}
+                  onGenerated={(content) => handleAIGenerated('basic_content', content)}
+                  disabled={!isAIReady() || aiGenerating}
+                  size="sm"
+                  variant="outline"
+                />
+              )}
+            </div>
+
+            <ProductDescriptions
+              formData={formData}
+              onInputChange={handleInputChange}
+            />
+          </div>
+
+          {/* 3. Images & Videos */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-medium text-gray-900">Product Media</h3>
+            <ImageUpload
+              images={formData.images}
+              onImagesChange={handleImagesChange}
+              maxImages={8}
+              maxVideos={2}
+            />
+          </div>
+
+          {/* 4. Pricing with Smart Suggestions */}
+          <ProductPricing
+            formData={formData}
+            selectedCountry={countries.find(c => c.id === formData.countryId)}
+            exchangeRate={countries.find(c => c.id === formData.countryId)?.exchangeRate || 1}
+            errors={errors}
+            onInputChange={handleInputChange}
+            showCostBreakdown={showCostBreakdown}
+            onToggleCostBreakdown={() => setShowCostBreakdown(!showCostBreakdown)}
+            pricingMode={pricingMode}
+            onPricingModeChange={setPricingMode}
+            showCustomerPreview={showCustomerPreview}
+            onToggleCustomerPreview={() => setShowCustomerPreview(!showCustomerPreview)}
+          />
+
+          {/* 5. Size Management & Inventory (ProductSizeManager handles both cases) */}
+          <ProductSizeManager
+            requiresSizes={formData.requiresSizes}
+            productSizes={formData.productSizes}
+            baseSku={formData.sku}
+            errors={errors}
+            onRequiresSizesChange={handleRequiresSizesChange}
+            onSizesChange={handleSizesChange}
+            onError={setError}
+            onClearError={clearError}
+            // ✅ ADDED: Traditional inventory props
+            stockQuantity={formData.stockQuantity}
+            lowStockAlert={formData.lowStockAlert}
+            onStockQuantityChange={(value) => handleInputChange('stockQuantity', value)}
+            onLowStockAlertChange={(value) => handleInputChange('lowStockAlert', value)}
+          />
+
+          {/* ✅ REMOVED: Barcode Generation Section - moved to sidebar */}
+
+          {/* 6. SEO Settings with AI */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-medium text-gray-900">SEO Settings</h3>
+              {isAIReady() && !showAiPanel && (
+                <AIGenerateButton
+                  type="seo_content"
+                  context={getAIContext()}
+                  onGenerated={(content) => handleAIGenerated('seo_content', content)}
+                  disabled={!isAIReady() || aiGenerating}
+                  size="sm"
+                  variant="outline"
+                />
+              )}
+            </div>
+
+            <ProductSEO
+              formData={formData}
+              onInputChange={handleInputChange}
+            />
+          </div>
+
+          {/* 7. Customer Preview Toggle */}
+          {mode === 'edit' && (
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <label className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  checked={showCustomerPreview}
+                  onChange={(e) => setShowCustomerPreview(e.target.checked)}
+                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                />
+                <span className="text-sm font-medium text-gray-700">
+                  Show customer preview after saving
+                </span>
+              </label>
+            </div>
+          )}
         </div>
 
-        {/* 8. Form Actions */}
+        {/* Form Actions */}
         <div className="flex items-center justify-between pt-6 border-t border-gray-200">
           <div className="flex items-center gap-4">
             <Link
@@ -1024,18 +792,3 @@ export default function ProductForm({
     </div>
   )
 }
-
-// ✅ COMPLETE FEATURES:
-// ✅ Image and video upload functionality (top priority)
-// ✅ Enhanced AI content generation with detailed user input
-// ✅ Dual AI modes: Quick AI and Enhanced AI
-// ✅ Clean configuration system (no hardcoded values)
-// ✅ Toggle-able AI panel for quick content generation
-// ✅ AI buttons integrated into relevant sections
-// ✅ Professional form layout and user experience
-// ✅ All existing functionality preserved
-// ✅ Smart AI context generation from product data
-// ✅ Material and fabric input for AI
-// ✅ Cultural context and target audience specification
-// ✅ Image analysis ready integration
-// ✅ FIXED: Removed duplicate inventory management sections - ProductSizeManager handles all inventory
