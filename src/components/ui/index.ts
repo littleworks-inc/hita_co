@@ -1,7 +1,6 @@
 // =====================================
-// src/components/ui/index.ts - UPDATED
+// src/components/ui/index.ts - CORRECTED
 // =====================================
-// Export all UI components including Textarea
 export { Button } from './button'
 export type { ButtonProps } from './button'
 
@@ -28,5 +27,4 @@ export {
   CardFooter 
 } from './card'
 
-
- export { Tabs, TabsList, TabsTrigger, TabsContent } from './tabs'
+export { Tabs, TabsList, TabsTrigger, TabsContent } from './tabs'
