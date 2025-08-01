@@ -1,43 +1,34 @@
+// src/components/customer/ContactButtons.tsx
+// ✅ FINAL PIECE: ContactButtons component for Catalog Mode
+
 'use client'
 
-import { useState } from 'react'
-import { MessageCircle, Instagram, ExternalLink } from 'lucide-react'
-import { useCurrency } from '@/contexts/CurrencyContext'
-import { formatPrice } from '@/lib/utils'
+import { MessageCircle, Instagram, Phone, Mail } from 'lucide-react'
 
 interface Product {
   id: string
-  sku: string
   name: string
-  shortDescription?: string | null  // ✅ FIXED: Allow null values to match ProductCard
+  sku: string
   sellingPriceUSD: number
-  discountPercentage: number
-  showDiscountToCustomers: boolean
-  category: {
-    id: string
-    name: string
-    slug: string
-  }
-  country: {
-    id: string
-    name: string
-    currency: string
-    currencySymbol: string
-  }
+  images: string[]
 }
 
-interface CatalogModeSettings {
-  whatsappNumber: string
-  instagramHandle: string
-  contactMessage: string
-  showWhatsApp: boolean
-  showInstagram: boolean
+interface CatalogSettings {
+  whatsappNumber?: string
+  instagramHandle?: string
+  contactMessage?: string
+  showWhatsApp?: boolean
+  showInstagram?: boolean
   customContactText?: string
+  showPhone?: boolean
+  phoneNumber?: string
+  showEmail?: boolean
+  emailAddress?: string
 }
 
 interface ContactButtonsProps {
   product: Product
-  catalogSettings: CatalogModeSettings
+  catalogSettings: CatalogSettings
   className?: string
 }
 
@@ -46,122 +37,126 @@ export default function ContactButtons({
   catalogSettings, 
   className = '' 
 }: ContactButtonsProps) {
-  const [isWhatsAppLoading, setIsWhatsAppLoading] = useState(false)
-  const [isInstagramLoading, setIsInstagramLoading] = useState(false)
   
-  // ✅ FIXED: Use correct currency property name
-  const { currency, convertPrice } = useCurrency()
-
-  // Calculate final price with discount
-  const originalPrice = convertPrice(product.sellingPriceUSD)
-  const discountAmount = product.showDiscountToCustomers 
-    ? (originalPrice * product.discountPercentage) / 100 
-    : 0
-  const finalPrice = originalPrice - discountAmount
-
-  // Generate comprehensive product message
-  const generateProductMessage = () => {
+  // Generate contact message with product details
+  const generateContactMessage = () => {
     const baseMessage = catalogSettings.contactMessage || 
       "Hi! I'm interested in this product. Can you provide more details?"
     
-    const productInfo = `
-
-Product Details:
-• Name: ${product.name}
-• SKU: ${product.sku}
-• Category: ${product.category.name}
-• Price: ${formatPrice(finalPrice)}${discountAmount > 0 ? ` (${product.discountPercentage}% off)` : ''}
-• Origin: ${product.country.name}${product.shortDescription ? `
-• Description: ${product.shortDescription}` : ''}`
-
-    return `${baseMessage}${productInfo}`
+    return `${baseMessage}\n\nProduct: ${product.name}\nSKU: ${product.sku}\nPrice: $${product.sellingPriceUSD}`
   }
 
-  // ✅ ADDED: Generate WhatsApp URL with pre-filled message
-  const generateWhatsAppUrl = () => {
-    const message = encodeURIComponent(generateProductMessage())
+  // WhatsApp contact handler
+  const handleWhatsAppContact = () => {
+    if (!catalogSettings.whatsappNumber) return
+    
+    const message = encodeURIComponent(generateContactMessage())
     const phoneNumber = catalogSettings.whatsappNumber.replace(/[^\d]/g, '') // Remove non-digits
-    return `https://wa.me/${phoneNumber}?text=${message}`
+    const whatsappUrl = `https://wa.me/${phoneNumber}?text=${message}`
+    
+    window.open(whatsappUrl, '_blank')
   }
 
-  // ✅ ADDED: Generate Instagram URL
-  const generateInstagramUrl = () => {
-    const handle = catalogSettings.instagramHandle.replace('@', '') // Remove @ if present
-    return `https://instagram.com/${handle}`
+  // Instagram contact handler
+  const handleInstagramContact = () => {
+    if (!catalogSettings.instagramHandle) return
+    
+    let instagramHandle = catalogSettings.instagramHandle
+    // Remove @ if present and clean handle
+    instagramHandle = instagramHandle.replace('@', '').replace(/[^a-zA-Z0-9._]/g, '')
+    
+    const instagramUrl = `https://instagram.com/${instagramHandle}`
+    window.open(instagramUrl, '_blank')
   }
 
-  // ✅ FIXED: Handle WhatsApp contact
-  const handleWhatsAppClick = () => {
-    setIsWhatsAppLoading(true)
-    window.open(generateWhatsAppUrl(), '_blank')
-    // Reset loading after a short delay
-    setTimeout(() => setIsWhatsAppLoading(false), 1000)
+  // Phone contact handler
+  const handlePhoneContact = () => {
+    if (!catalogSettings.phoneNumber) return
+    
+    const phoneNumber = catalogSettings.phoneNumber.replace(/[^\d]/g, '')
+    window.location.href = `tel:+${phoneNumber}`
   }
 
-  // ✅ FIXED: Handle Instagram contact
-  const handleInstagramClick = () => {
-    setIsInstagramLoading(true)
-    window.open(generateInstagramUrl(), '_blank')
-    // Reset loading after a short delay
-    setTimeout(() => setIsInstagramLoading(false), 1000)
-  }
-
-  // Don't render if no contact methods are enabled
-  if (!catalogSettings.showWhatsApp && !catalogSettings.showInstagram) {
-    return null
+  // Email contact handler
+  const handleEmailContact = () => {
+    if (!catalogSettings.emailAddress) return
+    
+    const subject = encodeURIComponent(`Inquiry about ${product.name}`)
+    const body = encodeURIComponent(generateContactMessage())
+    
+    window.location.href = `mailto:${catalogSettings.emailAddress}?subject=${subject}&body=${body}`
   }
 
   return (
-    <div className={`space-y-3 ${className}`}>
-      {/* Custom contact text */}
+    <div className={`space-y-2 ${className}`}>
+      {/* Custom Contact Text */}
       {catalogSettings.customContactText && (
-        <p className="text-sm text-gray-600 text-center">
+        <p className="text-xs text-gray-600 text-center mb-3">
           {catalogSettings.customContactText}
         </p>
       )}
 
-      {/* Contact buttons */}
-      <div className="space-y-2">
+      {/* Primary Contact Buttons */}
+      <div className="grid gap-2">
         {/* WhatsApp Button */}
         {catalogSettings.showWhatsApp && catalogSettings.whatsappNumber && (
           <button
-            onClick={handleWhatsAppClick}
-            disabled={isWhatsAppLoading}
-            className="w-full flex items-center justify-center gap-3 bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white font-medium py-3 px-4 rounded-lg transition-colors duration-200"
+            onClick={handleWhatsAppContact}
+            className="flex items-center justify-center gap-2 w-full px-4 py-2.5 bg-green-500 hover:bg-green-600 text-white text-sm font-medium rounded-lg transition-colors"
           >
-            <MessageCircle className="h-5 w-5" />
-            <span>
-              {isWhatsAppLoading ? 'Opening WhatsApp...' : 'Contact via WhatsApp'}
-            </span>
-            <ExternalLink className="h-4 w-4" />
+            <MessageCircle className="h-4 w-4" />
+            Contact on WhatsApp
           </button>
         )}
 
         {/* Instagram Button */}
         {catalogSettings.showInstagram && catalogSettings.instagramHandle && (
           <button
-            onClick={handleInstagramClick}
-            disabled={isInstagramLoading}
-            className="w-full flex items-center justify-center gap-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 disabled:from-purple-400 disabled:to-pink-400 text-white font-medium py-3 px-4 rounded-lg transition-all duration-200"
+            onClick={handleInstagramContact}
+            className="flex items-center justify-center gap-2 w-full px-4 py-2.5 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white text-sm font-medium rounded-lg transition-colors"
           >
-            <Instagram className="h-5 w-5" />
-            <span>
-              {isInstagramLoading ? 'Opening Instagram...' : 'Contact via Instagram'}
-            </span>
-            <ExternalLink className="h-4 w-4" />
+            <Instagram className="h-4 w-4" />
+            Message on Instagram
+          </button>
+        )}
+
+        {/* Phone Button */}
+        {catalogSettings.showPhone && catalogSettings.phoneNumber && (
+          <button
+            onClick={handlePhoneContact}
+            className="flex items-center justify-center gap-2 w-full px-4 py-2.5 bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium rounded-lg transition-colors"
+          >
+            <Phone className="h-4 w-4" />
+            Call Us
+          </button>
+        )}
+
+        {/* Email Button */}
+        {catalogSettings.showEmail && catalogSettings.emailAddress && (
+          <button
+            onClick={handleEmailContact}
+            className="flex items-center justify-center gap-2 w-full px-4 py-2.5 bg-gray-600 hover:bg-gray-700 text-white text-sm font-medium rounded-lg transition-colors"
+          >
+            <Mail className="h-4 w-4" />
+            Send Email
           </button>
         )}
       </div>
 
-      {/* Contact info display */}
-      <div className="text-xs text-gray-500 text-center space-y-1">
-        {catalogSettings.showWhatsApp && catalogSettings.whatsappNumber && (
-          <div>WhatsApp: {catalogSettings.whatsappNumber}</div>
-        )}
-        {catalogSettings.showInstagram && catalogSettings.instagramHandle && (
-          <div>Instagram: @{catalogSettings.instagramHandle.replace('@', '')}</div>
-        )}
-      </div>
+      {/* Fallback: If no contact methods are configured */}
+      {!catalogSettings.showWhatsApp && 
+       !catalogSettings.showInstagram && 
+       !catalogSettings.showPhone && 
+       !catalogSettings.showEmail && (
+        <div className="text-center p-4 bg-gray-100 rounded-lg">
+          <p className="text-sm text-gray-600">
+            Contact information not configured.
+          </p>
+          <p className="text-xs text-gray-500 mt-1">
+            Please configure contact methods in admin settings.
+          </p>
+        </div>
+      )}
     </div>
   )
 }
