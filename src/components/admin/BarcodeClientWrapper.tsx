@@ -4,7 +4,6 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-// import QuickBarcodePrinter from './QuickBarcodePrinter'
 import WorkingBarcodePrinter from './WorkingBarcodePrinter'
 
 interface BarcodeClientWrapperProps {
