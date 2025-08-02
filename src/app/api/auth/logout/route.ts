@@ -1,11 +1,19 @@
 // src/app/api/auth/logout/route.ts
-import { NextResponse } from 'next/server'
+// ✅ FIXED: Logout API with proper redirect handling
 
-export async function POST() {
+import { NextRequest, NextResponse } from 'next/server'
+
+export async function POST(request: NextRequest) {
   try {
-    const response = NextResponse.json({
-      message: 'Logged out successfully'
-    })
+    // Get the referer to determine where the logout came from
+    const referer = request.headers.get('referer') || ''
+    const isExhibitionLogout = referer.includes('/exhibition')
+    
+    // Determine redirect URL based on where logout came from
+    const redirectUrl = isExhibitionLogout ? '/exhibition/login' : '/admin/login'
+    
+    // Create redirect response
+    const response = NextResponse.redirect(new URL(redirectUrl, request.url))
 
     // Clear both session cookies
     response.cookies.set('session', '', {
@@ -24,12 +32,24 @@ export async function POST() {
       path: '/',
     })
 
+    console.log(`🔓 User logged out, redirecting to: ${redirectUrl}`)
     return response
+    
   } catch (error) {
     console.error('Logout error:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    
+    // Fallback redirect on error
+    const response = NextResponse.redirect(new URL('/admin/login', request.url))
+    
+    // Still clear cookies even on error
+    response.cookies.set('session', '', { maxAge: 0, path: '/' })
+    response.cookies.set('auth-token', '', { maxAge: 0, path: '/' })
+    
+    return response
   }
+}
+
+// ✅ ALSO handle GET requests (in case someone visits the URL directly)
+export async function GET(request: NextRequest) {
+  return POST(request)
 }

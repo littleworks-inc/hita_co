@@ -1,5 +1,5 @@
-// src/app/exhibition/login/page.tsx
-// ✅ SIMPLE SOLUTION: No auth check, just render the login form
+// src/app/exhibition/login/ExhibitionLoginClient.tsx
+// ✅ NEW: Client component for theme support and interactivity
 
 'use client'
 
@@ -9,7 +9,7 @@ import LoginForm from './LoginForm'
 import Link from 'next/link'
 import { ArrowLeft, Smartphone, Shield } from 'lucide-react'
 
-export default function ExhibitionLoginPage() {
+export default function ExhibitionLoginClient() {
   return (
     <ThemeProvider>
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 transition-colors duration-500">
