@@ -1,6 +1,9 @@
+// src/components/admin/ThemeToggle.tsx
+// ✅ FIXED: Consistent with main ThemeToggle component
+
 'use client'
 
-import { useTheme } from '@/contexts/ThemeContext'
+import { useThemeSafe } from '@/contexts/ThemeContext'  // ✅ Use safe version
 import { Monitor, Sun, Moon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -15,13 +18,14 @@ export default function ThemeToggle({
   showTooltip = true,
   size = 'md' 
 }: ThemeToggleProps) {
-  const { mode, resolvedTheme, toggleTheme, isSystemMode, isClient } = useTheme()
+  // ✅ FIXED - Use safe theme hook consistently
+  const { mode, resolvedTheme, toggleTheme, isSystemMode, systemTheme, isClient } = useThemeSafe()
 
   // Don't render until client-side to prevent hydration issues
   if (!isClient) {
     return (
       <div className={cn(
-        'animate-pulse bg-gray-200 rounded-full',
+        'bg-gray-200 dark:bg-gray-700 rounded-full',
         size === 'sm' && 'w-8 h-8',
         size === 'md' && 'w-10 h-10',
         size === 'lg' && 'w-12 h-12',
@@ -55,7 +59,6 @@ export default function ThemeToggle({
   }
 
   const { icon: Icon, label, description } = getThemeConfig()
-  const { systemTheme } = useTheme()
 
   // Size classes
   const sizeClasses = {
@@ -141,7 +144,7 @@ export function ThemeToggleCompact({ className }: { className?: string }) {
 
 // Theme indicator for showing current theme status (optional)
 export function ThemeIndicator() {
-  const { mode, resolvedTheme, systemTheme, isClient } = useTheme()
+  const { mode, resolvedTheme, systemTheme, isClient } = useThemeSafe()
 
   if (!isClient) return null
 
