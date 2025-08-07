@@ -6,6 +6,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { withRateLimiting } from '@/lib/rate-limit'
 
 // =====================================
 // 🔄 TYPE DEFINITIONS FOR SHARED STOCK
@@ -55,7 +56,7 @@ async function calculateTotalSoldAllChannels(productId: string, sizeId?: string)
     },
     select: { quantity: true }
   })
-  
+
   const soldToCustomers = customerOrderItems.reduce((sum: number, item: OrderItemForStock) => sum + item.quantity, 0)
 
   // Get exhibition sales (POS sales)
@@ -66,7 +67,7 @@ async function calculateTotalSoldAllChannels(productId: string, sizeId?: string)
     },
     select: { quantity: true }
   })
-  
+
   const soldAtExhibitions = exhibitionSaleItems.reduce((sum: number, item: ExhibitionSaleItemForStock) => sum + item.quantity, 0)
 
   return soldToCustomers + soldAtExhibitions
@@ -76,8 +77,8 @@ async function calculateTotalSoldAllChannels(productId: string, sizeId?: string)
  * Check shared stock availability for an item
  */
 async function checkSharedStockForItem(
-  productId: string, 
-  requestedQuantity: number, 
+  productId: string,
+  requestedQuantity: number,
   sizeId?: string
 ): Promise<{
   available: boolean
@@ -86,14 +87,14 @@ async function checkSharedStockForItem(
   totalSold: number
   message: string
 }> {
-  
+
   if (sizeId) {
     // Check specific size
     const productSize = await db.productSize.findUnique({
       where: { id: sizeId },
       select: { stockQuantity: true, size: true }
     })
-    
+
     if (!productSize) {
       return {
         available: false,
@@ -103,19 +104,19 @@ async function checkSharedStockForItem(
         message: 'Size not found'
       }
     }
-    
+
     const totalSold = await calculateTotalSoldAllChannels(productId, sizeId)
     const availableQuantity = Math.max(0, productSize.stockQuantity - totalSold)
-    
+
     return {
       available: availableQuantity >= requestedQuantity,
       availableQuantity,
       originalStock: productSize.stockQuantity,
       totalSold,
-      message: availableQuantity >= requestedQuantity 
-        ? `${availableQuantity} available` 
-        : availableQuantity === 0 
-          ? 'Out of stock' 
+      message: availableQuantity >= requestedQuantity
+        ? `${availableQuantity} available`
+        : availableQuantity === 0
+          ? 'Out of stock'
           : `Only ${availableQuantity} available`
     }
   } else {
@@ -124,7 +125,7 @@ async function checkSharedStockForItem(
       where: { id: productId },
       select: { stockQuantity: true, name: true, requiresSizes: true }
     })
-    
+
     if (!product) {
       return {
         available: false,
@@ -134,19 +135,19 @@ async function checkSharedStockForItem(
         message: 'Product not found'
       }
     }
-    
+
     const totalSold = await calculateTotalSoldAllChannels(productId)
     const availableQuantity = Math.max(0, product.stockQuantity - totalSold)
-    
+
     return {
       available: availableQuantity >= requestedQuantity,
       availableQuantity,
       originalStock: product.stockQuantity,
       totalSold,
-      message: availableQuantity >= requestedQuantity 
-        ? `${availableQuantity} available` 
-        : availableQuantity === 0 
-          ? 'Out of stock' 
+      message: availableQuantity >= requestedQuantity
+        ? `${availableQuantity} available`
+        : availableQuantity === 0
+          ? 'Out of stock'
           : `Only ${availableQuantity} available`
     }
   }
@@ -191,7 +192,7 @@ interface OrderCreateRequest {
 
 const paymentMethodMap = {
   'credit_card': 'CARD',
-  'debit_card': 'CARD', 
+  'debit_card': 'CARD',
   'paypal': 'OTHER',
   'stripe': 'OTHER',
   'bank_transfer': 'BANK_TRANSFER',
@@ -206,30 +207,30 @@ const paymentMethodMap = {
 async function createOrderWithSharedStock(data: OrderCreateRequest) {
   return await db.$transaction(async (tx) => {
     const orderNumber = generateOrderNumber()
-    
+
     console.log('🔄 SHARED STOCK: Creating order with shared stock validation')
-    
+
     // Step 1: Validate all items with shared stock logic
     const stockValidations: StockValidation[] = []
-    
+
     for (const item of data.items) {
       const stockCheck = await checkSharedStockForItem(
-        item.productId, 
-        item.quantity, 
+        item.productId,
+        item.quantity,
         item.productSizeId
       )
-      
+
       if (!stockCheck.available) {
         throw new Error(`🔄 SHARED STOCK: Insufficient stock for product. ${stockCheck.message}`)
       }
-      
+
       stockValidations.push({
         productId: item.productId,
         productSizeId: item.productSizeId,
         quantity: item.quantity,
         stockCheck
       })
-      
+
       console.log(`🔄 SHARED STOCK: Item validated - Product ${item.productId}, Requested: ${item.quantity}, Available: ${stockCheck.availableQuantity}`)
     }
 
@@ -277,10 +278,10 @@ async function createOrderWithSharedStock(data: OrderCreateRequest) {
     // Step 4: 🔄 KEY CHANGE - Update stock using shared stock logic
     // Instead of decrementing product.stockQuantity directly,
     // we now respect the shared stock system
-    
+
     for (const validation of stockValidations) {
       const item = validation
-      
+
       if (item.productSizeId) {
         // For sized products: Update size stock and recalculate main product stock
         await tx.productSize.update({
@@ -291,25 +292,25 @@ async function createOrderWithSharedStock(data: OrderCreateRequest) {
             }
           }
         })
-        
+
         // Recalculate main product stock as sum of all active sizes
         const updatedSizes = await tx.productSize.findMany({
-          where: { 
-            productId: item.productId, 
-            isActive: true 
+          where: {
+            productId: item.productId,
+            isActive: true
           },
           select: { stockQuantity: true }
         })
-        
+
         const newMainStock = updatedSizes.reduce((sum: number, size: { stockQuantity: number }) => sum + size.stockQuantity, 0)
-        
+
         await tx.product.update({
           where: { id: item.productId },
           data: { stockQuantity: newMainStock }
         })
-        
+
         console.log(`🔄 SHARED STOCK: Updated size stock for product ${item.productId}, new main stock: ${newMainStock}`)
-        
+
       } else {
         // For regular products: Update main stock directly
         await tx.product.update({
@@ -320,7 +321,7 @@ async function createOrderWithSharedStock(data: OrderCreateRequest) {
             }
           }
         })
-        
+
         console.log(`🔄 SHARED STOCK: Updated main stock for product ${item.productId}`)
       }
     }
@@ -329,18 +330,18 @@ async function createOrderWithSharedStock(data: OrderCreateRequest) {
     // Verify no negative stock and shared stock integrity
     for (const validation of stockValidations) {
       const item = validation
-      
+
       // Check final stock state
       const finalStockCheck = await checkSharedStockForItem(
-        item.productId, 
+        item.productId,
         0, // Just checking current state
         item.productSizeId
       )
-      
+
       if (finalStockCheck.availableQuantity < 0) {
         throw new Error(`🔄 SHARED STOCK: Stock validation failed after update for product ${item.productId}`)
       }
-      
+
       console.log(`🔄 SHARED STOCK: Final validation passed - Product ${item.productId}, Remaining: ${finalStockCheck.availableQuantity}`)
     }
 
@@ -372,65 +373,67 @@ function generateOrderNumber(): string {
 // POST /api/orders - CREATE ORDER
 // =====================================
 
-export async function POST(request: NextRequest) {
-  try {
-    const data: OrderCreateRequest = await request.json()
+export const POST = withRateLimiting({ interval: 60000, maxRequests: 10 })(
+  async (request: NextRequest) => {
+    try {
+      const data: OrderCreateRequest = await request.json()
 
-    console.log('🔄 SHARED STOCK: Processing new order with items:', data.items.length)
+      console.log('🔄 SHARED STOCK: Processing new order with items:', data.items.length)
 
-    // Validate required fields
-    if (!data.customerInfo || !data.items || data.items.length === 0) {
+      // Validate required fields
+      if (!data.customerInfo || !data.items || data.items.length === 0) {
+        return NextResponse.json(
+          { error: 'Invalid order data' },
+          { status: 400 }
+        )
+      }
+
+      // Create order using shared stock system
+      const result = await createOrderWithSharedStock(data)
+
+      console.log('🔄 SHARED STOCK: Order created successfully:', result.order.orderNumber)
+
+      return NextResponse.json({
+        success: true,
+        orderId: result.order.id,
+        orderNumber: result.order.orderNumber,
+        message: 'Order created successfully',
+        // 🔄 NEW: Shared stock summary (using available fields)
+        sharedStockSummary: {
+          totalItemsOrdered: data.items.reduce((sum: number, item: any) => sum + item.quantity, 0),
+          stockValidations: result.stockValidations,
+          systemNote: 'Order processed using shared stock system',
+          orderSource: 'ONLINE' // Using the actual schema field name
+        }
+      })
+
+    } catch (error) {
+      console.error('🔄 SHARED STOCK: Order creation error:', error)
+
+      // Enhanced error handling for shared stock issues
+      if (error instanceof Error) {
+        if (error.message.includes('🔄 SHARED STOCK:')) {
+          return NextResponse.json(
+            { error: error.message.replace('🔄 SHARED STOCK: ', '') },
+            { status: 400 }
+          )
+        }
+
+        if (error.message.includes('Insufficient stock')) {
+          return NextResponse.json(
+            { error: error.message },
+            { status: 400 }
+          )
+        }
+      }
+
       return NextResponse.json(
-        { error: 'Invalid order data' },
-        { status: 400 }
+        { error: 'Failed to create order' },
+        { status: 500 }
       )
     }
-
-    // Create order using shared stock system
-    const result = await createOrderWithSharedStock(data)
-
-    console.log('🔄 SHARED STOCK: Order created successfully:', result.order.orderNumber)
-
-    return NextResponse.json({
-      success: true,
-      orderId: result.order.id,
-      orderNumber: result.order.orderNumber,
-      message: 'Order created successfully',
-      // 🔄 NEW: Shared stock summary (using available fields)
-      sharedStockSummary: {
-        totalItemsOrdered: data.items.reduce((sum: number, item: any) => sum + item.quantity, 0),
-        stockValidations: result.stockValidations,
-        systemNote: 'Order processed using shared stock system',
-        orderSource: 'ONLINE' // Using the actual schema field name
-      }
-    })
-
-  } catch (error) {
-    console.error('🔄 SHARED STOCK: Order creation error:', error)
-    
-    // Enhanced error handling for shared stock issues
-    if (error instanceof Error) {
-      if (error.message.includes('🔄 SHARED STOCK:')) {
-        return NextResponse.json(
-          { error: error.message.replace('🔄 SHARED STOCK: ', '') },
-          { status: 400 }
-        )
-      }
-      
-      if (error.message.includes('Insufficient stock')) {
-        return NextResponse.json(
-          { error: error.message },
-          { status: 400 }
-        )
-      }
-    }
-
-    return NextResponse.json(
-      { error: 'Failed to create order' },
-      { status: 500 }
-    )
   }
-}
+)
 
 // =====================================
 // GET /api/orders - LIST ORDERS (Enhanced with shared stock info)
@@ -458,16 +461,16 @@ export async function GET(request: NextRequest) {
         items: {
           include: {
             product: {
-              select: { 
-                name: true, 
+              select: {
+                name: true,
                 sku: true,
-                images: true 
+                images: true
               }
             },
             productSize: {
-              select: { 
-                size: true, 
-                sku: true 
+              select: {
+                size: true,
+                sku: true
               }
             }
           }

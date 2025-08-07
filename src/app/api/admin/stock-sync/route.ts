@@ -6,9 +6,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth'
 import { db } from '@/lib/db' // ✅ ADDED: Missing db import
 import { syncAllProductsStock, syncProductStock, syncMultipleProductsStock } from '@/lib/stock-sync'
+import { withRateLimiting } from '@/lib/rate-limit'
 
 // POST /api/admin/stock-sync - Trigger stock synchronization
-export async function POST(request: NextRequest) {
+export const POST = withRateLimiting({ interval: 60000, maxRequests: 5 })(
+  async (request: NextRequest) => {
   try {
     const session = await getSession()
     if (!session) {
@@ -86,6 +88,7 @@ export async function POST(request: NextRequest) {
     )
   }
 }
+)
 
 // GET /api/admin/stock-sync/status - Check stock sync status
 export async function GET(request: NextRequest) {

@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { ProductStatus } from '@prisma/client'
+import { withRateLimiting, RATE_LIMIT_CONFIGS } from '@/lib/rate-limit'
 // Removed external import - using inline functions instead
 
 // =====================================
@@ -26,7 +27,7 @@ async function calculateTotalSoldAllChannels(productId: string, sizeId?: string)
     },
     select: { quantity: true }
   })
-  
+
   const soldToCustomers = customerOrderItems.reduce((sum, item) => sum + item.quantity, 0)
 
   // Get exhibition sales (POS sales)  
@@ -37,7 +38,7 @@ async function calculateTotalSoldAllChannels(productId: string, sizeId?: string)
     },
     select: { quantity: true }
   })
-  
+
   const soldAtExhibitions = exhibitionSaleItems.reduce((sum, item) => sum + item.quantity, 0)
 
   return soldToCustomers + soldAtExhibitions
@@ -58,12 +59,12 @@ async function calculateSharedAvailableStock(productId: string, requiresSizes: b
   if (requiresSizes && productSizes) {
     // For sized products, calculate total available across all sizes
     let totalAvailable = 0
-    
+
     for (const size of productSizes) {
       const sizeAvailable = await calculateSizeSharedStock(productId, size.id, size.stockQuantity)
       totalAvailable += sizeAvailable
     }
-    
+
     return totalAvailable
   } else {
     // For regular products, calculate based on main stock
@@ -71,9 +72,9 @@ async function calculateSharedAvailableStock(productId: string, requiresSizes: b
       where: { id: productId },
       select: { stockQuantity: true }
     })
-    
+
     if (!product) return 0
-    
+
     // Calculate total sold across all channels
     const totalSold = await calculateTotalSoldAllChannels(productId)
     return Math.max(0, product.stockQuantity - totalSold)
@@ -84,8 +85,8 @@ async function calculateSharedAvailableStock(productId: string, requiresSizes: b
  * Check shared stock availability for an item
  */
 async function checkSharedStockForItem(
-  productId: string, 
-  requestedQuantity: number, 
+  productId: string,
+  requestedQuantity: number,
   sizeId?: string
 ): Promise<{
   isAvailable: boolean
@@ -94,14 +95,14 @@ async function checkSharedStockForItem(
   totalSold: number
   message: string
 }> {
-  
+
   if (sizeId) {
     // Check specific size
     const productSize = await db.productSize.findUnique({
       where: { id: sizeId },
       select: { stockQuantity: true, size: true }
     })
-    
+
     if (!productSize) {
       return {
         isAvailable: false,
@@ -111,18 +112,18 @@ async function checkSharedStockForItem(
         message: 'Size not found'
       }
     }
-    
+
     const totalSold = await calculateTotalSoldAllChannels(productId, sizeId)
     const availableQuantity = Math.max(0, productSize.stockQuantity - totalSold)
-    
+
     return {
       isAvailable: availableQuantity >= requestedQuantity,
       availableQuantity,
       originalStock: productSize.stockQuantity,
       totalSold,
-      message: availableQuantity >= requestedQuantity 
-        ? `${availableQuantity} available` 
-        : availableQuantity === 0 
+      message: availableQuantity >= requestedQuantity
+        ? `${availableQuantity} available`
+        : availableQuantity === 0
           ? 'Out of stock'
           : `Only ${availableQuantity} available`
     }
@@ -132,7 +133,7 @@ async function checkSharedStockForItem(
       where: { id: productId },
       select: { stockQuantity: true, name: true }
     })
-    
+
     if (!product) {
       return {
         isAvailable: false,
@@ -142,18 +143,18 @@ async function checkSharedStockForItem(
         message: 'Product not found'
       }
     }
-    
+
     const totalSold = await calculateTotalSoldAllChannels(productId)
     const availableQuantity = Math.max(0, product.stockQuantity - totalSold)
-    
+
     return {
       isAvailable: availableQuantity >= requestedQuantity,
       availableQuantity,
       originalStock: product.stockQuantity,
       totalSold,
-      message: availableQuantity >= requestedQuantity 
-        ? `${availableQuantity} available` 
-        : availableQuantity === 0 
+      message: availableQuantity >= requestedQuantity
+        ? `${availableQuantity} available`
+        : availableQuantity === 0
           ? 'Out of stock'
           : `Only ${availableQuantity} available`
     }
@@ -222,191 +223,195 @@ interface StockValidationRequest {
 // GET HANDLER - EXISTING FUNCTIONALITY
 // =====================================
 
-export async function GET(request: NextRequest) {
-  try {
-    const session = await getSession()
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+export const GET = withRateLimiting(RATE_LIMIT_CONFIGS.admin.read)(
+  async (request: NextRequest) => {
+    try {
+      const session = await getSession()
+      if (!session) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      }
 
-    const { searchParams } = new URL(request.url)
-    const search = searchParams.get('search') || ''
-    const categoryId = searchParams.get('categoryId')
-    const countryId = searchParams.get('countryId')
-    const featured = searchParams.get('featured') === 'true'
-    const status = searchParams.get('status') as ProductStatus
-    const isActive = searchParams.get('isActive')
-    const validatedPage = Math.max(1, parseInt(searchParams.get('page') || '1'))
-    const validatedLimit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '12')))
-    const validatedSkip = (validatedPage - 1) * validatedLimit
+      const { searchParams } = new URL(request.url)
+      const search = searchParams.get('search') || ''
+      const categoryId = searchParams.get('categoryId')
+      const countryId = searchParams.get('countryId')
+      const featured = searchParams.get('featured') === 'true'
+      const status = searchParams.get('status') as ProductStatus
+      const isActive = searchParams.get('isActive')
+      const validatedPage = Math.max(1, parseInt(searchParams.get('page') || '1'))
+      const validatedLimit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '12')))
+      const validatedSkip = (validatedPage - 1) * validatedLimit
 
-    // Build where conditions
-    const whereConditions: any = {}
+      // Build where conditions
+      const whereConditions: any = {}
 
-    if (search) {
-      whereConditions.OR = [
-        { name: { contains: search, mode: 'insensitive' } },
-        { sku: { contains: search, mode: 'insensitive' } },
-        { description: { contains: search, mode: 'insensitive' } }
-      ]
-    }
+      if (search) {
+        whereConditions.OR = [
+          { name: { contains: search, mode: 'insensitive' } },
+          { sku: { contains: search, mode: 'insensitive' } },
+          { description: { contains: search, mode: 'insensitive' } }
+        ]
+      }
 
-    if (categoryId) whereConditions.categoryId = categoryId
-    if (countryId) whereConditions.countryId = countryId
-    if (featured) whereConditions.isFeatured = true
-    if (status) whereConditions.status = status
-    if (isActive !== null && isActive !== undefined) {
-      whereConditions.isActive = isActive === 'true'
-    }
+      if (categoryId) whereConditions.categoryId = categoryId
+      if (countryId) whereConditions.countryId = countryId
+      if (featured) whereConditions.isFeatured = true
+      if (status) whereConditions.status = status
+      if (isActive !== null && isActive !== undefined) {
+        whereConditions.isActive = isActive === 'true'
+      }
 
-    const orderBy = { createdAt: 'desc' as const }
+      const orderBy = { createdAt: 'desc' as const }
 
-    // Get total count and products
-    const [totalAvailableCount, allProducts] = await Promise.all([
-      db.product.count({ where: whereConditions }),
-      db.product.findMany({
-        where: whereConditions,
-        skip: validatedSkip,
-        take: validatedLimit,
-        include: {
-          category: {
-            select: { 
-              id: true, 
-              name: true, 
-              slug: true 
-            }
-          },
-          country: {
-            select: { 
-              id: true, 
-              name: true, 
-              currency: true, 
-              currencySymbol: true 
-            }
-          },
-          productSizes: {
-            where: { isActive: true },
-            select: {
-              id: true,
-              size: true,
-              sku: true,
-              stockQuantity: true,
-              sortOrder: true
+      // Get total count and products
+      const [totalAvailableCount, allProducts] = await Promise.all([
+        db.product.count({ where: whereConditions }),
+        db.product.findMany({
+          where: whereConditions,
+          skip: validatedSkip,
+          take: validatedLimit,
+          include: {
+            category: {
+              select: {
+                id: true,
+                name: true,
+                slug: true
+              }
             },
-            orderBy: { sortOrder: 'asc' }
+            country: {
+              select: {
+                id: true,
+                name: true,
+                currency: true,
+                currencySymbol: true
+              }
+            },
+            productSizes: {
+              where: { isActive: true },
+              select: {
+                id: true,
+                size: true,
+                sku: true,
+                stockQuantity: true,
+                sortOrder: true
+              },
+              orderBy: { sortOrder: 'asc' }
+            }
+          },
+          orderBy
+        })
+      ])
+
+      // Calculate shared stock availability for each product
+      const productsWithSharedStock = await Promise.all(
+        allProducts.map(async (product) => {
+          const sharedAvailableStock = await calculateSharedAvailableStock(
+            product.id,
+            product.requiresSizes,
+            product.productSizes
+          )
+
+          return {
+            ...product,
+            originalStockQuantity: product.stockQuantity,
+            stockQuantity: sharedAvailableStock,
+            sharedStockInfo: {
+              totalInventory: product.requiresSizes
+                ? product.productSizes.reduce((sum, size) => sum + size.stockQuantity, 0)
+                : product.stockQuantity,
+              availableStock: sharedAvailableStock,
+              pendingOrders: product.stockQuantity - sharedAvailableStock
+            }
+          }
+        })
+      )
+
+      // Calculate shared stock summary
+      const sharedStockSummary = {
+        totalProducts: allProducts.length,
+        inStock: productsWithSharedStock.filter(p => p.stockQuantity > 0).length,
+        lowStock: productsWithSharedStock.filter(p => p.stockQuantity > 0 && p.stockQuantity <= p.lowStockAlert).length,
+        outOfStock: productsWithSharedStock.filter(p => p.stockQuantity === 0).length
+      }
+
+      return NextResponse.json({
+        success: true,
+        products: productsWithSharedStock,
+        pagination: {
+          page: validatedPage,
+          limit: validatedLimit,
+          total: totalAvailableCount,
+          totalPages: Math.ceil(totalAvailableCount / validatedLimit),
+          hasNext: validatedPage * validatedLimit < totalAvailableCount,
+          hasPrev: validatedPage > 1
+        },
+        sharedStockSummary,
+        systemInfo: {
+          stockSystem: 'shared_stock_v1',
+          note: 'Stock availability calculated across all sales channels in real-time'
+        }
+      })
+
+    } catch (error) {
+      console.error('🔄 SHARED STOCK: Error fetching products:', error)
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Failed to fetch products',
+          products: [],
+          pagination: {
+            page: 1,
+            limit: 12,
+            total: 0,
+            totalPages: 0,
+            hasNext: false,
+            hasPrev: false
           }
         },
-        orderBy
-      })
-    ])
-
-    // Calculate shared stock availability for each product
-    const productsWithSharedStock = await Promise.all(
-      allProducts.map(async (product) => {
-        const sharedAvailableStock = await calculateSharedAvailableStock(
-          product.id, 
-          product.requiresSizes, 
-          product.productSizes
-        )
-
-        return {
-          ...product,
-          originalStockQuantity: product.stockQuantity,
-          stockQuantity: sharedAvailableStock,
-          sharedStockInfo: {
-            totalInventory: product.requiresSizes 
-              ? product.productSizes.reduce((sum, size) => sum + size.stockQuantity, 0)
-              : product.stockQuantity,
-            availableStock: sharedAvailableStock,
-            pendingOrders: product.stockQuantity - sharedAvailableStock
-          }
-        }
-      })
-    )
-
-    // Calculate shared stock summary
-    const sharedStockSummary = {
-      totalProducts: allProducts.length,
-      inStock: productsWithSharedStock.filter(p => p.stockQuantity > 0).length,
-      lowStock: productsWithSharedStock.filter(p => p.stockQuantity > 0 && p.stockQuantity <= p.lowStockAlert).length,
-      outOfStock: productsWithSharedStock.filter(p => p.stockQuantity === 0).length
+        { status: 500 }
+      )
     }
-
-    return NextResponse.json({
-      success: true,
-      products: productsWithSharedStock,
-      pagination: {
-        page: validatedPage,
-        limit: validatedLimit,
-        total: totalAvailableCount,
-        totalPages: Math.ceil(totalAvailableCount / validatedLimit),
-        hasNext: validatedPage * validatedLimit < totalAvailableCount,
-        hasPrev: validatedPage > 1
-      },
-      sharedStockSummary,
-      systemInfo: {
-        stockSystem: 'shared_stock_v1',
-        note: 'Stock availability calculated across all sales channels in real-time'
-      }
-    })
-
-  } catch (error) {
-    console.error('🔄 SHARED STOCK: Error fetching products:', error)
-    return NextResponse.json(
-      { 
-        success: false,
-        error: 'Failed to fetch products',
-        products: [],
-        pagination: {
-          page: 1,
-          limit: 12,
-          total: 0,
-          totalPages: 0,
-          hasNext: false,
-          hasPrev: false
-        }
-      },
-      { status: 500 }
-    )
   }
-}
+)
 
 // =====================================
 // POST HANDLER - DUAL FUNCTIONALITY
 // =====================================
 
-export async function POST(request: NextRequest) {
-  try {
-    const session = await getSession()
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+export const POST = withRateLimiting(RATE_LIMIT_CONFIGS.admin.write)(
+  async (request: NextRequest) => {
+    try {
+      const session = await getSession()
+      if (!session) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      }
 
-    const body = await request.json()
+      const body = await request.json()
 
-    // ✅ INTELLIGENT REQUEST DETECTION
-    // Check if this is a stock validation request or product creation request
-    if (body.items && Array.isArray(body.items)) {
-      // This is a STOCK VALIDATION REQUEST
-      return handleStockValidation(body as StockValidationRequest)
-    } else if (body.name && body.sku) {
-      // This is a PRODUCT CREATION REQUEST
-      return handleProductCreation(body as ProductCreateRequest)
-    } else {
+      // ✅ INTELLIGENT REQUEST DETECTION
+      // Check if this is a stock validation request or product creation request
+      if (body.items && Array.isArray(body.items)) {
+        // This is a STOCK VALIDATION REQUEST
+        return handleStockValidation(body as StockValidationRequest)
+      } else if (body.name && body.sku) {
+        // This is a PRODUCT CREATION REQUEST
+        return handleProductCreation(body as ProductCreateRequest)
+      } else {
+        return NextResponse.json(
+          { error: 'Invalid request format. Expected either product creation data or stock validation items.' },
+          { status: 400 }
+        )
+      }
+
+    } catch (error) {
+      console.error('Error in POST handler:', error)
       return NextResponse.json(
-        { error: 'Invalid request format. Expected either product creation data or stock validation items.' },
-        { status: 400 }
+        { error: 'Internal server error' },
+        { status: 500 }
       )
     }
-
-  } catch (error) {
-    console.error('Error in POST handler:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
   }
-}
+)
 
 // =====================================
 // STOCK VALIDATION HANDLER (EXISTING)
@@ -438,7 +443,7 @@ async function handleStockValidation(body: StockValidationRequest) {
         availableQuantity: stockResult.availableQuantity,
         isAvailable: stockResult.isAvailable,
         maxAllowedQuantity: stockResult.availableQuantity,
-        message: stockResult.isAvailable 
+        message: stockResult.isAvailable
           ? `${stockResult.availableQuantity} available`
           : 'Out of stock'
       }
@@ -467,8 +472,8 @@ async function handleProductCreation(productData: ProductCreateRequest) {
 
   // Validate required fields
   if (!productData.name || !productData.sku) {
-    return NextResponse.json({ 
-      error: 'Name and SKU are required' 
+    return NextResponse.json({
+      error: 'Name and SKU are required'
     }, { status: 400 })
   }
 
@@ -478,8 +483,8 @@ async function handleProductCreation(productData: ProductCreateRequest) {
   })
 
   if (duplicateSku) {
-    return NextResponse.json({ 
-      error: 'SKU already exists' 
+    return NextResponse.json({
+      error: 'SKU already exists'
     }, { status: 409 })
   }
 
@@ -490,8 +495,8 @@ async function handleProductCreation(productData: ProductCreateRequest) {
     })
 
     if (duplicateBarcode) {
-      return NextResponse.json({ 
-        error: 'Barcode already exists' 
+      return NextResponse.json({
+        error: 'Barcode already exists'
       }, { status: 409 })
     }
   }
