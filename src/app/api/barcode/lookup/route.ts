@@ -3,89 +3,94 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { lookupBarcode, validateBarcode } from '@/lib/barcode-lookup'
+import { withRateLimiting } from '@/lib/rate-limit'
 
-export async function GET(request: NextRequest) {
-  try {
-    const { searchParams } = new URL(request.url)
-    const barcode = searchParams.get('barcode')
+export const GET = withRateLimiting({ interval: 60000, maxRequests: 100 })(
+  async (request: NextRequest) => {
+    try {
+      const { searchParams } = new URL(request.url)
+      const barcode = searchParams.get('barcode')
 
-    if (!barcode) {
+      if (!barcode) {
+        return NextResponse.json(
+          { error: 'Barcode parameter is required' },
+          { status: 400 }
+        )
+      }
+
+      // Validate barcode format
+      const validation = validateBarcode(barcode)
+      if (!validation.isValid) {
+        return NextResponse.json(
+          { error: validation.error },
+          { status: 400 }
+        )
+      }
+
+      // Lookup barcode
+      const result = await lookupBarcode(barcode)
+
+      return NextResponse.json({
+        success: true,
+        barcode: barcode,
+        timestamp: new Date().toISOString(),
+        result
+      })
+
+    } catch (error) {
+      console.error('Barcode lookup API error:', error)
       return NextResponse.json(
-        { error: 'Barcode parameter is required' },
-        { status: 400 }
+        {
+          error: 'Internal server error during barcode lookup',
+          details: error instanceof Error ? error.message : 'Unknown error'
+        },
+        { status: 500 }
       )
     }
-
-    // Validate barcode format
-    const validation = validateBarcode(barcode)
-    if (!validation.isValid) {
-      return NextResponse.json(
-        { error: validation.error },
-        { status: 400 }
-      )
-    }
-
-    // Lookup barcode
-    const result = await lookupBarcode(barcode)
-
-    return NextResponse.json({
-      success: true,
-      barcode: barcode,
-      timestamp: new Date().toISOString(),
-      result
-    })
-
-  } catch (error) {
-    console.error('Barcode lookup API error:', error)
-    return NextResponse.json(
-      { 
-        error: 'Internal server error during barcode lookup',
-        details: error instanceof Error ? error.message : 'Unknown error'
-      },
-      { status: 500 }
-    )
   }
-}
+)
 
-export async function POST(request: NextRequest) {
-  try {
-    const body = await request.json()
-    const { barcode } = body
+export const POST = withRateLimiting({ interval: 60000, maxRequests: 100 })(
+  async (request: NextRequest) => {
+    try {
+      const body = await request.json()
+      const { barcode } = body
 
-    if (!barcode) {
+      if (!barcode) {
+        return NextResponse.json(
+          { error: 'Barcode is required in request body' },
+          { status: 400 }
+        )
+      }
+
+      // Validate barcode format
+      const validation = validateBarcode(barcode)
+      if (!validation.isValid) {
+        return NextResponse.json(
+          { error: validation.error },
+          { status: 400 }
+        )
+      }
+
+      // Lookup barcode
+      const result = await lookupBarcode(barcode)
+
+      return NextResponse.json({
+        success: true,
+        barcode: barcode,
+        timestamp: new Date().toISOString(),
+        result
+      })
+
+    } catch (error) {
+      console.error('Barcode lookup API error:', error)
       return NextResponse.json(
-        { error: 'Barcode is required in request body' },
-        { status: 400 }
+        {
+          error: 'Internal server error during barcode lookup',
+          details: error instanceof Error ? error.message : 'Unknown error'
+        },
+        { status: 500 }
       )
     }
-
-    // Validate barcode format
-    const validation = validateBarcode(barcode)
-    if (!validation.isValid) {
-      return NextResponse.json(
-        { error: validation.error },
-        { status: 400 }
-      )
-    }
-
-    // Lookup barcode
-    const result = await lookupBarcode(barcode)
-
-    return NextResponse.json({
-      success: true,
-      barcode: barcode,
-      timestamp: new Date().toISOString(),
-      result
-    })
-
-  } catch (error) {
-    console.error('Barcode lookup API error:', error)
-    return NextResponse.json(
-      { 
-        error: 'Internal server error during barcode lookup',
-        details: error instanceof Error ? error.message : 'Unknown error'
-      },
-      { status: 500 }
-    )
   }
-}
+)

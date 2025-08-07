@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth'
+import { withRateLimiting } from '@/lib/rate-limit'
 
-export async function POST(request: NextRequest) {
+export const GET = withRateLimiting({ interval: 60000, maxRequests: 10 })(
+  async (request: NextRequest) => {
   try {
     const session = await getSession()
     if (!session) {
@@ -29,6 +31,7 @@ export async function POST(request: NextRequest) {
     )
   }
 }
+)
 
 async function generateExportData(format: string, period: string, currency: string, timestamp: string) {
   const reportDate = new Date(timestamp).toLocaleDateString()

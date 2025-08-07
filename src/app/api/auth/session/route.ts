@@ -7,36 +7,39 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth'
+import { withRateLimiting } from '@/lib/rate-limit'
 
-export async function GET(request: NextRequest) {
-  try {
-    // Get current session
-    const session = await getSession()
-    
-    if (session) {
-      // User is authenticated
-      return NextResponse.json({
-        authenticated: true,
-        user: {
-          id: session.userId,
-          email: session.email,
-          role: session.role || 'user'
-        }
-      })
-    } else {
-      // User is not authenticated
+export const GET = withRateLimiting({ interval: 60000, maxRequests: 60 })(
+  async (request: NextRequest) => {
+    try {
+      // Get current session
+      const session = await getSession()
+
+      if (session) {
+        // User is authenticated
+        return NextResponse.json({
+          authenticated: true,
+          user: {
+            id: session.userId,
+            email: session.email,
+            role: session.role || 'user'
+          }
+        })
+      } else {
+        // User is not authenticated
+        return NextResponse.json({
+          authenticated: false,
+          user: null
+        })
+      }
+    } catch (error) {
+      console.error('Session check error:', error)
+
+      // If there's an error, treat as not authenticated
       return NextResponse.json({
         authenticated: false,
         user: null
       })
     }
-  } catch (error) {
-    console.error('Session check error:', error)
-    
-    // If there's an error, treat as not authenticated
-    return NextResponse.json({
-      authenticated: false,
-      user: null
-    })
   }
-}
+)
