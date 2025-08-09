@@ -9,10 +9,12 @@ import { withRateLimiting } from '@/lib/rate-limit'
 
 interface RecentActivity {
   id: string
-  type: 'order' | 'product' | 'customer'
+  type: 'order' | 'product' | 'customer' | 'exhibition' | 'sale'
   title: string
   description: string
   timestamp: Date
+  time: string  // ✅ Keep this for display
+  status: 'success' | 'warning' | 'info'
   priority?: 'high' | 'medium' | 'low'
 }
 
@@ -172,6 +174,7 @@ export const GET = withRateLimiting({ interval: 60000, maxRequests: 100 })(
             type: 'product',
             title: 'Product Added',
             description: `${product.name} was ${product.status === 'PUBLISHED' ? 'published' : 'saved as draft'}`,
+            timestamp: product.createdAt, // ✅ ADD this line
             time: hoursAgo < 1 ? 'Just now' : hoursAgo < 24 ? `${hoursAgo}h ago` : new Date(product.createdAt).toLocaleDateString(),
             status: product.status === 'PUBLISHED' && product.isActive ? 'success' : 'info'
           })
@@ -204,6 +207,7 @@ export const GET = withRateLimiting({ interval: 60000, maxRequests: 100 })(
             type: 'exhibition',
             title: 'Exhibition Created',
             description: `${exhibition.title} at ${exhibition.location}`,
+            timestamp: exhibition.createdAt, // ✅ ADD this line
             time: hoursAgo < 1 ? 'Just now' : hoursAgo < 24 ? `${hoursAgo}h ago` : new Date(exhibition.createdAt).toLocaleDateString(),
             status: exhibition.isActive ? 'success' : 'info'
           })
@@ -235,9 +239,10 @@ export const GET = withRateLimiting({ interval: 60000, maxRequests: 100 })(
 
           recentActivity.push({
             id: `sale-${sale.id}`,
-            type: 'sale',
+            type: 'order', // Use 'order' instead of 'sale'
             title: 'Sale Completed',
-            description: `Sale #${sale.saleNumber} - ${sale.total} ${sale.customerName ? `to ${sale.customerName}` : '(walk-in)'}`,
+            description: `Sale #${sale.saleNumber} - $${sale.total} ${sale.customerName ? `to ${sale.customerName}` : '(walk-in)'}`,
+            timestamp: sale.createdAt, // ✅ ADD this line
             time: hoursAgo < 1 ? 'Just now' : hoursAgo < 24 ? `${hoursAgo}h ago` : new Date(sale.createdAt).toLocaleDateString(),
             status: 'success'
           })
