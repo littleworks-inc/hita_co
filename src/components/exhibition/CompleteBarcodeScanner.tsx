@@ -38,7 +38,7 @@ export default function CompleteBarcodeScanner({
   onProductFound,
   onError
 }: CompleteBarcodeScanner) {
-  
+
   // State management
   const [searchInput, setSearchInput] = useState('')
   const [isScanning, setIsScanning] = useState(false)
@@ -81,58 +81,44 @@ export default function CompleteBarcodeScanner({
     try {
       setIsScanning(true)
       setLoading(true)
+      if (!scannerRef.current) {
+        console.error('Scanner element not found')
+        setLoading(false)
+        return
+      }
 
-      // Initialize Quagga
-      await new Promise((resolve, reject) => {
-        Quagga.init({
-          inputStream: {
-            name: "Live",
-            type: "LiveStream",
-            target: scannerRef.current,
-            constraints: {
-              width: 640,
-              height: 480,
-              facingMode: "environment" // Use back camera
-            }
-          },
-          decoder: {
-            readers: [
-              "code_128_reader",
-              "ean_reader", 
-              "ean_8_reader",
-              "code_39_reader",
-              "code_39_vin_reader"
-            ]
-          },
-          locator: {
-            patchSize: "medium",
-            halfSample: true
-          },
-          numOfWorkers: 2,
-          frequency: 10,
-          locate: true
-        }, (err) => {
-          if (err) {
-            console.error('Quagga initialization error:', err)
-            reject(err)
-            return
+      Quagga.init({
+        inputStream: {
+          name: "Live",
+          type: "LiveStream",
+          target: scannerRef.current,  // ✅ Now safe
+          constraints: {
+            width: 640,
+            height: 480,
+            facingMode: "environment"
           }
-          console.log('Quagga initialized successfully')
-          Quagga.start()
-          setScannerInitialized(true)
-          resolve(true)
-        })
+        },
+        decoder: {
+          readers: ["code_128_reader", "ean_reader", "ean_8_reader"]
+        }
+      }, (err: any) => {
+        if (err) {
+          console.error('Quagga initialization failed:', err)
+          setLoading(false)
+          return
+        }
+        console.log('Quagga initialized successfully')
       })
 
       // Listen for successful scans
       Quagga.onDetected((result) => {
         const code = result.codeResult.code
         console.log('Barcode detected:', code)
-        
+
         // Search for product
         searchProducts(code)
         setLastScanned(code)
-        
+
         // Stop scanning after successful detection
         stopScanning()
       })
@@ -168,17 +154,17 @@ export default function CompleteBarcodeScanner({
       if (!product.product) return false
 
       // 1. Check main product barcode
-      const matchesMainBarcode = product.product.barcode && 
+      const matchesMainBarcode = product.product.barcode &&
         product.product.barcode.toLowerCase().includes(query.toLowerCase())
-      
+
       // 2. Check main product SKU
       const matchesMainSku = product.product.sku.toLowerCase().includes(query.toLowerCase())
-      
+
       // 3. Check product name
       const matchesName = product.product.name.toLowerCase().includes(query.toLowerCase())
-      
+
       // 4. Check size variant barcodes (if product has sizes)
-      const matchesSizeBarcode = product.product.productSizes?.some((size: any) => 
+      const matchesSizeBarcode = product.product.productSizes?.some((size: any) =>
         size.sku && size.sku.toLowerCase().includes(query.toLowerCase())
       )
 
@@ -210,7 +196,7 @@ export default function CompleteBarcodeScanner({
 
   return (
     <div className="space-y-4">
-      
+
       {/* Scanner Controls */}
       <Card>
         <CardHeader>
@@ -220,7 +206,7 @@ export default function CompleteBarcodeScanner({
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          
+
           {/* Manual Input */}
           <div className="flex gap-2">
             <Input
@@ -280,7 +266,7 @@ export default function CompleteBarcodeScanner({
             <div className="text-center mb-2">
               <div className="text-sm text-gray-600">Point camera at barcode</div>
             </div>
-            <div 
+            <div
               ref={scannerRef}
               className="relative bg-black rounded-lg overflow-hidden"
               style={{ minHeight: '300px' }}

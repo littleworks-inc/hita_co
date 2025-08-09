@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { withRateLimiting, RATE_LIMIT_CONFIGS } from '@/lib/rate-limit'
+import { PaymentMethod } from '@prisma/client'
 
 // =====================================
 // 🔄 SHARED STOCK CALCULATION HELPERS
@@ -162,11 +163,13 @@ interface OrderCreateRequest {
 // =====================================
 
 const paymentMethodMap = {
-  'credit_card': 'CREDIT_CARD',
-  'debit_card': 'DEBIT_CARD',
-  // 'paypal': 'PAYPAL',
-  'stripe': 'STRIPE',
-  'bank_transfer': 'BANK_TRANSFER'
+  'credit_card': 'CARD',          // ✅ FIXED: Use 'CARD' instead of 'CREDIT_CARD'
+  'debit_card': 'CARD',           // ✅ FIXED: Use 'CARD' instead of 'DEBIT_CARD'  
+  'bank_transfer': 'BANK_TRANSFER',
+  'cash': 'CASH',
+  'upi': 'UPI',
+  'other': 'OTHER'
+  // ✅ REMOVED: 'stripe': 'STRIPE' - not in your enum
 } as const
 
 // =====================================
@@ -214,14 +217,10 @@ async function createOrderWithSharedStock(data: OrderCreateRequest) {
         shipping: data.shipping,
         total: data.total,
         currency: data.currency,
-        paymentMethod: paymentMethodMap[data.paymentMethod as keyof typeof paymentMethodMap],
+        paymentMethod: paymentMethodMap[data.paymentMethod as keyof typeof paymentMethodMap] || 'OTHER',
         paymentStatus: 'PENDING',
         status: 'PENDING',
-        // 🔄 NEW: Sales channel tracking
-        salesChannel: 'ONLINE',
-        salesLocation: 'Customer Portal',
-        deviceType: 'web', // Could be detected from user agent
-        source: 'ONLINE'
+        source: 'ONLINE'  // ✅ Only include fields that exist in your schema
       }
     })
 

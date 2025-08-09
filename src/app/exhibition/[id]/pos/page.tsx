@@ -367,6 +367,24 @@ export default function ExhibitionPOS({ params }: POSProps) {
   // Get unique categories
   const categories = [...new Set(products.map(p => p.product.category.name))].sort()
 
+  // Helper to handle barcode search results
+      const handleBarcodeSearchResult = (result: any) => {
+        // Find the ExhibitionProduct that matches the barcode result
+        const exhibitionProduct = products.find(p =>
+          p.product.sku === result.sku ||
+          p.product.barcode === result.barcode ||
+          p.id === result.exhibitionProductId
+        )
+
+        if (exhibitionProduct) {
+          handleProductFoundFromScanner(exhibitionProduct)
+        } else {
+          console.error('Product not found for barcode result:', result)
+          setError('Product not found in exhibition inventory')
+          setTimeout(() => setError(''), 3000)
+        }
+      }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -458,9 +476,9 @@ export default function ExhibitionPOS({ params }: POSProps) {
           {/* Barcode Scanner Section */}
           {quickAddMode && (
             <BarcodeSearch
-              exhibitionId={params.id}
+              exhibitionId={exhibition.id}
               products={products}
-              onProductFound={handleProductFoundFromScanner}
+              onProductFound={handleBarcodeSearchResult}  // ✅ Use helper function
               onError={handleScannerError}
             />
           )}
