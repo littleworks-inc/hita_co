@@ -164,7 +164,7 @@ interface OrderCreateRequest {
 const paymentMethodMap = {
   'credit_card': 'CREDIT_CARD',
   'debit_card': 'DEBIT_CARD',
-  'paypal': 'PAYPAL',
+  // 'paypal': 'PAYPAL',
   'stripe': 'STRIPE',
   'bank_transfer': 'BANK_TRANSFER'
 } as const

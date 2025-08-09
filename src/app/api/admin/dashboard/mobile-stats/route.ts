@@ -7,6 +7,15 @@ import { getSession } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { withRateLimiting } from '@/lib/rate-limit'
 
+interface RecentActivity {
+  id: string
+  type: 'order' | 'product' | 'customer'
+  title: string
+  description: string
+  timestamp: Date
+  priority?: 'high' | 'medium' | 'low'
+}
+
 export const GET = withRateLimiting({ interval: 60000, maxRequests: 100 })(
   async (request: NextRequest) => {
     try {
@@ -138,7 +147,7 @@ export const GET = withRateLimiting({ interval: 60000, maxRequests: 100 })(
       }
 
       // Get recent activity (last 10 activities)
-      const recentActivity = []
+      const recentActivity: RecentActivity[] = []
 
       try {
         // Recent products added
@@ -238,11 +247,8 @@ export const GET = withRateLimiting({ interval: 60000, maxRequests: 100 })(
       }
 
       // Sort recent activity by time (most recent first)
-      recentActivity.sort((a, b) => {
-        // Simple sort by type priority and then by time string
-        if (a.type === 'sale' && b.type !== 'sale') return -1
-        if (a.type !== 'sale' && b.type === 'sale') return 1
-        return 0
+      recentActivity.sort((a: RecentActivity, b: RecentActivity) => {
+        return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
       })
 
       const response = {

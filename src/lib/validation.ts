@@ -309,5 +309,5 @@ export function validateRequest<T>(
 }
 
 export function getErrorMessage(error: z.ZodError): string {
-  return error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(', ')
+  return error.issues.map(issue => `${issue.path.join('.')}: ${issue.message}`).join(', ')
 }
