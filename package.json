@@ -20,7 +20,11 @@
     "build:static": "NEXT_TELEMETRY_DISABLED=1 next build",
     "build:debug": "DEBUG=prisma* next build",
     "test:db": "node -e \"require('./src/lib/db').dbUtils.testConnection().then(r => console.log('DB Test:', r))\"",
-    "check:connections": "node -e \"require('./src/lib/db').dbUtils.getConnectionStatus().then(r => console.log('DB Status:', r))\""
+    "check:connections": "node -e \"require('./src/lib/db').dbUtils.getConnectionStatus().then(r => console.log('DB Status:', r))\"",
+    "ts:check": "tsc --noEmit",
+    "ts:check:watch": "tsc --noEmit --watch",
+    "ts:errors": "npx tsx scripts/find-typescript-errors.ts",
+    "ts:fix": "npm run ts:errors && npm run ts:check"
   },
   "dependencies": {
     "@prisma/client": "^5.7.0",

@@ -590,7 +590,11 @@ async function handleProductCreation(productData: ProductCreateRequest) {
       return createdProduct
     })
 
-    console.log('✅ Product created successfully:', result.id)
+    if (result) {
+      console.log('✅ Product created successfully:', result.id)
+    } else {
+      console.log('❌ Product creation returned null')
+    }
 
     return NextResponse.json({
       success: true,

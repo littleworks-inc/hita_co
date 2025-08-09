@@ -178,7 +178,7 @@ export default function CompleteBarcodeScanner({
       const matchesName = product.product.name.toLowerCase().includes(query.toLowerCase())
       
       // 4. Check size variant barcodes (if product has sizes)
-      const matchesSizeBarcode = product.product.productSizes?.some(size => 
+      const matchesSizeBarcode = product.product.productSizes?.some((size: any) => 
         size.sku && size.sku.toLowerCase().includes(query.toLowerCase())
       )
 

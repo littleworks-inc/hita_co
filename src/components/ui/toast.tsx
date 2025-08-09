@@ -138,6 +138,7 @@ const TOAST_REMOVE_DELAY = 1000000
 
 type Toast = ToastOptions & {
   id: string
+  open?: boolean 
 }
 
 const actionTypes = {
@@ -276,7 +277,7 @@ function toast(opts: ToastOptions) {
       ...opts,
       id,
       open: true,
-      onOpenChange: (open) => {
+      onOpenChange: (open: boolean) => {
         if (!open) dismiss()
       },
     },

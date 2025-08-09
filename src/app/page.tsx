@@ -261,7 +261,7 @@ async function FeaturedProducts({ storeSettings }: { storeSettings: Awaited<Retu
                 ...product,
                 shortDescription: product.shortDescription || undefined  // ✅ Convert null to undefined
               }} 
-              storeSettings={storeSettingsForProductCard}  // ✅ Use helper function
+              storeSettings={storeSettingsForProductCard || undefined}  // ✅ Use helper function
             />
           ))}
         </div>

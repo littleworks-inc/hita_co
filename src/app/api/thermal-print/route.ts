@@ -11,6 +11,12 @@ interface ThermalPrintRequest {
   timeout?: number
 }
 
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message
+  if (typeof error === 'string') return error
+  return 'Unknown error occurred'
+}
+
 export async function POST(request: NextRequest) {
   try {
     const { zplCode, printerIP, port = 9100, timeout = 5000 }: ThermalPrintRequest = await request.json()
@@ -50,7 +56,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       { 
         error: 'Failed to send to thermal printer',
-        details: error.message,
+        details: getErrorMessage(error),
         timestamp: new Date().toISOString()
       },
       { status: 500 }
@@ -154,7 +160,7 @@ export async function GET(request: NextRequest) {
       {
         success: false,
         error: 'Printer not reachable',
-        details: error.message,
+        details: getErrorMessage(error),
         printerIP,
         port,
         timestamp: new Date().toISOString()
