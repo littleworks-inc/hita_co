@@ -19,7 +19,7 @@
     "prestart": "prisma generate",
     "heroku-postbuild": "npm run build",
     "vercel-build": "prisma generate && next build",
-    "netlify-build": "prisma generate && next build",
+    "netlify-build": "prisma generate && next build && next export",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
     "db:studio": "prisma studio",
