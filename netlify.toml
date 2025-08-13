@@ -1,39 +1,75 @@
+# ✅ CORRECTED Netlify Configuration for Hita&Co Next.js App
+# netlify.toml
+
 [build]
-  command = "npm run build"
+  # ✅ FIXED: Correct build command for Next.js with database safety
+  command = "npm install && npm run build"
+  
+  # ✅ FIXED: Correct publish directory for Next.js on Netlify
   publish = ".next"
 
 [build.environment]
+  # Node.js version
   NODE_VERSION = "18"
   NPM_VERSION = "9"
+  
+  # Disable Next.js telemetry for faster builds
+  NEXT_TELEMETRY_DISABLED = "1"
+  
+  # Environment for build process
+  NODE_ENV = "production"
 
-# Next.js specific settings
+# ✅ ESSENTIAL: Next.js plugin for proper server-side rendering
 [[plugins]]
   package = "@netlify/plugin-nextjs"
 
-[functions]
-  node_bundler = "esbuild"
+# ✅ FIXED: Correct redirects for Next.js application
+# Handle Next.js internal files
+[[redirects]]
+  from = "/_next/*"
+  to = "/_next/:splat"
+  status = 200
 
-# Redirects for API routes
+# Handle API routes - these go to Netlify functions
 [[redirects]]
   from = "/api/*"
-  to = "/.netlify/functions/api/:splat"
+  to = "/.netlify/functions/nextjs"
   status = 200
 
-# Catch-all redirect for client-side routing
+# ✅ IMPORTANT: Root route redirect to admin login
 [[redirects]]
-  from = "/*"
-  to = "/index.html"
-  status = 200
-  conditions = {Role = ["admin", "user"]}
+  from = "/"
+  to = "/admin/login"
+  status = 302
 
 # Handle admin routes
 [[redirects]]
   from = "/admin/*"
-  to = "/admin/index.html"
+  to = "/admin/:splat"
   status = 200
 
-# Handle exhibition routes  
+# Handle exhibition routes
 [[redirects]]
   from = "/exhibition/*"
-  to = "/exhibition/index.html"
+  to = "/exhibition/:splat"
   status = 200
+
+# ✅ CATCH-ALL: Final fallback for client-side routing
+[[redirects]]
+  from = "/*"
+  to = "/404"
+  status = 404
+
+# ✅ SECURITY: Security headers
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    X-XSS-Protection = "1; mode=block"
+
+# ✅ FUNCTIONS: Configuration for serverless functions
+[functions]
+  node_bundler = "esbuild"
+  included_files = ["prisma/**"]
