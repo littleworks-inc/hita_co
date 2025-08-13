@@ -1,18 +1,61 @@
-// src/app/admin/login/page.tsx - FIXED VERSION - Completely isolated from CurrencyContext
+// src/app/admin/login/page.tsx
+// =====================================
+// 🔧 ENVIRONMENT-BASED ADMIN LOGIN
+// Uses ADMIN_EMAIL from environment for pre-filling
+// Ensures login form matches your .env configuration
+// =====================================
+
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 
 export default function AdminLogin() {
   const router = useRouter()
   const [formData, setFormData] = useState({
-    email: 'thehitanco@gmail.com', // Pre-filled for convenience
+    email: '', // Will be populated from environment
     password: ''
   })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [successMessage, setSuccessMessage] = useState('')
+  const [envEmail, setEnvEmail] = useState('')
+
+  // =====================================
+  // FETCH ADMIN EMAIL FROM ENVIRONMENT
+  // =====================================
+  useEffect(() => {
+    // Fetch the admin email from environment (via API endpoint)
+    fetch('/api/admin/config')
+      .then(res => res.json())
+      .then(data => {
+        if (data.adminEmail) {
+          setEnvEmail(data.adminEmail)
+          setFormData(prev => ({ ...prev, email: data.adminEmail }))
+        }
+      })
+      .catch(() => {
+        // Fallback if API doesn't exist yet
+        console.log('Environment config API not available, using fallback')
+      })
+  }, [])
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }))
+    
+    // Clear error when user starts typing
+    if (error) setError('')
+  }
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !loading) {
+      handleSubmit(e as any)
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -34,6 +77,8 @@ export default function AdminLogin() {
     }
 
     try {
+      console.log('🔐 Attempting login with:', { email: formData.email })
+      
       const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: {
@@ -43,6 +88,7 @@ export default function AdminLogin() {
       })
 
       const data = await response.json()
+      console.log('📡 Login response:', { status: response.status, data })
 
       if (response.ok) {
         setSuccessMessage('Login successful! Redirecting...')
@@ -52,33 +98,39 @@ export default function AdminLogin() {
           window.location.href = '/admin/dashboard'
         }, 1000)
       } else {
-        setError(data.error || 'Invalid credentials')
+        // Handle specific error cases
+        if (response.status === 401) {
+          setError('Invalid email or password. Please check your credentials.')
+        } else if (response.status === 429) {
+          setError('Too many login attempts. Please wait a minute and try again.')
+        } else {
+          setError(data.error || 'Login failed. Please try again.')
+        }
+        console.error('❌ Login failed:', data)
       }
     } catch (error) {
-      console.error('Login error:', error)
+      console.error('❌ Login error:', error)
       setError('Network error. Please check your connection and try again.')
     } finally {
       setLoading(false)
     }
   }
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }))
-    
-    // Clear error when user starts typing
-    if (error) {
-      setError('')
+  // =====================================
+  // DEVELOPMENT HELPER FUNCTIONS
+  // =====================================
+  const handleUseEnvCredentials = () => {
+    if (envEmail) {
+      setFormData(prev => ({ ...prev, email: envEmail }))
+      // Focus password field for convenience
+      document.getElementById('password')?.focus()
     }
   }
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      handleSubmit(e as any)
-    }
+  const handleClearForm = () => {
+    setFormData({ email: '', password: '' })
+    setError('')
+    setSuccessMessage('')
   }
 
   return (
@@ -88,25 +140,23 @@ export default function AdminLogin() {
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      padding: '1rem',
-      fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+      padding: '1rem'
     }}>
       <div style={{
         width: '100%',
         maxWidth: '420px',
         backgroundColor: 'white',
-        borderRadius: '16px',
+        borderRadius: '12px',
         boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
-        padding: '2.5rem',
-        border: '1px solid #e2e8f0'
+        padding: '2rem'
       }}>
         {/* Header */}
         <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
           <div style={{
-            width: '80px',
-            height: '80px',
-            backgroundColor: '#3b82f6',
-            borderRadius: '20px',
+            width: '60px',
+            height: '60px',
+            background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+            borderRadius: '50%',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -207,6 +257,38 @@ export default function AdminLogin() {
           </div>
         )}
 
+        {/* Environment Info (Development Only) */}
+        {process.env.NODE_ENV === 'development' && envEmail && (
+          <div style={{
+            padding: '0.75rem',
+            backgroundColor: '#eff6ff',
+            border: '1px solid #bfdbfe',
+            borderRadius: '6px',
+            marginBottom: '1rem',
+            fontSize: '0.75rem',
+            color: '#1e40af'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span><strong>🔧 Environment:</strong> {envEmail}</span>
+              <button
+                type="button"
+                onClick={handleUseEnvCredentials}
+                style={{
+                  padding: '0.25rem 0.5rem',
+                  backgroundColor: '#3b82f6',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  fontSize: '0.625rem',
+                  cursor: 'pointer'
+                }}
+              >
+                Use
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Login Form */}
         <form onSubmit={handleSubmit}>
           <div style={{ marginBottom: '1.5rem' }}>
@@ -304,7 +386,7 @@ export default function AdminLogin() {
             disabled={loading}
             style={{
               width: '100%',
-              padding: '0.875rem 1rem',
+              padding: '0.75rem 1rem',
               backgroundColor: loading ? '#9ca3af' : '#3b82f6',
               color: 'white',
               border: 'none',
@@ -316,57 +398,76 @@ export default function AdminLogin() {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: '0.5rem',
-              boxShadow: loading ? 'none' : '0 4px 6px -1px rgba(59, 130, 246, 0.3)'
+              gap: '0.5rem'
             }}
             onMouseOver={(e) => {
               if (!loading) {
                 e.currentTarget.style.backgroundColor = '#2563eb'
-                e.currentTarget.style.transform = 'translateY(-1px)'
               }
             }}
             onMouseOut={(e) => {
               if (!loading) {
                 e.currentTarget.style.backgroundColor = '#3b82f6'
-                e.currentTarget.style.transform = 'translateY(0)'
               }
             }}
           >
-            {loading ? (
-              <>
-                <div style={{
-                  width: '16px',
-                  height: '16px',
-                  border: '2px solid #ffffff',
-                  borderTop: '2px solid transparent',
-                  borderRadius: '50%',
-                  animation: 'spin 1s linear infinite'
-                }} />
-                Signing in...
-              </>
-            ) : (
-              'Sign In'
+            {loading && (
+              <div style={{
+                width: '16px',
+                height: '16px',
+                border: '2px solid #ffffff30',
+                borderTop: '2px solid #ffffff',
+                borderRadius: '50%',
+                animation: 'spin 1s linear infinite'
+              }} />
             )}
+            {loading ? 'Signing In...' : 'Sign In to Admin'}
           </button>
         </form>
 
+        {/* Development Tools */}
+        {process.env.NODE_ENV === 'development' && (
+          <div style={{
+            marginTop: '1.5rem',
+            paddingTop: '1rem',
+            borderTop: '1px solid #e5e7eb',
+            display: 'flex',
+            gap: '0.5rem'
+          }}>
+            <button
+              type="button"
+              onClick={handleClearForm}
+              style={{
+                flex: 1,
+                padding: '0.5rem',
+                backgroundColor: '#f3f4f6',
+                border: '1px solid #d1d5db',
+                borderRadius: '6px',
+                fontSize: '0.75rem',
+                cursor: 'pointer'
+              }}
+            >
+              Clear Form
+            </button>
+          </div>
+        )}
+
         {/* Footer */}
         <div style={{
-          marginTop: '2rem',
           textAlign: 'center',
-          fontSize: '0.75rem',
-          color: '#6b7280'
+          marginTop: '2rem',
+          paddingTop: '1.5rem',
+          borderTop: '1px solid #e5e7eb'
         }}>
-          <p style={{ marginBottom: '0.5rem' }}>
-            🔒 Secure admin access
-          </p>
-          <p>
-            Hita&Co eCommerce Platform v2.0
+          <p style={{
+            fontSize: '0.75rem',
+            color: '#6b7280'
+          }}>
+            Hita&Co Admin Dashboard v1.0
           </p>
         </div>
       </div>
-
-      {/* Add spinning animation */}
+      
       <style jsx>{`
         @keyframes spin {
           0% { transform: rotate(0deg); }
