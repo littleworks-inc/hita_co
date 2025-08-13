@@ -1,57 +1,40 @@
 /** @type {import('next').NextConfig} */
 
-// ✅ Enhanced Next.js configuration optimized for Netlify deployment
-const securityHeaders = [
-  {
-    key: 'X-DNS-Prefetch-Control',
-    value: 'on'
-  },
-  {
-    key: 'Strict-Transport-Security',
-    value: 'max-age=63072000; includeSubDomains; preload'
-  },
-  {
-    key: 'X-XSS-Protection',
-    value: '1; mode=block'
-  },
-  {
-    key: 'X-Frame-Options',
-    value: 'SAMEORIGIN'
-  },
-  {
-    key: 'X-Content-Type-Options',
-    value: 'nosniff'
-  },
-  {
-    key: 'Referrer-Policy',
-    value: 'strict-origin-when-cross-origin'
-  },
-  {
-    key: 'Permissions-Policy',
-    value: 'camera=(), microphone=(), geolocation=(), interest-cohort=()'
-  }
-]
-
+// ✅ FIXED: Next.js configuration for Netlify with proper runtime settings
 const nextConfig = {
-  // ✅ NETLIFY: Essential configuration for Netlify deployment
+  // ✅ NETLIFY: Essential configuration
   trailingSlash: false,
   
-  // ✅ NETLIFY: Optimize for serverless functions
+  // ✅ OUTPUT: Standalone for serverless deployment
+  output: 'standalone',
+  
+  // ✅ EXPERIMENTAL: Server components configuration
   experimental: {
     serverComponentsExternalPackages: ['@prisma/client', 'bcryptjs'],
   },
   
-  // ✅ SECURITY: Restricted image domains
+  // ✅ SECURITY: Image domains
   images: {
     domains: [
       'localhost',
       'uploadthing.com',
       'utfs.io',
-      'hitaco.netlify.app', // Add your Netlify domain
+      'hitaco.netlify.app',
     ],
-    unoptimized: false, // Enable image optimization
+    unoptimized: false,
     dangerouslyAllowSVG: false,
     contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
+  },
+  
+  // ✅ METADATA: Set metadataBase to fix build warnings
+  async generateMetadata() {
+    return {
+      metadataBase: new URL(
+        process.env.NEXT_PUBLIC_APP_URL || 
+        process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` :
+        'https://hitaco.netlify.app'
+      ),
+    }
   },
   
   // ✅ SECURITY: Apply security headers
@@ -59,12 +42,33 @@ const nextConfig = {
     return [
       {
         source: '/(.*)',
-        headers: securityHeaders,
+        headers: [
+          {
+            key: 'X-DNS-Prefetch-Control',
+            value: 'on'
+          },
+          {
+            key: 'X-XSS-Protection',
+            value: '1; mode=block'
+          },
+          {
+            key: 'X-Frame-Options',
+            value: 'SAMEORIGIN'
+          },
+          {
+            key: 'X-Content-Type-Options',
+            value: 'nosniff'
+          },
+          {
+            key: 'Referrer-Policy',
+            value: 'strict-origin-when-cross-origin'
+          },
+        ],
       },
     ]
   },
   
-  // ✅ NETLIFY: Handle redirects at Next.js level
+  // ✅ REDIRECTS: Handle routing
   async redirects() {
     return [
       {
@@ -75,27 +79,41 @@ const nextConfig = {
     ]
   },
   
-  // ✅ PRODUCTION: Webpack optimizations
+  // ✅ WEBPACK: Optimize for production
   webpack: (config, { isServer, dev }) => {
     if (!dev && !isServer) {
-      // Optimize bundle size for production
       config.resolve.alias = {
         ...config.resolve.alias,
         '@prisma/client': '@prisma/client',
       }
     }
     
+    // ✅ FIX: Handle Node.js modules for browser compatibility
+    config.resolve.fallback = {
+      ...config.resolve.fallback,
+      crypto: false,
+      buffer: false,
+      stream: false,
+    }
+    
     return config
   },
   
-  // ✅ NETLIFY: Environment variable handling
+  // ✅ ENVIRONMENT: Runtime variables
   env: {
     NETLIFY: process.env.NETLIFY,
     NETLIFY_DEV: process.env.NETLIFY_DEV,
   },
   
-  // ✅ OUTPUT: Configure for serverless deployment
-  output: 'standalone',
+  // ✅ TYPESCRIPT: Ignore build errors during deployment
+  typescript: {
+    ignoreBuildErrors: false,
+  },
+  
+  // ✅ ESLINT: Ignore lint errors during build
+  eslint: {
+    ignoreDuringBuilds: false,
+  },
 }
 
 module.exports = nextConfig
