@@ -1,6 +1,6 @@
 /** @type {import('next').NextConfig} */
 
-// ✅ SECURITY: Enhanced Next.js configuration with security best practices
+// ✅ Enhanced Next.js configuration optimized for Netlify deployment
 const securityHeaders = [
   {
     key: 'X-DNS-Prefetch-Control',
@@ -29,17 +29,14 @@ const securityHeaders = [
   {
     key: 'Permissions-Policy',
     value: 'camera=(), microphone=(), geolocation=(), interest-cohort=()'
-  },
-  {
-    key: 'Content-Security-Policy',
-    value: process.env.NODE_ENV === 'production' 
-      ? "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https: blob:; connect-src 'self' https://api.openai.com https://api.anthropic.com https://api.mistral.ai https://openrouter.ai https://generativelanguage.googleapis.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self';"
-      : "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: blob:; connect-src 'self' http://localhost:* ws://localhost:*;"
   }
 ]
 
 const nextConfig = {
-  // ✅ SECURITY: Server components configuration
+  // ✅ NETLIFY: Essential configuration for Netlify deployment
+  trailingSlash: false,
+  
+  // ✅ NETLIFY: Optimize for serverless functions
   experimental: {
     serverComponentsExternalPackages: ['@prisma/client', 'bcryptjs'],
   },
@@ -50,117 +47,55 @@ const nextConfig = {
       'localhost',
       'uploadthing.com',
       'utfs.io',
+      'hitaco.netlify.app', // Add your Netlify domain
     ],
-    // Additional security for image optimization
+    unoptimized: false, // Enable image optimization
     dangerouslyAllowSVG: false,
     contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
   },
   
-  // ❌ REMOVED: No sensitive environment variables exposed to client
-  // Only public variables should be prefixed with NEXT_PUBLIC_
-  
-  // ✅ SECURITY: Production optimizations
-  poweredByHeader: false, // Don't advertise Next.js usage
-  compress: true, // Enable gzip compression
-  generateEtags: true, // Enable ETags for caching
-  
-  // ✅ SECURITY: Headers configuration
+  // ✅ SECURITY: Apply security headers
   async headers() {
     return [
       {
-        // Apply security headers to all routes
-        source: '/:path*',
+        source: '/(.*)',
         headers: securityHeaders,
-      },
-      {
-        // Additional headers for API routes
-        source: '/api/:path*',
-        headers: [
-          {
-            key: 'Cache-Control',
-            value: 'no-store, no-cache, must-revalidate, proxy-revalidate',
-          },
-          {
-            key: 'X-API-Version',
-            value: '1.0.0',
-          },
-        ],
       },
     ]
   },
   
-  // ✅ SECURITY: Redirects for common security issues
+  // ✅ NETLIFY: Handle redirects at Next.js level
   async redirects() {
     return [
       {
-        source: '/.env',
-        destination: '/404',
-        permanent: false,
-      },
-      {
-        source: '/.git/:path*',
-        destination: '/404',
-        permanent: false,
-      },
-      {
-        source: '/wp-admin/:path*',
-        destination: '/404',
+        source: '/',
+        destination: '/admin/login',
         permanent: false,
       },
     ]
   },
   
-  // ✅ SECURITY: Webpack configuration for production
+  // ✅ PRODUCTION: Webpack optimizations
   webpack: (config, { isServer, dev }) => {
-    // Handle Prisma in serverless environments
-    if (isServer) {
-      config.externals.push('@prisma/client')
-    }
-    
-    // ✅ SECURITY: Minimize and optimize in production
-    if (!dev) {
-      config.optimization = {
-        ...config.optimization,
-        minimize: true,
-        // Additional optimization for security
-        sideEffects: false,
-        usedExports: true,
+    if (!dev && !isServer) {
+      // Optimize bundle size for production
+      config.resolve.alias = {
+        ...config.resolve.alias,
+        '@prisma/client': '@prisma/client',
       }
-    }
-    
-    // ✅ SECURITY: Source map configuration
-    if (!dev) {
-      config.devtool = false // No source maps in production
     }
     
     return config
   },
   
-  // ✅ SECURITY: Runtime configuration (server-side only)
-  serverRuntimeConfig: {
-    // Server-only secrets (not exposed to browser)
-    jwtSecret: process.env.JWT_SECRET,
-    databaseUrl: process.env.DATABASE_URL,
+  // ✅ NETLIFY: Environment variable handling
+  env: {
+    NETLIFY: process.env.NETLIFY,
+    NETLIFY_DEV: process.env.NETLIFY_DEV,
   },
   
-  // ✅ SECURITY: Public runtime configuration (careful with this)
-  publicRuntimeConfig: {
-    // Only truly public configuration
-    appName: 'Ecommers Platform',
-    apiUrl: process.env.NEXT_PUBLIC_API_URL || '',
-  },
-  
-  // Output configuration for deployment
-  output: process.env.NODE_ENV === 'production' ? 'standalone' : undefined,
-  
-  // ✅ SECURITY: Disable x-powered-by header
-  poweredByHeader: false,
-  
-  // ✅ SECURITY: Enable React strict mode for better error detection
-  reactStrictMode: true,
-  
-  // ✅ SECURITY: SWC minification for better performance and smaller bundles
-  swcMinify: true,
+  // ✅ OUTPUT: Configure for serverless deployment
+  output: 'standalone',
 }
 
 module.exports = nextConfig
