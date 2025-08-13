@@ -1,4 +1,8 @@
-// ✅ SECURITY: Universal rate limiting implementation
+// =====================================
+// src/lib/rate-limit.ts - FIXED
+// Fixed TypeScript types for Next.js 14 compatibility
+// =====================================
+
 import { NextRequest, NextResponse } from 'next/server'
 import { LRUCache } from 'lru-cache'
 
@@ -103,7 +107,7 @@ export class RateLimiter {
 }
 
 // =====================================
-// MIDDLEWARE FUNCTIONS
+// HELPER FUNCTIONS
 // =====================================
 
 export function getIdentifier(request: NextRequest): string {
@@ -153,22 +157,20 @@ export async function withRateLimit(
 }
 
 // =====================================
-// UNIVERSAL RATE LIMIT WRAPPER
+// ✅ FIXED: NEXT.JS 14 COMPATIBLE WRAPPER
 // =====================================
 
 /**
- * Universal rate limit wrapper that works with any route handler signature
- * This is the ONLY function you need to use for ALL your routes
+ * ✅ FIXED: Rate limiting wrapper that preserves proper TypeScript types
+ * Works with all Next.js 14 route handlers including dynamic routes with multiple params
  */
-export function withRateLimiting<T extends any[], R>(
-  config: RateLimitConfig
-): (handler: (...args: T) => Promise<R>) => (...args: T) => Promise<R | NextResponse> {
-  return (handler: (...args: T) => Promise<R>) => {
-    return async (...args: T): Promise<R | NextResponse> => {
-      // Extract the request object (always the first argument)
+export function withRateLimiting(config: RateLimitConfig) {
+  return function<T extends (...args: any[]) => Promise<NextResponse>>(handler: T): T {
+    return (async (...args: any[]): Promise<NextResponse> => {
+      // Extract request from arguments (always first parameter)
       const request = args[0] as NextRequest
       
-      // Check rate limit
+      // Check rate limit first
       const limiter = new RateLimiter(config)
       const identifier = getIdentifier(request)
       const result = await limiter.check(identifier)
@@ -189,13 +191,13 @@ export function withRateLimiting<T extends any[], R>(
               'Retry-After': Math.ceil((result.reset - Date.now()) / 1000).toString(),
             },
           }
-        ) as R
+        )
       }
       
-      // Call the original handler
+      // Call the original handler with all original arguments
       const response = await handler(...args)
       
-      // Add rate limit headers if response is NextResponse
+      // Add rate limit headers to successful responses
       if (response instanceof NextResponse) {
         response.headers.set('X-RateLimit-Limit', result.limit.toString())
         response.headers.set('X-RateLimit-Remaining', Math.max(0, result.remaining - 1).toString())
@@ -203,7 +205,7 @@ export function withRateLimiting<T extends any[], R>(
       }
       
       return response
-    }
+    }) as T
   }
 }
 
@@ -256,6 +258,7 @@ export class DistributedRateLimiter {
       }
     } catch (error) {
       console.error('Redis rate limit error:', error)
+      // Fallback to allow request if Redis fails
       return {
         success: true,
         limit: this.config.maxRequests!,
@@ -265,3 +268,20 @@ export class DistributedRateLimiter {
     }
   }
 }
+
+// =====================================
+// CONVENIENCE EXPORTS
+// =====================================
+
+// Export pre-configured rate limiters for common use cases
+export const authRateLimit = (config: RateLimitConfig = RATE_LIMIT_CONFIGS.auth.login) => 
+  withRateLimiting(config)
+
+export const apiRateLimit = (config: RateLimitConfig = RATE_LIMIT_CONFIGS.api.write) => 
+  withRateLimiting(config)
+
+export const adminRateLimit = (config: RateLimitConfig = RATE_LIMIT_CONFIGS.admin.write) => 
+  withRateLimiting(config)
+
+export const publicRateLimit = (config: RateLimitConfig = RATE_LIMIT_CONFIGS.public.products) => 
+  withRateLimiting(config)

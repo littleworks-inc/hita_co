@@ -9,6 +9,8 @@ const inter = Inter({
   variable: '--font-inter'
 })
 
+export const dynamic = 'force-dynamic'
+
 export const metadata: Metadata = {
   title: {
     default: 'Admin Panel - Hita&Co',
