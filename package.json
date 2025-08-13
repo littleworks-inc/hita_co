@@ -52,7 +52,8 @@
     "react-qr-barcode-scanner": "^2.1.8",
     "recharts": "^2.15.4",
     "tailwind-merge": "^2.2.0",
-    "tailwindcss-animate": "^1.0.7"
+    "tailwindcss-animate": "^1.0.7",
+    "zod": "^4.0.17"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
