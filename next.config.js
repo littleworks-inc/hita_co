@@ -1,5 +1,7 @@
 /** @type {import('next').NextConfig} */
 
+const path = require("path");
+
 // ✅ FIXED: Next.js configuration for Netlify with proper runtime settings
 const nextConfig = {
   // ✅ NETLIFY: Essential configuration
@@ -12,6 +14,7 @@ const nextConfig = {
   experimental: {
     serverComponentsExternalPackages: ['@prisma/client', 'bcryptjs'],
   },
+
   
   // ✅ SECURITY: Image domains
   images: {
@@ -81,23 +84,26 @@ const nextConfig = {
   
   // ✅ WEBPACK: Optimize for production
   webpack: (config, { isServer, dev }) => {
-    if (!dev && !isServer) {
-      config.resolve.alias = {
-        ...config.resolve.alias,
-        '@prisma/client': '@prisma/client',
-      }
-    }
-    
-    // ✅ FIX: Handle Node.js modules for browser compatibility
-    config.resolve.fallback = {
-      ...config.resolve.fallback,
-      crypto: false,
-      buffer: false,
-      stream: false,
-    }
-    
-    return config
-  },
+  // Ensure @ alias works in all environments (fix for Netlify)
+  config.resolve.alias["@"] = path.resolve(__dirname, "src");
+
+  if (!dev && !isServer) {
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      "@prisma/client": "@prisma/client",
+    };
+  }
+
+  // Handle Node.js modules for browser compatibility
+  config.resolve.fallback = {
+    ...config.resolve.fallback,
+    crypto: false,
+    buffer: false,
+    stream: false,
+  };
+
+  return config;
+},
   
   // ✅ ENVIRONMENT: Runtime variables
   env: {
