@@ -1,14 +1,13 @@
 // src/app/layout.tsx
 // =====================================
-// 🔧 COMPLETE ROOT LAYOUT WITH TOAST PROVIDER - SCHEMA CORRECTED
-// Updated to match exact StoreSetting model fields only
+// 🔧 FIXED: ROOT LAYOUT WITH CORRECT TABLE NAME
+// Fixed the database table name from storeSettings to storeSetting
 // =====================================
 
 import type { Metadata, Viewport } from 'next'
 import { Inter } from 'next/font/google'
 import { ThemeProvider } from '@/contexts/ThemeContext'
 import ConditionalLayoutWrapper from '@/components/ConditionalLayoutWrapper'
-import { ToastProvider, ToastViewport } from '@/components/ui'
 import { db } from '@/lib/db'
 import { SupportedCurrency, isValidCurrency } from '@/lib/currency'
 import './globals.css'
@@ -25,120 +24,87 @@ export const metadata: Metadata = {
     template: '%s | Hita&Co'
   },
   description: 'Discover unique artisan products from skilled craftsmen around the world. Premium quality, authentic craftsmanship.',
-  keywords: ['artisan', 'handmade', 'crafts', 'premium', 'authentic', 'traditional'],
-  authors: [{ name: 'Hita&Co Team' }],
+  keywords: ['artisan', 'handmade', 'crafts', 'premium', 'unique', 'authentic'],
+  authors: [{ name: 'Hita&Co' }],
   creator: 'Hita&Co',
   publisher: 'Hita&Co',
-  robots: 'index, follow',
-  openGraph: {
-    type: 'website',
-    locale: 'en_US',
-    url: process.env.NEXT_PUBLIC_APP_URL,
-    siteName: 'Hita&Co',
-    title: 'Hita&Co - Premium Artisan Products',
-    description: 'Discover unique artisan products from skilled craftsmen around the world.',
-    images: [
-      {
-        url: '/og-image.jpg',
-        width: 1200,
-        height: 630,
-        alt: 'Hita&Co Premium Artisan Products',
-      },
-    ],
+  formatDetection: {
+    email: false,
+    address: false,
+    telephone: false,
   },
-  twitter: {
-    card: 'summary_large_image',
-    title: 'Hita&Co - Premium Artisan Products',
-    description: 'Discover unique artisan products from skilled craftsmen around the world.',
-    images: ['/og-image.jpg'],
-  },
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'),
   manifest: '/manifest.json',
-  icons: {
-    icon: [
-      { url: '/favicon-16x16.png', sizes: '16x16', type: 'image/png' },
-      { url: '/favicon-32x32.png', sizes: '32x32', type: 'image/png' },
-    ],
-    apple: [
-      { url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' },
-    ],
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'Hita&Co Mobile',
+    startupImage: [
+      {
+        media: '(device-width: 320px) and (device-height: 568px) and (-webkit-device-pixel-ratio: 2)',
+        url: '/icons/apple-touch-startup-image-640x1136.png'
+      },
+      {
+        media: '(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2)',
+        url: '/icons/apple-touch-startup-image-750x1334.png'
+      },
+      {
+        media: '(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 2)',
+        url: '/icons/apple-touch-startup-image-828x1792.png'
+      }
+    ]
   },
+  other: {
+    'mobile-web-app-capable': 'yes',
+    'apple-mobile-web-app-capable': 'yes',
+    'apple-mobile-web-app-status-bar-style': 'black-translucent',
+    'msapplication-TileColor': '#8b5cf6',
+    'msapplication-config': '/browserconfig.xml'
+  }
 }
 
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
-  maximumScale: 5,
-  userScalable: true,
+  maximumScale: 1,
+  userScalable: false,
   themeColor: [
-    { media: '(prefers-color-scheme: light)', color: '#ffffff' },
-    { media: '(prefers-color-scheme: dark)', color: '#0f0f23' },
-  ],
+    { media: '(prefers-color-scheme: light)', color: '#8b5cf6' },
+    { media: '(prefers-color-scheme: dark)', color: '#7c3aed' }
+  ]
 }
 
-// ✅ CORRECTED: Get store settings with ONLY fields that exist in StoreSetting model
+// ✅ FIXED: Get store settings with correct table name and error handling
 async function getStoreSettings() {
   try {
-    // ✅ FIXED: Use correct table name 'storeSetting' (singular)
+    // ✅ CRITICAL FIX: Changed from db.storeSettings to db.storeSetting (singular)
     const settings = await db.storeSetting.findFirst({
-      orderBy: { updatedAt: 'desc' }
+      where: { id: 'default' }
     })
-    
+
     if (!settings) {
-      console.warn('No store settings found in database')
+      console.warn('No store settings found, using defaults')
       return null
     }
 
-    // ✅ CORRECTED: Return ONLY fields that exist in your StoreSetting schema
     return {
-      // Basic store information
       id: settings.id,
       storeName: settings.storeName,
       tagline: settings.tagline,
       logo: settings.logo,
-      favicon: settings.favicon,
-      
-      // Colors
       primaryColor: settings.primaryColor,
       secondaryColor: settings.secondaryColor,
       accentColor: settings.accentColor,
-      
-      // Contact information  
       email: settings.email,
       phone: settings.phone,
       address: settings.address,
-      
-      // Localization
-      currency: settings.currency,
-      timezone: settings.timezone,
-      
-      // Social media (only the ones that exist in schema)
       instagram: settings.instagram,
       facebook: settings.facebook,
       pinterest: settings.pinterest,
       twitter: settings.twitter,
-      
-      // AI integration fields
-      aiProvider: settings.aiProvider,
-      aiApiKey: settings.aiApiKey,
-      aiModel: settings.aiModel,
-      
-      // Return policy fields
-      returnsEnabled: settings.returnsEnabled ?? false,
-      returnPeriodDays: settings.returnPeriodDays ?? 30,
-      returnPolicyUrl: settings.returnPolicyUrl,
-      hasRestockingFee: settings.hasRestockingFee ?? false,
-      restockingFeePercentage: settings.restockingFeePercentage ?? 0,
-      returnPolicyDescription: settings.returnPolicyDescription,
-      noReturnsReason: settings.noReturnsReason,
-      
-      // eCommerce/Catalog mode toggles
+      currency: settings.currency,
       disableShoppingCart: settings.disableShoppingCart ?? undefined,
       catalogModeSettings: settings.catalogModeSettings ?? undefined,
-      
-      // System fields
-      defaultShippingZoneId: settings.defaultShippingZoneId,
-      createdAt: settings.createdAt,
-      updatedAt: settings.updatedAt,
     }
   } catch (error) {
     console.error('Error fetching store settings:', error)
@@ -222,48 +188,55 @@ export default async function RootLayout({
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="apple-mobile-web-app-title" content="Hita&Co" />
+        <meta name="application-name" content="Hita&Co" />
+        <meta name="msapplication-TileColor" content="#8b5cf6" />
+        <meta name="msapplication-config" content="/browserconfig.xml" />
         
-        {/* Preload critical fonts */}
-        <link
-          rel="preload"
-          href="/fonts/inter-var.woff2"
-          as="font"
-          type="font/woff2"
-          crossOrigin=""
-        />
+        {/* Favicon and Icons */}
+        <link rel="icon" href="/favicon.ico" sizes="any" />
+        <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
         
-        {/* DNS Prefetch for external services */}
+        {/* PWA Manifest */}
+        <link rel="manifest" href="/manifest.json" />
+        
+        {/* Preconnect to external domains */}
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
+        
+        {/* DNS Prefetch for performance */}
         <link rel="dns-prefetch" href="//fonts.googleapis.com" />
         <link rel="dns-prefetch" href="//fonts.gstatic.com" />
       </head>
-      <body className={`${inter.className} font-sans antialiased`}>
-        {/* Global Theme Provider */}
+      <body className={`${inter.className} antialiased`}>
         <ThemeProvider>
-          {/* Global Toast Provider */}
-          <ToastProvider>
-            {/* Conditional Layout Wrapper - handles different route contexts */}
-            <ConditionalLayoutWrapper
-              initialCurrency={currencyData.initialCurrency}
-              initialRates={currencyData.initialRates}
-            >
-              {children}
-            </ConditionalLayoutWrapper>
-            
-            {/* Toast Viewport - where toasts will be rendered */}
-            <ToastViewport />
-          </ToastProvider>
+          <ConditionalLayoutWrapper 
+            initialCurrency={currencyData.initialCurrency}
+            initialRates={currencyData.initialRates}
+          >
+            {children}
+          </ConditionalLayoutWrapper>
         </ThemeProvider>
-
-        {/* Global Loading Indicator (optional) */}
-        <div id="global-loading" className="fixed top-0 left-0 w-full h-1 bg-gradient-to-r from-purple-600 to-pink-600 transform scale-x-0 origin-left transition-transform duration-300 z-50" />
         
-        {/* Skip to main content link for accessibility */}
-        <a
-          href="#main-content"
-          className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 bg-blue-600 text-white px-4 py-2 rounded-md z-50"
-        >
-          Skip to main content
-        </a>
+        {/* Service Worker Registration */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              if ('serviceWorker' in navigator) {
+                window.addEventListener('load', function() {
+                  navigator.serviceWorker.register('/sw.js')
+                    .then(function(registration) {
+                      console.log('SW registered: ', registration);
+                    })
+                    .catch(function(registrationError) {
+                      console.log('SW registration failed: ', registrationError);
+                    });
+                });
+              }
+            `,
+          }}
+        />
       </body>
     </html>
   )

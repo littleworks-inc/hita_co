@@ -151,7 +151,7 @@ export default function DynamicHeroSection({ storeSettings }: DynamicHeroSection
   const currentSlideData = slides[currentSlide]
 
   return (
-    <section
+    <section 
       className="relative overflow-hidden bg-gray-50 w-full"
       onMouseEnter={() => setIsPaused(true)}
       onMouseLeave={() => setIsPaused(false)}
@@ -159,7 +159,7 @@ export default function DynamicHeroSection({ storeSettings }: DynamicHeroSection
       {/* Constrained container for hero content */}
       <div className="relative w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Hero Background with Responsive Height and Width Constraints */}
-        <div
+        <div 
           className="relative w-full h-[25vh] sm:h-[30vh] md:h-[35vh] lg:h-[40vh] xl:h-[45vh] 
                      rounded-lg sm:rounded-xl lg:rounded-2xl overflow-hidden shadow-lg"
         >
@@ -170,7 +170,7 @@ export default function DynamicHeroSection({ storeSettings }: DynamicHeroSection
                 src={currentSlideData.image}
                 alt="Hero background"
                 fill
-                className="object-cover object-center w-full h-full"  // ✅ MERGED classes
+                className="object-cover object-center"
                 priority
                 sizes="100vw"
                 quality={85}
@@ -178,6 +178,7 @@ export default function DynamicHeroSection({ storeSettings }: DynamicHeroSection
                   objectFit: 'cover',
                   objectPosition: 'center'
                 }}
+                className="w-full h-full"
               />
               {/* Overlay for better content readability */}
               <div className="absolute inset-0 bg-black/20"></div>
@@ -186,7 +187,7 @@ export default function DynamicHeroSection({ storeSettings }: DynamicHeroSection
             // Fallback gradient when no image with responsive scaling
             <div className={`absolute inset-0 bg-gradient-to-br ${currentSlideData.gradient || 'from-purple-600 to-pink-600'}`}>
               {/* Subtle background pattern that scales */}
-              <div
+              <div 
                 className="absolute inset-0 opacity-10"
                 style={{
                   backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23FFFFFF' fill-opacity='0.3'%3E%3Ccircle cx='30' cy='30' r='3'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
@@ -217,10 +218,11 @@ export default function DynamicHeroSection({ storeSettings }: DynamicHeroSection
                   <button
                     key={index}
                     onClick={() => goToSlide(index)}
-                    className={`rounded-full transition-all duration-200 ${index === currentSlide
+                    className={`rounded-full transition-all duration-200 ${
+                      index === currentSlide
                         ? 'bg-white scale-125 shadow-lg w-3 h-3 sm:w-4 sm:h-4'
                         : 'bg-white/50 hover:bg-white/70 w-2.5 h-2.5 sm:w-3 sm:h-3'
-                      }`}
+                    }`}
                     aria-label={`Go to slide ${index + 1}`}
                   />
                 ))}

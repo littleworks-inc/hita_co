@@ -39,8 +39,7 @@ import {
   Camera,
   QrCode,
   Zap,
-  Home,
-  Clock,
+  Home
 } from 'lucide-react'
 
 interface DashboardStats {
