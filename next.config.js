@@ -1,8 +1,6 @@
 /** @type {import('next').NextConfig} */
 
-const path = require("path");
-
-// ✅ FIXED: Next.js configuration for Netlify with proper runtime settings
+// ✅ CORRECTED: Next.js configuration preserving customer portal
 const nextConfig = {
   // ✅ NETLIFY: Essential configuration
   trailingSlash: false,
@@ -14,7 +12,6 @@ const nextConfig = {
   experimental: {
     serverComponentsExternalPackages: ['@prisma/client', 'bcryptjs'],
   },
-
   
   // ✅ SECURITY: Image domains
   images: {
@@ -27,17 +24,6 @@ const nextConfig = {
     unoptimized: false,
     dangerouslyAllowSVG: false,
     contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
-  },
-  
-  // ✅ METADATA: Set metadataBase to fix build warnings
-  async generateMetadata() {
-    return {
-      metadataBase: new URL(
-        process.env.NEXT_PUBLIC_APP_URL || 
-        process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` :
-        'https://hitaco.netlify.app'
-      ),
-    }
   },
   
   // ✅ SECURITY: Apply security headers
@@ -71,39 +57,28 @@ const nextConfig = {
     ]
   },
   
-  // ✅ REDIRECTS: Handle routing
-  async redirects() {
-    return [
-      {
-        source: '/',
-        destination: '/admin/login',
-        permanent: false,
-      },
-    ]
-  },
+  // ✅ REMOVED: NO ROOT REDIRECT - Let customer portal work normally
+  // The root "/" should show the customer homepage, not redirect to admin
   
   // ✅ WEBPACK: Optimize for production
   webpack: (config, { isServer, dev }) => {
-  // Ensure @ alias works in all environments (fix for Netlify)
-  config.resolve.alias["@"] = path.resolve(__dirname, "src");
-
-  if (!dev && !isServer) {
-    config.resolve.alias = {
-      ...config.resolve.alias,
-      "@prisma/client": "@prisma/client",
-    };
-  }
-
-  // Handle Node.js modules for browser compatibility
-  config.resolve.fallback = {
-    ...config.resolve.fallback,
-    crypto: false,
-    buffer: false,
-    stream: false,
-  };
-
-  return config;
-},
+    if (!dev && !isServer) {
+      config.resolve.alias = {
+        ...config.resolve.alias,
+        '@prisma/client': '@prisma/client',
+      }
+    }
+    
+    // ✅ FIX: Handle Node.js modules for browser compatibility
+    config.resolve.fallback = {
+      ...config.resolve.fallback,
+      crypto: false,
+      buffer: false,
+      stream: false,
+    }
+    
+    return config
+  },
   
   // ✅ ENVIRONMENT: Runtime variables
   env: {
