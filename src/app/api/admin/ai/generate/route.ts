@@ -6,7 +6,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth'
 import { db } from '@/lib/db'
-import { withRateLimiting } from '@/lib/rate-limit'
 
 // TypeScript interfaces for type safety
 interface AIGenerationRequest {
@@ -58,152 +57,150 @@ interface SEOContent {
   description: string
 }
 
-export const POST = withRateLimiting({ interval: 60000, maxRequests: 5 })(
-  async (request: NextRequest): Promise<NextResponse> => {
+export async function POST(request: NextRequest): Promise<NextResponse> {
+  try {
+    const session = await getSession()
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const body = await request.json()
+    
+    // Handle different request formats for backward compatibility
+    let type, context, options = {}
+    
+    if (body.type) {
+      // Standard AIGenerationRequest format
+      type = body.type
+      context = body.context
+      options = body.options || {}
+    } else if (body.contentType) {
+      // Legacy format - convert contentType to type
+      type = body.contentType === 'custom' ? 'product_description' : body.contentType
+      context = body.productContext || body.context
+      options = body.options || {}
+    } else {
+      return NextResponse.json({
+        success: false,
+        error: 'Missing content type. Please specify either "type" or "contentType"'
+      }, { status: 400 })
+    }
+
+    console.log('AI Generate Request:', { type, context, options })
+
+    // ✅ FIXED: Flexible context field mapping
+    const productName = context?.name || context?.productName || ''
+    
+    // Validate required fields with flexible field names
+    if (!type || !productName.trim()) {
+      return NextResponse.json({
+        success: false,
+        error: 'Missing required fields: type and product name are required'
+      }, { status: 400 })
+    }
+
+    // ✅ NORMALIZE: Create normalized context for AI functions
+    const normalizedContext = {
+      name: productName, // Normalize to 'name' for internal functions
+      productName: productName, // Keep both for compatibility
+      category: context?.category || '',
+      price: context?.price || 0,
+      currency: context?.currency || 'USD',
+      country: context?.country || '',
+      materials: context?.materials || [],
+      colors: context?.colors || [],
+      tags: context?.tags || [],
+      features: context?.features || [],
+      shortDescription: context?.shortDescription || '',
+      description: context?.description || '',
+      userInput: context?.userInput || {}
+    }
+
+    // Get AI settings from store settings
+    const storeSettings = await db.storeSetting.findFirst({
+      where: { id: 'default' },
+      select: {
+        aiProvider: true,
+        aiApiKey: true,
+        aiModel: true
+      }
+    })
+
+    if (!storeSettings?.aiProvider || !storeSettings?.aiApiKey) {
+      return NextResponse.json({
+        success: false,
+        error: 'AI provider not configured. Please configure AI settings first.'
+      }, { status: 400 })
+    }
+
+    if (!storeSettings.aiModel) {
+      return NextResponse.json({
+        success: false,
+        error: 'No AI model selected. Please select a model in Store Settings.'
+      }, { status: 400 })
+    }
+
+    // Generate content based on type
+    let generatedContent: any = null
+    
     try {
-      const session = await getSession()
-      if (!session) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-      }
-
-      const body = await request.json()
-
-      // Handle different request formats for backward compatibility
-      let type, context, options = {}
-
-      if (body.type) {
-        // Standard AIGenerationRequest format
-        type = body.type
-        context = body.context
-        options = body.options || {}
-      } else if (body.contentType) {
-        // Legacy format - convert contentType to type
-        type = body.contentType === 'custom' ? 'product_description' : body.contentType
-        context = body.productContext || body.context
-        options = body.options || {}
+      console.log('Generating content for type:', type, 'with context:', normalizedContext)
+      
+      if (type === 'short_description' || type === 'shortDescription') {
+        generatedContent = await generateShortDescription(storeSettings, normalizedContext, options)
+      } else if (type === 'product_description' || type === 'description') {
+        generatedContent = await generateProductDescription(storeSettings, normalizedContext, options)
+      } else if (type === 'seo_content') {
+        generatedContent = await generateSEOContent(storeSettings, normalizedContext, options)
+      } else if (type === 'social_caption') {
+        generatedContent = await generateSocialCaption(storeSettings, normalizedContext, options)
       } else {
+        console.error('Unsupported content type:', type)
         return NextResponse.json({
           success: false,
-          error: 'Missing content type. Please specify either "type" or "contentType"'
+          error: `Unsupported content type: ${type}. Supported types: product_description, seo_content, social_caption`
         }, { status: 400 })
       }
 
-      console.log('AI Generate Request:', { type, context, options })
-
-      // ✅ FIXED: Flexible context field mapping
-      const productName = context?.name || context?.productName || ''
-
-      // Validate required fields with flexible field names
-      if (!type || !productName.trim()) {
-        return NextResponse.json({
-          success: false,
-          error: 'Missing required fields: type and product name are required'
-        }, { status: 400 })
+      console.log('Generated content:', generatedContent)
+      
+      if (!generatedContent) {
+        throw new Error('No content was generated')
       }
 
-      // ✅ NORMALIZE: Create normalized context for AI functions
-      const normalizedContext = {
-        name: productName, // Normalize to 'name' for internal functions
-        productName: productName, // Keep both for compatibility
-        category: context?.category || '',
-        price: context?.price || 0,
-        currency: context?.currency || 'USD',
-        country: context?.country || '',
-        materials: context?.materials || [],
-        colors: context?.colors || [],
-        tags: context?.tags || [],
-        features: context?.features || [],
-        shortDescription: context?.shortDescription || '',
-        description: context?.description || '',
-        userInput: context?.userInput || {}
-      }
+      // ✅ FIXED: Clean the generated content properly
+      const cleanedContent = safeCleanAIResponse(generatedContent, type)
 
-      // Get AI settings from store settings
-      const storeSettings = await db.storeSetting.findFirst({
-        where: { id: 'default' },
-        select: {
-          aiProvider: true,
-          aiApiKey: true,
-          aiModel: true
-        }
+      return NextResponse.json({
+        success: true,
+        content: cleanedContent,
+        provider: storeSettings.aiProvider,
+        model: storeSettings.aiModel
       })
-
-      if (!storeSettings?.aiProvider || !storeSettings?.aiApiKey) {
-        return NextResponse.json({
-          success: false,
-          error: 'AI provider not configured. Please configure AI settings first.'
-        }, { status: 400 })
-      }
-
-      if (!storeSettings.aiModel) {
-        return NextResponse.json({
-          success: false,
-          error: 'No AI model selected. Please select a model in Store Settings.'
-        }, { status: 400 })
-      }
-
-      // Generate content based on type
-      let generatedContent: any = null
-
-      try {
-        console.log('Generating content for type:', type, 'with context:', normalizedContext)
-
-        if (type === 'short_description' || type === 'shortDescription') {
-          generatedContent = await generateShortDescription(storeSettings, normalizedContext, options)
-        } else if (type === 'product_description' || type === 'description') {
-          generatedContent = await generateProductDescription(storeSettings, normalizedContext, options)
-        } else if (type === 'seo_content') {
-          generatedContent = await generateSEOContent(storeSettings, normalizedContext, options)
-        } else if (type === 'social_caption') {
-          generatedContent = await generateSocialCaption(storeSettings, normalizedContext, options)
-        } else {
-          console.error('Unsupported content type:', type)
-          return NextResponse.json({
-            success: false,
-            error: `Unsupported content type: ${type}. Supported types: product_description, seo_content, social_caption`
-          }, { status: 400 })
-        }
-
-        console.log('Generated content:', generatedContent)
-
-        if (!generatedContent) {
-          throw new Error('No content was generated')
-        }
-
-        // ✅ FIXED: Clean the generated content properly
-        const cleanedContent = safeCleanAIResponse(generatedContent, type)
-
-        return NextResponse.json({
-          success: true,
-          content: cleanedContent,
-          provider: storeSettings.aiProvider,
-          model: storeSettings.aiModel
-        })
-
-      } catch (error) {
-        console.error('AI generation error:', error)
-        return NextResponse.json({
-          success: false,
-          error: error instanceof Error ? error.message : 'Content generation failed',
-          provider: storeSettings.aiProvider
-        }, { status: 500 })
-      }
 
     } catch (error) {
       console.error('AI generation error:', error)
       return NextResponse.json({
         success: false,
-        error: 'Internal server error'
+        error: error instanceof Error ? error.message : 'Content generation failed',
+        provider: storeSettings.aiProvider
       }, { status: 500 })
     }
+
+  } catch (error) {
+    console.error('AI generation error:', error)
+    return NextResponse.json({
+      success: false,
+      error: 'Internal server error'
+    }, { status: 500 })
   }
-)
+}
 
 // ✅ CONTENT GENERATION FUNCTIONS
 
 async function generateProductDescription(settings: any, context: any, options: any): Promise<string> {
   const { name, category, price, currency, country, materials, features } = context
-
+  
   const prompt = `Create a compelling product description for "${name}" which is a ${category} product.
 
 Product Details:
@@ -234,7 +231,7 @@ Write ONLY the product description, no additional text or formatting.`
 
 async function generateShortDescription(settings: any, context: any, options: any): Promise<string> {
   const { name, category, materials } = context
-
+  
   const prompt = `Write a short, compelling description (30-50 words) for "${name}" - a ${category} product.
 ${materials?.length ? `Made from: ${materials.join(', ')}` : ''}
 
@@ -251,7 +248,7 @@ Focus on the key selling points and make it appealing to customers. Write only t
 
 async function generateSEOContent(settings: any, context: any, options: any): Promise<SEOContent> {
   const { name, category, country, materials } = context
-
+  
   const prompt = `Generate SEO content for "${name}" - a ${category} product.
 ${country ? `Origin: ${country}` : ''}
 ${materials?.length ? `Materials: ${materials.join(', ')}` : ''}
@@ -268,7 +265,7 @@ Format as JSON:
 
   try {
     const content = await callAIProvider(settings, prompt, 200)
-
+    
     // Try to parse as JSON
     try {
       const parsed = JSON.parse(content)
@@ -281,18 +278,18 @@ Format as JSON:
     } catch (parseError) {
       console.log('Failed to parse JSON, using fallback parsing')
     }
-
+    
     // Fallback parsing
     const titleMatch = content.match(/title['":\s]*([^"'\n,}]+)/i)
     const descMatch = content.match(/description['":\s]*([^"'\n,}]+)/i)
-
+    
     return {
       title: titleMatch?.[1]?.substring(0, 60) || `${name} - Premium ${category}`,
       description: descMatch?.[1]?.substring(0, 160) || `Discover our beautiful ${name}. High-quality ${category.toLowerCase()} with authentic design and premium materials. Shop now for exceptional craftsmanship.`
     }
   } catch (error) {
     console.error('SEO generation failed:', error)
-
+    
     return {
       title: `${name} - Authentic ${category}`,
       description: `Beautiful ${name} with authentic designs and premium quality. Perfect for special occasions and cultural celebrations. Shop our ${category.toLowerCase()} collection.`
@@ -302,7 +299,7 @@ Format as JSON:
 
 async function generateSocialCaption(settings: any, context: any, options: any): Promise<string> {
   const { name, category, country } = context
-
+  
   const prompt = `Write an engaging social media caption for "${name}" - a beautiful ${category}.
 ${country ? `From ${country}` : ''}
 
@@ -330,7 +327,7 @@ function safeCleanAIResponse(content: any, contentType: string): any {
   // Handle null or undefined
   if (content === null || content === undefined) {
     console.warn('Content is null/undefined, returning fallback')
-    return contentType === 'seo_content'
+    return contentType === 'seo_content' 
       ? { title: 'Untitled Product', description: 'Product description coming soon.' }
       : 'Product description coming soon.'
   }
@@ -339,7 +336,7 @@ function safeCleanAIResponse(content: any, contentType: string): any {
   if (typeof content === 'string') {
     const cleaned = content.trim()
     if (cleaned.length === 0) {
-      return contentType === 'seo_content'
+      return contentType === 'seo_content' 
         ? { title: 'Untitled Product', description: 'Product description coming soon.' }
         : 'Product description coming soon.'
     }
@@ -366,7 +363,7 @@ function safeCleanAIResponse(content: any, contentType: string): any {
 // ✅ AI PROVIDER CALLING FUNCTION
 // async function callAIProvider(settings: any, prompt: string, maxTokens: number = 200): Promise<string> {
 //   const { aiProvider, aiApiKey, aiModel } = settings
-
+  
 //   // Add retry logic
 //   const maxRetries = 2
 //   let lastError: Error | null = null
@@ -374,7 +371,7 @@ function safeCleanAIResponse(content: any, contentType: string): any {
 //   for (let attempt = 1; attempt <= maxRetries; attempt++) {
 //     try {
 //       console.log(`AI Provider call attempt ${attempt}/${maxRetries}:`, { provider: aiProvider, model: aiModel })
-
+      
 //       switch (aiProvider) {
 //         case 'openai':
 //           return await callOpenAI(aiApiKey, aiModel, prompt, maxTokens)
@@ -392,16 +389,16 @@ function safeCleanAIResponse(content: any, contentType: string): any {
 //     } catch (error) {
 //       lastError = error instanceof Error ? error : new Error(String(error))
 //       console.error(`AI Provider call failed (attempt ${attempt}):`, lastError.message)
-
+      
 //       if (attempt === maxRetries) {
 //         throw lastError
 //       }
-
+      
 //       // Wait before retry
 //       await new Promise(resolve => setTimeout(resolve, 1000 * attempt))
 //     }
 //   }
-
+  
 //   throw lastError || new Error('All retry attempts failed')
 // }
 
@@ -562,9 +559,9 @@ async function callAIProviderWithRetry(settings: any, prompt: string, maxTokens:
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       console.log(`AI Provider call attempt ${attempt}/${maxRetries}:`, { provider: aiProvider, model: aiModel })
-
+      
       let result: string
-
+      
       switch (aiProvider) {
         case 'openai':
           result = await callOpenAI(aiApiKey, aiModel, prompt, maxTokens)
@@ -584,14 +581,14 @@ async function callAIProviderWithRetry(settings: any, prompt: string, maxTokens:
         default:
           throw new Error(`Unsupported AI provider: ${aiProvider}`)
       }
-
+      
       console.log('AI Provider call successful')
       return result
-
+      
     } catch (error) {
       lastError = error instanceof Error ? error : new Error(String(error))
       console.error(`AI Provider call failed (attempt ${attempt}):`, lastError.message)
-
+      
       // Check if it's a rate limit error
       if (lastError.message.includes('429') || lastError.message.includes('Too Many Requests')) {
         if (attempt < maxRetries) {
@@ -602,14 +599,14 @@ async function callAIProviderWithRetry(settings: any, prompt: string, maxTokens:
           continue
         }
       }
-
+      
       // For non-rate-limit errors, don't retry
       if (!lastError.message.includes('429')) {
         break
       }
     }
   }
-
+  
   throw lastError || new Error('All retry attempts failed')
 }
 
@@ -621,13 +618,13 @@ async function callOpenRouterWithFallback(apiKey: string, model: string, prompt:
     'microsoft/phi-3-mini-128k-instruct:free',
     'mistralai/mistral-7b-instruct:free'
   ]
-
+  
   let lastError: Error | null = null
-
+  
   for (const tryModel of fallbackModels) {
     try {
       console.log(`Trying OpenRouter model: ${tryModel}`)
-
+      
       const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -655,38 +652,38 @@ async function callOpenRouterWithFallback(apiKey: string, model: string, prompt:
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
-
+        
         // If rate limited on this model, try the next one
         if (response.status === 429) {
           console.log(`Model ${tryModel} rate limited, trying next model...`)
           lastError = new Error(`Rate limited: ${tryModel}`)
           continue
         }
-
+        
         throw new Error(`OpenRouter API error: ${response.status} ${response.statusText}`)
       }
 
       const data = await response.json()
       const content = data.choices?.[0]?.message?.content
-
+      
       if (!content) {
         throw new Error('No content generated by OpenRouter')
       }
-
+      
       console.log(`Successfully generated content using model: ${tryModel}`)
       return content.trim()
-
+      
     } catch (error) {
       console.log(`Model ${tryModel} failed:`, error instanceof Error ? error.message : 'Unknown error')
       lastError = error instanceof Error ? error : new Error(String(error))
-
+      
       // If it's not a rate limit error, don't try other models
       if (!lastError.message.includes('429') && !lastError.message.includes('Rate limited')) {
         throw lastError
       }
     }
   }
-
+  
   throw lastError || new Error('All OpenRouter models failed')
 }
 

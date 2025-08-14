@@ -25,7 +25,7 @@ interface LabelData {
   barcode: string
   price: number
   category: string
-  exhibitionPrice: number | null 
+  exhibitionPrice?: number
   finalPrice: number
 }
 

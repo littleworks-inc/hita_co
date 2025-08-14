@@ -15,7 +15,6 @@ import {
   type ShippingCalculationRequest,
   type ShippingCalculationResult
 } from '@/lib/shipping-utils'
-import { withRateLimiting } from '@/lib/rate-limit'
 
 // =================
 // INTERFACES
@@ -50,8 +49,7 @@ interface ShippingAPIResponse extends ShippingCalculationResult {
  * POST /api/shipping/calculate
  * Calculate shipping costs for cart/checkout
  */
-export const POST = withRateLimiting({ interval: 60000, maxRequests: 30 })(
-  async (request: NextRequest): Promise<NextResponse<ShippingAPIResponse>> => {
+export async function POST(request: NextRequest): Promise<NextResponse<ShippingAPIResponse>> {
   const requestId = generateRequestId()
   
   try {
@@ -156,7 +154,6 @@ export const POST = withRateLimiting({ interval: 60000, maxRequests: 30 })(
     } as ShippingAPIResponse, { status: 500 })
   }
 }
-)
 
 /**
  * GET /api/shipping/calculate?country=US&subtotal=150&currency=USD
