@@ -7,6 +7,9 @@ import { ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui'
 
+// Force dynamic rendering - this page uses database calls
+export const dynamic = 'force-dynamic'
+
 interface SocialProductsPageProps {
   searchParams: {
     search?: string

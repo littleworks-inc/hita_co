@@ -8,6 +8,9 @@ import AdminNavigation from '@/components/admin/AdminNavigation'
 import ShippingManagement from '@/components/admin/ShippingManagement'
 import { Truck } from 'lucide-react'
 
+// Force dynamic rendering - this page uses database calls
+export const dynamic = 'force-dynamic'
+
 export default async function AdminShippingPage() {
   const session = await getSession()
   

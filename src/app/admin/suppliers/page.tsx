@@ -12,6 +12,9 @@ import {
   Star
 } from 'lucide-react'
 
+// Force dynamic rendering - this page uses database calls
+export const dynamic = 'force-dynamic'
+
 // Suppliers Data Component
 async function SuppliersData() {
   const suppliers = await db.supplier.findMany({

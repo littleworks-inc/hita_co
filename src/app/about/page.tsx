@@ -20,6 +20,9 @@ import {
   Zap
 } from 'lucide-react'
 
+// Force dynamic rendering - this page uses database calls
+export const dynamic = 'force-dynamic'
+
 // Get store settings for dynamic content
 async function getStoreSettings() {
   try {

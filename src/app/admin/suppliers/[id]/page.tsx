@@ -25,6 +25,9 @@ import {
   TrendingUp
 } from 'lucide-react'
 
+// Force dynamic rendering - this page uses database calls
+export const dynamic = 'force-dynamic'
+
 interface SupplierDetailPageProps {
   params: {
     id: string

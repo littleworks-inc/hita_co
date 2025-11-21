@@ -16,6 +16,9 @@ import {
   Plus
 } from 'lucide-react'
 
+// Force dynamic rendering - this page uses database calls
+export const dynamic = 'force-dynamic'
+
 interface ExhibitionProductsPageProps {
   params: {
     id: string

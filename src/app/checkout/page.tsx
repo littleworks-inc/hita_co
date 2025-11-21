@@ -4,6 +4,9 @@ import { db } from '@/lib/db'
 import CustomerNavigation from '@/components/customer/CustomerNavigation'
 import CheckoutContent from '@/components/checkout/CheckoutContent'
 
+// Force dynamic rendering - this page uses database calls
+export const dynamic = 'force-dynamic'
+
 // Get store settings for branding
 async function getStoreSettings() {
   try {
