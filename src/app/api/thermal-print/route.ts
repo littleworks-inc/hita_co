@@ -1,5 +1,5 @@
 // src/app/api/thermal-print/route.ts
-// 🔧 Backend API for direct thermal printer communication
+// 🔧 FIXED: Proper error handling for unknown error types
 
 import { NextRequest, NextResponse } from 'next/server'
 import net from 'net'
@@ -47,10 +47,13 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Thermal print API error:', error)
     
+    // ✅ FIX: Proper error handling for unknown error type
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
+    
     return NextResponse.json(
       { 
         error: 'Failed to send to thermal printer',
-        details: error.message,
+        details: errorMessage,
         timestamp: new Date().toISOString()
       },
       { status: 500 }
@@ -104,10 +107,12 @@ async function sendZPLToPrinter(
       })
     })
     
-    socket.on('error', (error) => {
-      console.error('Printer socket error:', error)
+    socket.on('error', (socketError) => {
+      console.error('Printer socket error:', socketError)
       socket.destroy()
-      reject(new Error(`Printer connection failed: ${error.message}`))
+      // ✅ FIX: Proper error handling in socket error callback
+      const errorMessage = socketError instanceof Error ? socketError.message : 'Socket connection failed'
+      reject(new Error(`Printer connection failed: ${errorMessage}`))
     })
     
     socket.on('timeout', () => {
@@ -150,11 +155,14 @@ export async function GET(request: NextRequest) {
     })
     
   } catch (error) {
+    // ✅ FIX: Proper error handling for unknown error type
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
+    
     return NextResponse.json(
       {
         success: false,
         error: 'Printer not reachable',
-        details: error.message,
+        details: errorMessage,
         printerIP,
         port,
         timestamp: new Date().toISOString()
