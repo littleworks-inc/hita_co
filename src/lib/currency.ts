@@ -335,30 +335,19 @@ export async function getCountryCurrencyInfo(countryId: string): Promise<{
   }
 }
 
-// ✅ FIXED: Initialize exchange rates (call this when the app starts)
+// ✅ SIMPLIFIED: Initialize exchange rates (no database storage)
 export async function initializeExchangeRates(): Promise<Record<string, number>> {
   try {
-    // First try to get stored rates from Country model
-    let rates = await getStoredExchangeRates()
-    
-    // If no stored rates, fetch fresh ones
-    if (Object.keys(rates).length <= 1) { // Only USD means no stored rates
-      console.log('No stored rates found, fetching fresh rates...')
-      rates = await fetchExchangeRates()
-      
-      // Update database in background (don't wait for it)
-      updateExchangeRates().catch(error => {
-        console.error('Background rate update failed:', error)
-      })
+    // Fetch live rates from external API
+    const rates = await fetchExchangeRates()
+
+    if (Object.keys(rates).length > 1) {
+      return rates
     }
 
-    // If still no rates, use fallback
-    if (Object.keys(rates).length <= 1) {
-      console.log('Using fallback exchange rates')
-      rates = FALLBACK_RATES
-    }
-
-    return rates
+    // If API fails, use fallback
+    console.log('Using fallback exchange rates')
+    return FALLBACK_RATES
   } catch (error) {
     console.error('Error initializing exchange rates:', error)
     return FALLBACK_RATES
