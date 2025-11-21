@@ -126,13 +126,15 @@ export default function CompleteBarcodeScanner({
 
       // Listen for successful scans
       Quagga.onDetected((result) => {
-        const code = result.codeResult.code
+        const code = result.codeResult?.code
+        if (!code) return // Skip if no code detected
+
         console.log('Barcode detected:', code)
-        
+
         // Search for product
         searchProducts(code)
         setLastScanned(code)
-        
+
         // Stop scanning after successful detection
         stopScanning()
       })
