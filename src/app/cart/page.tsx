@@ -6,6 +6,9 @@ import { db } from '@/lib/db'
 import CustomerNavigation from '@/components/customer/CustomerNavigation'
 import CartPageContent from '@/components/cart/CartPageContent'
 
+// Force dynamic rendering - this page uses database calls
+export const dynamic = 'force-dynamic'
+
 // ✅ FIXED: Type-safe interface that matches both Prisma and component needs
 interface StoreSettings {
   id: string

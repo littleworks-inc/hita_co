@@ -20,6 +20,9 @@ import {
   ChevronRight
 } from 'lucide-react'
 
+// Force dynamic rendering - this page uses database calls
+export const dynamic = 'force-dynamic'
+
 // Page props interface
 interface ProductsPageProps {
   searchParams: {

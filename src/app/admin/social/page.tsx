@@ -22,6 +22,9 @@ import {
   Hash
 } from 'lucide-react'
 
+// Force dynamic rendering - this page uses database calls
+export const dynamic = 'force-dynamic'
+
 export default async function SocialMediaDashboard() {
   const session = await getSession()
   

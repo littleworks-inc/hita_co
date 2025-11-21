@@ -22,6 +22,9 @@ import {
   Users
 } from 'lucide-react'
 
+// Force dynamic rendering - this page uses database calls
+export const dynamic = 'force-dynamic'
+
 // Exhibition Stats Component
 async function ExhibitionStats() {
   const [

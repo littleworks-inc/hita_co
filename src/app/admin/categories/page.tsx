@@ -13,6 +13,9 @@ import {
   Layers
 } from 'lucide-react'
 
+// Force dynamic rendering - this page uses database calls
+export const dynamic = 'force-dynamic'
+
 // Category Stats Component
 async function CategoryStats() {
   const [

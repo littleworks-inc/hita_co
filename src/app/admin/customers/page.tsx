@@ -7,6 +7,9 @@ import CustomersTable from '@/components/admin/CustomersTable'
 import { Card, CardContent } from '@/components/ui'
 import { RefreshCw } from 'lucide-react'
 
+// Force dynamic rendering - this page uses database calls
+export const dynamic = 'force-dynamic'
+
 // Server component to fetch initial customer data
 async function CustomersData() {
   try {

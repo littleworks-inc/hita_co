@@ -23,6 +23,9 @@ import {
   BarChart3
 } from 'lucide-react'
 
+// Force dynamic rendering - this page uses database calls
+export const dynamic = 'force-dynamic'
+
 // Helper function to safely extract numeric values
 function safeNumber(value: any): number {
   if (typeof value === 'number') return value

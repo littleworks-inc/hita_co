@@ -17,6 +17,9 @@ import {
   Clock
 } from 'lucide-react'
 
+// Force dynamic rendering - this page uses database calls
+export const dynamic = 'force-dynamic'
+
 // ✅ FIXED: Get exchange rates from Country model
 async function getExchangeRates() {
   return await db.country.findMany({
