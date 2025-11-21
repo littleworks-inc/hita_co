@@ -19,8 +19,8 @@
     "db:reset": "prisma migrate reset",
     "build:static": "NEXT_TELEMETRY_DISABLED=1 next build",
     "build:debug": "DEBUG=prisma* next build",
-    "test:db": "node -e \"require('./src/lib/db').dbUtils.testConnection().then(r => console.log('DB Test:', r))\"",
-    "check:connections": "node -e \"require('./src/lib/db').dbUtils.getConnectionStatus().then(r => console.log('DB Status:', r))\""
+    "test:db": "npx tsx -e \"import { buildSafeDb } from './src/lib/db'; buildSafeDb.testConnection().then(r => console.log('DB Test:', r))\"",
+    "check:connections": "npx tsx -e \"import { buildSafeDb } from './src/lib/db'; buildSafeDb.testConnection().then(r => console.log('DB Status:', r))\""
   },
   "dependencies": {
     "@prisma/client": "^5.7.0",

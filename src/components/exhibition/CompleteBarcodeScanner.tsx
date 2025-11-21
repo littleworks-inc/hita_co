@@ -126,13 +126,15 @@ export default function CompleteBarcodeScanner({
 
       // Listen for successful scans
       Quagga.onDetected((result) => {
-        const code = result.codeResult.code
+        const code = result.codeResult?.code
+        if (!code) return // Skip if no code detected
+
         console.log('Barcode detected:', code)
-        
+
         // Search for product
         searchProducts(code)
         setLastScanned(code)
-        
+
         // Stop scanning after successful detection
         stopScanning()
       })
@@ -178,7 +180,7 @@ export default function CompleteBarcodeScanner({
       const matchesName = product.product.name.toLowerCase().includes(query.toLowerCase())
       
       // 4. Check size variant barcodes (if product has sizes)
-      const matchesSizeBarcode = product.product.productSizes?.some(size => 
+      const matchesSizeBarcode = product.product.productSizes?.some((size: { sku?: string | null }) =>
         size.sku && size.sku.toLowerCase().includes(query.toLowerCase())
       )
 

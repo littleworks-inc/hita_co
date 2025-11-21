@@ -205,11 +205,12 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
           </nav>
 
           {/* Product Detail Client Component */}
-          <ProductDetailClient 
+          <ProductDetailClient
             product={product}
             stockStatus={stockStatus}
             finalPrice={finalPrice}
             originalPrice={originalPrice}
+            storeSettings={storeSettings}
           />
         </main>
       </div>

@@ -6,6 +6,41 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth'
 import { db } from '@/lib/db'
 
+interface RecentActivity {
+  id: string
+  type: 'product' | 'exhibition' | 'sale' | 'supplier'
+  title: string
+  description: string
+  time: string
+  status: 'success' | 'warning' | 'info'
+}
+
+interface ProductQueryResult {
+  id: string
+  name: string
+  createdAt: Date
+  isActive: boolean
+  status: string
+}
+
+interface ExhibitionQueryResult {
+  id: string
+  title: string
+  location: string
+  createdAt: Date
+  startDate: Date
+  isActive: boolean
+}
+
+interface SaleQueryResult {
+  id: string
+  saleNumber: string
+  total: number
+  createdAt: Date
+  customerName: string | null
+  exhibition: { title: string }
+}
+
 export async function GET(request: NextRequest) {
   try {
     const session = await getSession()
@@ -136,7 +171,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Get recent activity (last 10 activities)
-    const recentActivity = []
+    const recentActivity: RecentActivity[] = []
 
     try {
       // Recent products added
@@ -152,7 +187,7 @@ export async function GET(request: NextRequest) {
         }
       })
 
-      recentProducts.forEach(product => {
+      recentProducts.forEach((product: ProductQueryResult) => {
         const timeDiff = Date.now() - new Date(product.createdAt).getTime()
         const hoursAgo = Math.floor(timeDiff / (1000 * 60 * 60))
         
@@ -184,7 +219,7 @@ export async function GET(request: NextRequest) {
         }
       })
 
-      recentExhibitions.forEach(exhibition => {
+      recentExhibitions.forEach((exhibition: ExhibitionQueryResult) => {
         const timeDiff = Date.now() - new Date(exhibition.createdAt).getTime()
         const hoursAgo = Math.floor(timeDiff / (1000 * 60 * 60))
         
@@ -218,7 +253,7 @@ export async function GET(request: NextRequest) {
         }
       })
 
-      recentSales.forEach(sale => {
+      recentSales.forEach((sale: SaleQueryResult) => {
         const timeDiff = Date.now() - new Date(sale.createdAt).getTime()
         const hoursAgo = Math.floor(timeDiff / (1000 * 60 * 60))
         
