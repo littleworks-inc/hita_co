@@ -5,6 +5,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth'
 import { db } from '@/lib/db'
 
+// Force dynamic rendering - this route uses cookies via getSession()
+export const dynamic = 'force-dynamic'
+
 // GET: Fetch store settings
 export async function GET(request: NextRequest) {
   try {
