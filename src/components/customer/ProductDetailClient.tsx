@@ -1,4 +1,4 @@
-// ✅ NEW: src/components/customer/ProductDetailClient.tsx
+// ✅ UPDATED: src/components/customer/ProductDetailClient.tsx - CATALOG/ECOMMERCE TOGGLE SUPPORT
 // Client Component - Handles size selection and interactive features
 
 'use client'
@@ -9,6 +9,7 @@ import { useCurrency } from '@/contexts/CurrencyContext'
 import ProductGallery from '@/components/customer/ProductGallery'
 import ProductSizeSelector from '@/components/customer/ProductSizeSelector'
 import AddToCartButton from '@/components/cart/AddToCartButton'
+import ContactButtons from '@/components/customer/ContactButtons'
 import {
   Star,
   Heart,
@@ -21,7 +22,8 @@ import {
   Info,
   CheckCircle,
   AlertTriangle,
-  Ruler
+  Ruler,
+  MessageCircle
 } from 'lucide-react'
 
 // ✅ ProductSize interface
@@ -35,23 +37,49 @@ interface ProductSize {
   sortOrder: number
 }
 
+interface StoreSettings {
+  disableShoppingCart?: boolean
+  catalogModeSettings?: string
+}
+
 interface ProductDetailClientProps {
   product: any
   stockStatus: any
   finalPrice: number
   originalPrice: number | null
+  storeSettings?: StoreSettings | null
 }
 
-export default function ProductDetailClient({ 
-  product, 
-  stockStatus, 
-  finalPrice, 
-  originalPrice 
+export default function ProductDetailClient({
+  product,
+  stockStatus,
+  finalPrice,
+  originalPrice,
+  storeSettings
 }: ProductDetailClientProps) {
   // ✅ SHARED STATE: Manage selected size at this level
   const [selectedSize, setSelectedSize] = useState<ProductSize | null>(null)
   const [isWishlisted, setIsWishlisted] = useState(false)
   const { formatPrice } = useCurrency()
+
+  // ✅ NEW: Parse catalog mode settings
+  const isECommerceMode = !storeSettings?.disableShoppingCart
+  const catalogSettings = storeSettings?.catalogModeSettings
+    ? (() => {
+        try {
+          return JSON.parse(storeSettings.catalogModeSettings)
+        } catch {
+          return {
+            whatsappNumber: '',
+            instagramHandle: '',
+            contactMessage: 'Hi! I\'m interested in this product. Can you provide more details?',
+            showWhatsApp: true,
+            showInstagram: true,
+            customContactText: 'Contact us for pricing and availability'
+          }
+        }
+      })()
+    : null
 
   const handleSizeSelect = (size: ProductSize | null) => {
     setSelectedSize(size)
@@ -154,24 +182,58 @@ export default function ProductDetailClient({
           </div>
         )}
 
-        {/* Add to Cart Section */}
+        {/* Add to Cart / Contact Section */}
         <div className="space-y-4 pt-6 border-t border-gray-200">
-          <AddToCartButton 
-            product={product}
-            variant="large"
-            showQuantitySelector={true}
-            selectedSize={selectedSize}
-            disabled={stockStatus.isOutOfStock || (stockStatus.requiresSizeSelection && !selectedSize)}
-          />
+          {isECommerceMode ? (
+            /* eCommerce Mode: Show Add to Cart */
+            <>
+              <AddToCartButton
+                product={product}
+                variant="large"
+                showQuantitySelector={true}
+                selectedSize={selectedSize}
+                disabled={stockStatus.isOutOfStock || (stockStatus.requiresSizeSelection && !selectedSize)}
+              />
 
-          {/* Size Selection Required Message */}
-          {stockStatus.requiresSizeSelection && !selectedSize && (
-            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-              <div className="flex items-center gap-2 text-amber-800">
-                <Info className="h-5 w-5" />
-                <span className="font-medium">Please select a size to continue</span>
-              </div>
-            </div>
+              {/* Size Selection Required Message */}
+              {stockStatus.requiresSizeSelection && !selectedSize && (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                  <div className="flex items-center gap-2 text-amber-800">
+                    <Info className="h-5 w-5" />
+                    <span className="font-medium">Please select a size to continue</span>
+                  </div>
+                </div>
+              )}
+            </>
+          ) : (
+            /* Catalog Mode: Show Contact Buttons */
+            <>
+              {catalogSettings && (
+                <div className="bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200 rounded-lg p-6">
+                  <div className="flex items-center gap-2 text-purple-800 mb-4">
+                    <MessageCircle className="h-5 w-5" />
+                    <span className="font-medium">Interested in this product?</span>
+                  </div>
+                  <ContactButtons
+                    product={product}
+                    catalogSettings={catalogSettings}
+                    className="w-full"
+                  />
+                </div>
+              )}
+
+              {/* Size info for catalog mode */}
+              {stockStatus.requiresSizeSelection && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <div className="flex items-center gap-2 text-blue-800">
+                    <Info className="h-5 w-5" />
+                    <span className="font-medium">
+                      Available in {stockStatus.availableSizes} size{stockStatus.availableSizes !== 1 ? 's' : ''} - Ask about your size when contacting us!
+                    </span>
+                  </div>
+                </div>
+              )}
+            </>
           )}
 
           {/* Action Buttons */}
