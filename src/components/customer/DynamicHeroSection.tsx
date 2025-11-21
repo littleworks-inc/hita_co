@@ -170,7 +170,7 @@ export default function DynamicHeroSection({ storeSettings }: DynamicHeroSection
                 src={currentSlideData.image}
                 alt="Hero background"
                 fill
-                className="object-cover object-center"
+                className="object-cover object-center w-full h-full"
                 priority
                 sizes="100vw"
                 quality={85}
@@ -178,7 +178,6 @@ export default function DynamicHeroSection({ storeSettings }: DynamicHeroSection
                   objectFit: 'cover',
                   objectPosition: 'center'
                 }}
-                className="w-full h-full"
               />
               {/* Overlay for better content readability */}
               <div className="absolute inset-0 bg-black/20"></div>
