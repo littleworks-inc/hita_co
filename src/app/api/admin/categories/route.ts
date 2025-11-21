@@ -3,6 +3,9 @@ import { getSession } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { slugify } from '@/lib/utils'
 
+// Force dynamic rendering - this route uses cookies or request.url
+export const dynamic = 'force-dynamic'
+
 export async function GET(request: NextRequest) {
   try {
     const session = await getSession()

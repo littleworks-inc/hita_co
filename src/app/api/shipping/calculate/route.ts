@@ -16,6 +16,9 @@ import {
   type ShippingCalculationResult
 } from '@/lib/shipping-utils'
 
+// Force dynamic rendering - this route uses cookies or request.url
+export const dynamic = 'force-dynamic'
+
 // =================
 // INTERFACES
 // =================
