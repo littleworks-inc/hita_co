@@ -5,6 +5,9 @@ import { getSession } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { Prisma } from '@prisma/client' // ✅ ADD THIS IMPORT
 
+// Force dynamic rendering - this route uses cookies via getSession()
+export const dynamic = 'force-dynamic'
+
 export async function GET(request: NextRequest) {
   try {
     const session = await getSession()
