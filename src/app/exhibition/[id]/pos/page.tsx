@@ -17,6 +17,7 @@ import { Badge } from '@/components/ui/badge'
 import { Textarea } from '@/components/ui/textarea'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import BarcodeSearch from '@/components/exhibition/BarcodeSearch'
+import { BarcodeResult } from '@/lib/barcode-lookup-working'
 import {
   ShoppingCart,
   Plus,
@@ -143,10 +144,23 @@ export default function ExhibitionPOS({ params }: POSProps) {
   }
 
   // Handle product found from barcode scanner
-  const handleProductFoundFromScanner = (product: ExhibitionProduct) => {
-    addToCart(product)
-    setQuickAddMode(false)
-    setShowBarcodeSearch(false)
+  const handleProductFoundFromScanner = (result: BarcodeResult) => {
+    if (!result.found || !result.product) {
+      setError('Product not found in barcode lookup')
+      return
+    }
+
+    // Find the matching exhibition product from our products array
+    const exhibitionProduct = products.find(p => p.productId === result.product?.id)
+
+    if (exhibitionProduct) {
+      addToCart(exhibitionProduct)
+      setQuickAddMode(false)
+      setShowBarcodeSearch(false)
+    } else {
+      setError('Product not found in this exhibition')
+      setTimeout(() => setError(''), 3000)
+    }
   }
 
   // Handle scanner errors
