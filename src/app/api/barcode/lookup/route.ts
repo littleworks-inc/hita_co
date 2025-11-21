@@ -4,6 +4,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { lookupBarcode, validateBarcode } from '@/lib/barcode-lookup'
 
+// Force dynamic rendering - this route uses cookies or request.url
+export const dynamic = 'force-dynamic'
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)

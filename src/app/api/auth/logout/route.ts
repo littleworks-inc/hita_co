@@ -3,6 +3,9 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 
+// Force dynamic rendering - this route uses cookies or request.url
+export const dynamic = 'force-dynamic'
+
 export async function POST(request: NextRequest) {
   try {
     // Get the referer to determine where the logout came from

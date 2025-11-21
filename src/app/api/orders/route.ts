@@ -7,6 +7,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 
+// Force dynamic rendering - this route uses cookies or request.url
+export const dynamic = 'force-dynamic'
+
 // =====================================
 // 🔄 TYPE DEFINITIONS FOR SHARED STOCK
 // =====================================

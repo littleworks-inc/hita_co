@@ -7,6 +7,9 @@ import { getSession } from '@/lib/auth'
 import { db } from '@/lib/db' // ✅ ADDED: Missing db import
 import { syncAllProductsStock, syncProductStock, syncMultipleProductsStock } from '@/lib/stock-sync'
 
+// Force dynamic rendering - this route uses cookies or request.url
+export const dynamic = 'force-dynamic'
+
 // POST /api/admin/stock-sync - Trigger stock synchronization
 export async function POST(request: NextRequest) {
   try {
