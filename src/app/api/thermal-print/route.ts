@@ -4,6 +4,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import net from 'net'
 
+// Force dynamic rendering - this route uses cookies or request.url
+export const dynamic = 'force-dynamic'
+
 interface ThermalPrintRequest {
   zplCode: string
   printerIP: string

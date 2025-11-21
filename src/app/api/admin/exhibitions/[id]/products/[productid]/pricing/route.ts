@@ -8,6 +8,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth'
 import { db } from '@/lib/db'
 
+// Force dynamic rendering - this route uses cookies or request.url
+export const dynamic = 'force-dynamic'
+
 // GET - Fetch current pricing for an exhibition product
 export async function GET(
   request: NextRequest,
