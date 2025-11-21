@@ -63,8 +63,8 @@ async function getStoreSettings() {
 
 // ✅ NEW: Helper function to convert for ProductCard (only needs specific fields)
 function convertForProductCard(storeSettings: Awaited<ReturnType<typeof getStoreSettings>>) {
-  if (!storeSettings) return null
-  
+  if (!storeSettings) return undefined
+
   return {
     storeName: storeSettings.storeName,
     primaryColor: storeSettings.primaryColor,
