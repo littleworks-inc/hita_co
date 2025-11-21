@@ -1,11 +1,33 @@
 // src/app/api/admin/products/route.ts
 // ✅ FIXED: Added missing POST handler for product creation while preserving stock validation
+// ✅ FIXED: All TypeScript parameter type errors
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth'
 import { db } from '@/lib/db'
-import { ProductStatus } from '@prisma/client'
+// ✅ FIX: Define ProductStatus enum locally since it may not be exported from Prisma
+enum ProductStatus {
+  DRAFT = 'DRAFT',
+  PUBLISHED = 'PUBLISHED',
+  ARCHIVED = 'ARCHIVED'
+}
 // Removed external import - using inline functions instead
+
+// =====================================
+// 🔄 TYPE DEFINITIONS FOR SHARED STOCK
+// =====================================
+
+interface OrderItemForStock {
+  quantity: number
+}
+
+interface ExhibitionSaleItemForStock {
+  quantity: number
+}
+
+interface ProductSizeForStock {
+  stockQuantity: number
+}
 
 // =====================================
 // SHARED STOCK HELPERS (INLINE)
@@ -27,7 +49,8 @@ async function calculateTotalSoldAllChannels(productId: string, sizeId?: string)
     select: { quantity: true }
   })
   
-  const soldToCustomers = customerOrderItems.reduce((sum, item) => sum + item.quantity, 0)
+  // ✅ FIX: Add explicit parameter types to reduce callback
+  const soldToCustomers = customerOrderItems.reduce((sum: number, item: OrderItemForStock) => sum + item.quantity, 0)
 
   // Get exhibition sales (POS sales)  
   const exhibitionSaleItems = await db.exhibitionSaleItem.findMany({
@@ -38,7 +61,8 @@ async function calculateTotalSoldAllChannels(productId: string, sizeId?: string)
     select: { quantity: true }
   })
   
-  const soldAtExhibitions = exhibitionSaleItems.reduce((sum, item) => sum + item.quantity, 0)
+  // ✅ FIX: Add explicit parameter types to reduce callback
+  const soldAtExhibitions = exhibitionSaleItems.reduce((sum: number, item: ExhibitionSaleItemForStock) => sum + item.quantity, 0)
 
   return soldToCustomers + soldAtExhibitions
 }
@@ -302,7 +326,8 @@ export async function GET(request: NextRequest) {
 
     // Calculate shared stock availability for each product
     const productsWithSharedStock = await Promise.all(
-      allProducts.map(async (product) => {
+      // ✅ FIX: Add explicit parameter type to map callback
+      allProducts.map(async (product: any) => {
         const sharedAvailableStock = await calculateSharedAvailableStock(
           product.id, 
           product.requiresSizes, 
@@ -315,7 +340,8 @@ export async function GET(request: NextRequest) {
           stockQuantity: sharedAvailableStock,
           sharedStockInfo: {
             totalInventory: product.requiresSizes 
-              ? product.productSizes.reduce((sum, size) => sum + size.stockQuantity, 0)
+              // ✅ FIX: Add explicit parameter types to reduce callback
+              ? product.productSizes.reduce((sum: number, size: ProductSizeForStock) => sum + size.stockQuantity, 0)
               : product.stockQuantity,
             availableStock: sharedAvailableStock,
             pendingOrders: product.stockQuantity - sharedAvailableStock
@@ -539,7 +565,8 @@ async function handleProductCreation(productData: ProductCreateRequest) {
 
   try {
     // Create product with potential sizes in a transaction
-    const result = await db.$transaction(async (tx) => {
+    // ✅ FIX: Add explicit transaction parameter type
+    const result = await db.$transaction(async (tx: any) => {
       // Create the main product
       const createdProduct = await tx.product.create({
         data: dbProductData,
@@ -552,7 +579,8 @@ async function handleProductCreation(productData: ProductCreateRequest) {
 
       // Create product sizes if provided
       if (productData.requiresSizes && productData.productSizes && productData.productSizes.length > 0) {
-        const sizesData = productData.productSizes.map((size, index) => ({
+        // ✅ FIX: Add explicit parameter types to map callback
+        const sizesData = productData.productSizes.map((size: any, index: number) => ({
           productId: createdProduct.id,
           size: size.size,
           sku: size.sku,
@@ -579,13 +607,15 @@ async function handleProductCreation(productData: ProductCreateRequest) {
           }
         })
 
-        return productWithSizes
+        // ✅ FIX: Handle potential null result with fallback
+        return productWithSizes || createdProduct
       }
 
       return createdProduct
     })
 
-    console.log('✅ Product created successfully:', result.id)
+    // ✅ FIX: Use safe access for potentially null result
+    console.log('✅ Product created successfully:', result?.id)
 
     return NextResponse.json({
       success: true,

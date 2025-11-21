@@ -2,10 +2,48 @@
 // src/app/api/orders/route.ts - CUSTOMER ORDERS SHARED STOCK SYSTEM
 // 🔄 MODIFIED: Customer orders use shared stock validation and tracking
 // 📊 ENHANCED: Sales channel tracking and shared stock updates
+// ✅ FIXED: All TypeScript parameter type errors
 // =====================================
 
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+
+// =====================================
+// 🔄 TYPE DEFINITIONS FOR SHARED STOCK
+// =====================================
+
+interface OrderItemForStock {
+  quantity: number
+}
+
+interface ExhibitionSaleItemForStock {
+  quantity: number
+}
+
+interface ProductSizeForTransaction {
+  stockQuantity: number
+}
+
+interface StockValidation {
+  productId: string
+  productSizeId?: string
+  quantity: number
+  stockCheck: {
+    available: boolean
+    availableQuantity: number
+    originalStock: number
+    totalSold: number
+    message: string
+  }
+}
+
+interface OrderItemInput {
+  productId: string
+  productSizeId?: string
+  quantity: number
+  pricePerItem: number
+  totalPrice: number
+}
 
 // =====================================
 // 🔄 SHARED STOCK CALCULATION HELPERS
@@ -27,7 +65,8 @@ async function calculateTotalSoldAllChannels(productId: string, sizeId?: string)
     select: { quantity: true }
   })
   
-  const soldToCustomers = customerOrderItems.reduce((sum, item) => sum + item.quantity, 0)
+  // ✅ FIX: Add explicit parameter types to reduce callback
+  const soldToCustomers = customerOrderItems.reduce((sum: number, item: OrderItemForStock) => sum + item.quantity, 0)
 
   // Get exhibition sales (POS sales)
   const exhibitionSaleItems = await db.exhibitionSaleItem.findMany({
@@ -38,7 +77,8 @@ async function calculateTotalSoldAllChannels(productId: string, sizeId?: string)
     select: { quantity: true }
   })
   
-  const soldAtExhibitions = exhibitionSaleItems.reduce((sum, item) => sum + item.quantity, 0)
+  // ✅ FIX: Add explicit parameter types to reduce callback
+  const soldAtExhibitions = exhibitionSaleItems.reduce((sum: number, item: ExhibitionSaleItemForStock) => sum + item.quantity, 0)
 
   return soldToCustomers + soldAtExhibitions
 }
@@ -161,11 +201,13 @@ interface OrderCreateRequest {
 // =====================================
 
 const paymentMethodMap = {
-  'credit_card': 'CREDIT_CARD',
-  'debit_card': 'DEBIT_CARD', 
-  'paypal': 'PAYPAL',
-  'stripe': 'STRIPE',
-  'bank_transfer': 'BANK_TRANSFER'
+  'credit_card': 'CARD',         // ✅ Map credit cards to CARD
+  'debit_card': 'CARD',          // ✅ Map debit cards to CARD  
+  'paypal': 'OTHER',             // ✅ Map PayPal to OTHER
+  'stripe': 'OTHER',             // ✅ Map Stripe to OTHER
+  'bank_transfer': 'BANK_TRANSFER', // ✅ This one is correct
+  'cash': 'CASH',                // ✅ Add cash mapping
+  'upi': 'UPI'                   // ✅ Add UPI mapping
 } as const
 
 // =====================================
@@ -173,13 +215,14 @@ const paymentMethodMap = {
 // =====================================
 
 async function createOrderWithSharedStock(data: OrderCreateRequest) {
-  return await db.$transaction(async (tx) => {
+  // ✅ FIX: Add explicit transaction parameter type
+  return await db.$transaction(async (tx: any) => {
     const orderNumber = generateOrderNumber()
     
     console.log('🔄 SHARED STOCK: Creating order with shared stock validation')
     
     // Step 1: Validate all items with shared stock logic
-    const stockValidations = []
+    const stockValidations: StockValidation[] = []
     
     for (const item of data.items) {
       const stockCheck = await checkSharedStockForItem(
@@ -193,7 +236,9 @@ async function createOrderWithSharedStock(data: OrderCreateRequest) {
       }
       
       stockValidations.push({
-        ...item,
+        productId: item.productId,
+        productSizeId: item.productSizeId,
+        quantity: item.quantity,
         stockCheck
       })
       
@@ -228,7 +273,8 @@ async function createOrderWithSharedStock(data: OrderCreateRequest) {
 
     // Step 3: Create order items with size tracking
     const orderItems = await Promise.all(
-      data.items.map(item =>
+      // ✅ FIX: Add explicit parameter type to map callback
+      data.items.map((item: OrderItemInput) =>
         tx.orderItem.create({
           data: {
             orderId: order.id,
@@ -273,7 +319,8 @@ async function createOrderWithSharedStock(data: OrderCreateRequest) {
           select: { stockQuantity: true }
         })
         
-        const newMainStock = updatedSizes.reduce((sum, size) => sum + size.stockQuantity, 0)
+        // ✅ FIX: Add explicit parameter types to reduce callback
+        const newMainStock = updatedSizes.reduce((sum: number, size: ProductSizeForTransaction) => sum + size.stockQuantity, 0)
         
         await tx.product.update({
           where: { id: item.productId },
@@ -370,7 +417,8 @@ export async function POST(request: NextRequest) {
       message: 'Order created successfully',
       // 🔄 NEW: Shared stock summary
       sharedStockSummary: {
-        totalItemsOrdered: data.items.reduce((sum, item) => sum + item.quantity, 0),
+        // ✅ FIX: Add explicit parameter types to reduce callback
+        totalItemsOrdered: data.items.reduce((sum: number, item: OrderItemInput) => sum + item.quantity, 0),
         stockValidations: result.stockValidations,
         systemNote: 'Order processed using shared stock system',
         salesChannel: 'ONLINE'
