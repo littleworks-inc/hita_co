@@ -23,6 +23,8 @@ This document provides comprehensive guidance for AI assistants working on the H
 11. [Testing Guidelines](#testing-guidelines)
 12. [Common Tasks](#common-tasks)
 13. [Troubleshooting](#troubleshooting)
+    - [TypeScript Errors](#typescript-errors)
+    - [Barcode Issues](#barcode-issues)
 14. [Critical Files](#critical-files)
 
 ---
@@ -838,6 +840,290 @@ Check `src/middleware.ts`:
 - Verify cookie names match between auth and middleware
 - Check matcher config excludes static files
 
+### TypeScript Errors
+
+#### Understanding TypeScript Errors in Next.js
+
+**Important**: Running `npx tsc --noEmit` may show errors that don't affect the build. Next.js handles TypeScript differently.
+
+**Common False Positives:**
+
+```bash
+# These errors often appear with raw tsc but don't break Next.js builds:
+# - JSX element implicitly has type 'any'
+# - Cannot find module 'next/...' or its corresponding type declarations
+# - Cannot find name 'process' (in seed.ts or other non-src files)
+```
+
+**Solution: Always test with Next.js build:**
+
+```bash
+# Instead of running tsc directly, use:
+npm run build
+
+# This uses Next.js's TypeScript handling which is more accurate
+```
+
+#### Common TypeScript Issues & Fixes
+
+**1. Prisma Client Not Found**
+
+```bash
+# Error: Cannot find module '@prisma/client'
+# Fix:
+npm run db:generate
+```
+
+**2. Missing Type Definitions**
+
+```bash
+# Error: Cannot find name 'process'. Try `npm i --save-dev @types/node`
+# Fix: Already installed, but if needed:
+npm install --save-dev @types/node
+```
+
+**3. Type Errors in Components**
+
+```typescript
+// ❌ Bad: Implicit any
+function MyComponent({ data }) { ... }
+
+// ✅ Good: Explicit types
+interface MyComponentProps {
+  data: Product;
+}
+function MyComponent({ data }: MyComponentProps) { ... }
+```
+
+**4. Prisma Type Imports**
+
+```typescript
+// ✅ Always import types from @prisma/client
+import { Product, Category, Order } from '@prisma/client';
+
+// ✅ Use Prisma's generated types for relations
+import type { Product as PrismaProduct } from '@prisma/client';
+type ProductWithCategory = PrismaProduct & {
+  category: { name: string };
+};
+```
+
+**5. Client vs Server Component Types**
+
+```typescript
+// ❌ Bad: Using server-only features in client components
+'use client'
+import { prisma } from '@/lib/db'; // Error: Can't use Prisma in client
+
+// ✅ Good: Fetch data via API in client components
+'use client'
+const fetchData = async () => {
+  const res = await fetch('/api/products');
+  return res.json();
+};
+```
+
+### Barcode Issues
+
+The platform uses **CODE128** barcode format exclusively with custom canvas-based generation.
+
+#### Common Barcode Problems & Solutions
+
+**1. Barcode Not Generating**
+
+```typescript
+// Issue: Barcode field is empty or null
+// Check: src/lib/barcode-utils.ts
+
+// Solution 1: Auto-generate from SKU
+import { generateBarcodeFromSKU } from '@/lib/barcode-utils';
+const barcode = generateBarcodeFromSKU(product.sku);
+
+// Solution 2: Use SKU as fallback
+const displayBarcode = product.barcode || product.sku;
+```
+
+**2. Barcode Validation Errors**
+
+```typescript
+// Common validation errors:
+
+// ❌ Too Long (>80 characters)
+const barcode = 'VERY-LONG-SKU-WITH-MANY-CHARACTERS-THAT-EXCEEDS-CODE128-LIMIT-OF-80';
+// Fix: Truncate or use shorter format
+
+// ❌ Invalid Characters (non-ASCII)
+const barcode = 'PRODUCT-™-SKU'; // ™ is > ASCII 127
+// Fix: Remove special characters
+
+// ✅ Valid CODE128
+import { validateBarcodeFormat } from '@/lib/barcode-utils';
+const validation = validateBarcodeFormat(barcode);
+if (!validation.isValid) {
+  console.error(validation.error);
+}
+```
+
+**3. Size Variant Barcode Issues**
+
+```typescript
+// Issue: Size variants not getting unique barcodes
+
+// Solution: Use size-specific SKU generation
+// Pattern: BASE-SKU + SIZE (e.g., "KURTA-001-M", "KURTA-001-L")
+
+// In src/lib/barcode-utils.ts:
+import { generateSizeBarcodes } from '@/lib/barcode-utils';
+
+const sizeBarcodes = generateSizeBarcodes(
+  'KURTA-001',
+  ['S', 'M', 'L', 'XL']
+);
+// Result: {
+//   S: 'KURTA-001-S',
+//   M: 'KURTA-001-M',
+//   L: 'KURTA-001-L',
+//   XL: 'KURTA-001-XL'
+// }
+```
+
+**4. Barcode Lookup Not Finding Products**
+
+```typescript
+// Issue: Scanned barcode doesn't match database
+
+// Check 1: Barcode case sensitivity
+// Barcodes are stored and searched in UPPERCASE
+const cleanBarcode = scannedBarcode.trim().toUpperCase();
+
+// Check 2: Check both Product and ProductSize tables
+import { lookupBarcode } from '@/lib/barcode-lookup';
+const result = await lookupBarcode(scannedBarcode);
+
+if (result.type === 'main_product') {
+  // Found main product
+} else if (result.type === 'size_variant') {
+  // Found size variant
+} else {
+  // Not found - check if barcode exists in database
+}
+```
+
+**5. Canvas Rendering Issues**
+
+```typescript
+// Issue: Barcode not rendering in browser
+
+// Solution: Ensure component is client-side
+'use client' // Add this at the top
+
+// Solution: Check canvas ref is initialized
+const canvasRef = useRef<HTMLCanvasElement>(null);
+
+useEffect(() => {
+  if (!canvasRef.current) return; // Wait for mount
+
+  const canvas = canvasRef.current;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+
+  // Generate barcode...
+}, [barcode]);
+```
+
+**6. Barcode Printing Issues**
+
+```typescript
+// Issue: Print dialog shows blank page
+
+// Check 1: Ensure barcode is generated before printing
+await generateBarcode(); // Wait for generation
+setTimeout(() => window.print(), 100); // Small delay
+
+// Check 2: Print-specific CSS
+// In your component styles or globals.css:
+/*
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  #barcode-container,
+  #barcode-container * {
+    visibility: visible;
+  }
+  #barcode-container {
+    position: absolute;
+    left: 0;
+    top: 0;
+  }
+}
+*/
+```
+
+**7. Barcode Uniqueness Conflicts**
+
+```bash
+# Error: Unique constraint failed on barcode field
+
+# Issue: Duplicate barcode in database
+# Check duplicates:
+npx prisma studio
+# Search in Product and ProductSize tables
+
+# Solution: Auto-append timestamp for uniqueness
+const uniqueBarcode = `${baseSKU}-${Date.now().toString().slice(-6)}`;
+```
+
+#### Barcode Best Practices
+
+```typescript
+// 1. Always validate before saving
+import { validateBarcodeFormat } from '@/lib/barcode-utils';
+const validation = validateBarcodeFormat(barcode);
+if (!validation.isValid) {
+  throw new Error(validation.error);
+}
+
+// 2. Handle missing barcodes gracefully
+const effectiveBarcode = product.barcode || product.sku;
+
+// 3. For size variants, always use parent SKU + size
+const sizeVariantBarcode = `${product.sku}-${size.toUpperCase()}`;
+
+// 4. Store barcodes in UPPERCASE for consistency
+const normalizedBarcode = barcode.trim().toUpperCase();
+
+// 5. Check uniqueness before creating
+const existing = await prisma.product.findUnique({
+  where: { barcode: newBarcode }
+});
+if (existing) {
+  throw new Error('Barcode already exists');
+}
+```
+
+#### Barcode Debugging Checklist
+
+- [ ] Is barcode field populated in database?
+- [ ] Is barcode less than 80 characters?
+- [ ] Does barcode contain only ASCII characters?
+- [ ] Is barcode unique across Product and ProductSize tables?
+- [ ] For size variants, does each size have unique barcode?
+- [ ] Is barcode stored in UPPERCASE?
+- [ ] Does canvas element exist when trying to render?
+- [ ] Is component marked as 'use client' if using canvas?
+- [ ] Does barcode match what's in the database (case-insensitive search)?
+
+#### Key Barcode Files
+
+| File | Purpose |
+|------|---------|
+| `src/lib/barcode-utils.ts` | Barcode generation and validation |
+| `src/lib/barcode-lookup.ts` | Database lookup for scanned barcodes |
+| `src/components/admin/BarcodeDisplay.tsx` | Display barcode with canvas |
+| `src/components/admin/WorkingBarcodePrinter.tsx` | Print barcodes |
+| `src/components/admin/AutoBarcodeGenerator.tsx` | Auto-generate on SKU change |
+
 ---
 
 ## Critical Files
@@ -852,6 +1138,8 @@ Check `src/middleware.ts`:
 | `prisma/schema.prisma` | Database schema | All models, relationships, constraints |
 | `src/lib/stock-sync.ts` | Stock management | Product ↔ ProductSize synchronization |
 | `src/lib/currency.ts` | Currency system | Conversion, exchange rates |
+| `src/lib/barcode-utils.ts` | Barcode generation | CODE128 validation, SKU-to-barcode |
+| `src/lib/barcode-lookup.ts` | Barcode search | Find products by scanned barcode |
 | `next.config.js` | Next.js config | Prisma externals, image domains |
 | `.env.example` | Environment template | Required secrets, API keys |
 
