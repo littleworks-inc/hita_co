@@ -5,6 +5,9 @@ import AdminNavigation from '@/components/admin/AdminNavigation'
 import StoreSettingsForm from '@/components/admin/StoreSettingsForm'
 import { Settings } from 'lucide-react'
 
+// Force dynamic rendering - this page uses database calls
+export const dynamic = 'force-dynamic'
+
 export default async function StoreSettingsPage() {
   const session = await getSession()
   

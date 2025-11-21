@@ -7,6 +7,9 @@ import OrdersTable from '@/components/admin/OrdersTable'
 import { Card, CardContent } from '@/components/ui/card'
 import { RefreshCw } from 'lucide-react'
 
+// Force dynamic rendering - this page uses database calls
+export const dynamic = 'force-dynamic'
+
 // Server component to fetch initial data
 async function OrdersData() {
   try {

@@ -20,6 +20,9 @@ import {
   Archive
 } from 'lucide-react'
 
+// Force dynamic rendering - this page uses database calls
+export const dynamic = 'force-dynamic'
+
 // Product Stats Component with Enhanced Metrics
 async function ProductStats() {
   try {

@@ -7,6 +7,9 @@ import { db } from '@/lib/db'
 import CustomerNavigation from '@/components/customer/CustomerNavigation'
 import OrderConfirmation from '@/components/checkout/OrderConfirmation'
 
+// Force dynamic rendering - this page uses database calls
+export const dynamic = 'force-dynamic'
+
 // ✅ FIXED: Get store settings with proper transformation
 async function getStoreSettings() {
   try {

@@ -27,6 +27,9 @@ import {
   CheckCircle
 } from 'lucide-react'
 
+// Force dynamic rendering - this page uses database calls
+export const dynamic = 'force-dynamic'
+
 // ✅ FIXED: Get store settings with proper type conversion for BOTH seo.ts AND components
 async function getStoreSettings() {
   const settings = await db.storeSetting.findFirst({
