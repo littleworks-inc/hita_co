@@ -4,7 +4,7 @@ import { Suspense } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { db } from '@/lib/db'
-import { isValidCurrency, SupportedCurrency } from '@/lib/currency'
+import { isValidCurrency, SupportedCurrency, initializeExchangeRates } from '@/lib/currency'
 import { generateStoreMetadata, generateOrganizationJsonLd } from '@/lib/seo'
 import CustomerNavigation from '@/components/customer/CustomerNavigation'
 import ProductCard from '@/components/customer/ProductCard'
@@ -94,12 +94,8 @@ async function getInitialCurrencyData(): Promise<{
       console.log('No admin currency found, using USD as fallback')
     }
     
-    // Fetch exchange rates
-    const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/currency/rates`, {
-      next: { revalidate: 3600 }
-    })
-    
-    const initialRates = response.ok ? await response.json() : {}
+    // Get exchange rates directly (no HTTP call needed in server component)
+    const initialRates = await initializeExchangeRates()
     
     return { initialCurrency, initialRates }
   } catch (error) {

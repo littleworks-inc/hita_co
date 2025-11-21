@@ -9,7 +9,7 @@ import { Inter } from 'next/font/google'
 import { ThemeProvider } from '@/contexts/ThemeContext'
 import ConditionalLayoutWrapper from '@/components/ConditionalLayoutWrapper'
 import { db } from '@/lib/db'
-import { SupportedCurrency, isValidCurrency } from '@/lib/currency'
+import { SupportedCurrency, isValidCurrency, initializeExchangeRates } from '@/lib/currency'
 import './globals.css'
 
 const inter = Inter({ 
@@ -131,28 +131,10 @@ async function getInitialCurrencyData(): Promise<{
       console.log('No admin currency found, using USD as fallback')
     }
     
-    // Fetch exchange rates with timeout
-    const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 5000) // 5 second timeout
-    
-    try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/currency/rates`, {
-        next: { revalidate: 3600 },
-        signal: controller.signal
-      })
-      
-      clearTimeout(timeoutId)
-      const initialRates = response.ok ? await response.json() : {}
-      
-      return { initialCurrency, initialRates }
-    } catch (fetchError) {
-      clearTimeout(timeoutId)
-      console.warn('Failed to fetch exchange rates:', fetchError)
-      return { 
-        initialCurrency, 
-        initialRates: {} 
-      }
-    }
+    // Get exchange rates directly (no HTTP call needed in server component)
+    const initialRates = await initializeExchangeRates()
+
+    return { initialCurrency, initialRates }
   } catch (error) {
     console.error('Failed to fetch initial currency data:', error)
     return { 
