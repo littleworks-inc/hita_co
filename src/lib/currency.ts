@@ -335,23 +335,10 @@ export async function getCountryCurrencyInfo(countryId: string): Promise<{
   }
 }
 
-// ✅ SIMPLIFIED: Initialize exchange rates (no database storage)
+// ✅ SIMPLIFIED: USD only - no exchange rate fetching needed
 export async function initializeExchangeRates(): Promise<Record<string, number>> {
-  try {
-    // Fetch live rates from external API
-    const rates = await fetchExchangeRates()
-
-    if (Object.keys(rates).length > 1) {
-      return rates
-    }
-
-    // If API fails, use fallback
-    console.log('Using fallback exchange rates')
-    return FALLBACK_RATES
-  } catch (error) {
-    console.error('Error initializing exchange rates:', error)
-    return FALLBACK_RATES
-  }
+  // Only USD - no conversion needed
+  return { USD: 1 }
 }
 
 // Validate currency code
