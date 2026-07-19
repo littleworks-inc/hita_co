@@ -3,6 +3,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Link from 'next/link'
 import { Ruler } from 'lucide-react'
 
 // ✅ ADD: ProductSize interface definition
@@ -81,11 +82,20 @@ export default function ProductSizeSelector({
   return (
     <div className="space-y-4">
       {/* Size Selection Header */}
-      <div className="flex items-center gap-2">
-        <Ruler className="h-5 w-5 text-gray-600" />
-        <span className="font-medium text-gray-900">
-          Size {selectedSize && <span className="text-purple-600">({selectedSize.size})</span>}
-        </span>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Ruler className="h-5 w-5 text-gray-600" />
+          <span className="font-medium text-gray-900">
+            Size {selectedSize && <span className="text-purple-600">({selectedSize.size})</span>}
+          </span>
+        </div>
+        <Link
+          href="/size-guide"
+          target="_blank"
+          className="text-sm text-purple-600 hover:text-purple-700 underline"
+        >
+          Size Guide
+        </Link>
       </div>
 
       {/* Available Sizes */}

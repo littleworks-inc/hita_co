@@ -93,8 +93,8 @@ export default async function TrustIndicators() {
             <div className="inline-flex items-center justify-center w-12 h-12 bg-green-100 rounded-lg mb-4">
               <Shield className="h-6 w-6 text-green-600" />
             </div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">Secure Payment</h3>
-            <p className="text-gray-600">100% protected with bank-level security encryption.</p>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Secure Checkout</h3>
+            <p className="text-gray-600">Your details are encrypted and never shared.</p>
           </div>
 
           {/* Dynamic Free Shipping */}

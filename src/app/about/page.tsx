@@ -38,12 +38,12 @@ async function getStoreSettings() {
 // Generate dynamic metadata
 export async function generateMetadata() {
   const storeSettings = await getStoreSettings()
-  const storeName = storeSettings?.storeName || 'LittleWorks Inc'
-  const tagline = storeSettings?.tagline || 'Building Digital Solutions'
+  const storeName = storeSettings?.storeName || 'Hita&Co'
+  const tagline = storeSettings?.tagline || 'Authentic Indian Ethnic Wear'
   
   return {
     title: `About Us - ${storeName}`,
-    description: `Learn about ${storeName} - ${tagline}. Discover our story, mission, and commitment to delivering exceptional digital solutions.`,
+    description: `Learn about ${storeName} - ${tagline}. Authentic Indian ethnic wear for women, curated from India and shipped within the USA.`,
     openGraph: {
       title: `About ${storeName}`,
       description: `Learn about our story, mission, and commitment to excellence.`,
@@ -54,8 +54,8 @@ export async function generateMetadata() {
 
 // Dynamic Navigation Component
 function DynamicNavigation({ storeSettings }: { storeSettings: any }) {
-  const storeName = storeSettings?.storeName || 'LittleWorks Inc'
-  const tagline = storeSettings?.tagline || 'Building Digital Solutions'
+  const storeName = storeSettings?.storeName || 'Hita&Co'
+  const tagline = storeSettings?.tagline || 'Authentic Indian Ethnic Wear'
   const primaryColor = storeSettings?.primaryColor || '#1f2937'
   const accentColor = storeSettings?.accentColor || '#f59e0b'
   const logo = storeSettings?.logo
@@ -70,7 +70,7 @@ function DynamicNavigation({ storeSettings }: { storeSettings: any }) {
         }}
       >
         <p className="text-sm font-medium">
-          ✨ Professional services and solutions | Contact us for consultation
+          ✨ Authentic Indian ethnic wear for women | Shipped across the USA
         </p>
       </div>
 
@@ -131,8 +131,8 @@ function DynamicNavigation({ storeSettings }: { storeSettings: any }) {
 
 // About Hero Section
 function AboutHero({ storeSettings }: { storeSettings: any }) {
-  const storeName = storeSettings?.storeName || 'LittleWorks Inc'
-  const tagline = storeSettings?.tagline || 'Building Digital Solutions'
+  const storeName = storeSettings?.storeName || 'Hita&Co'
+  const tagline = storeSettings?.tagline || 'Authentic Indian Ethnic Wear'
   const primaryColor = storeSettings?.primaryColor || '#1f2937'
   const accentColor = storeSettings?.accentColor || '#f59e0b'
 
@@ -154,14 +154,14 @@ function AboutHero({ storeSettings }: { storeSettings: any }) {
             </span>
           </h1>
           <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
-            {tagline} - We are passionate about bringing you exceptional products and creating amazing shopping experiences.
+            {tagline} — bringing the colors, fabrics and craftsmanship of India to women across the USA.
           </p>
-          <div 
+          <div
             className="flex items-center justify-center gap-2"
             style={{ color: primaryColor }}
           >
             <Star className="h-5 w-5" />
-            <span className="text-sm font-medium">Excellence in every project</span>
+            <span className="text-sm font-medium">From India&apos;s artisans to your closet</span>
             <Star className="h-5 w-5" />
           </div>
         </div>
@@ -172,7 +172,7 @@ function AboutHero({ storeSettings }: { storeSettings: any }) {
 
 // Our Story Section
 function OurStorySection({ storeSettings }: { storeSettings: any }) {
-  const storeName = storeSettings?.storeName || 'LittleWorks Inc'
+  const storeName = storeSettings?.storeName || 'Hita&Co'
   const primaryColor = storeSettings?.primaryColor || '#1f2937'
 
   return (
@@ -185,19 +185,21 @@ function OurStorySection({ storeSettings }: { storeSettings: any }) {
             </h2>
             <div className="space-y-4 text-gray-600 leading-relaxed">
               <p>
-                {storeName} was founded with a passion for bringing exceptional products directly to our customers. 
-                We believe that everyone deserves access to high-quality, authentic products that enhance their 
-                lifestyle and bring joy to their everyday experiences.
+                {storeName} began with a simple idea: the kurtas, sets and drapes we grew up
+                loving in India shouldn&apos;t be hard to find — or hard to fit — for women
+                living in the United States.
               </p>
               <p>
-                What started as a small vision has grown into a trusted online destination where quality meets 
-                convenience. We carefully curate our product selection, working directly with trusted suppliers 
-                and artisans to ensure that every item in our store meets our high standards.
+                We work directly with suppliers and artisans in India to handpick every piece
+                in our collection, from everyday cotton kurtas to festive wear for weddings,
+                Diwali and celebrations. Each item is chosen for its fabric, finish and fit
+                before it ever reaches our store.
               </p>
               <p>
-                Our commitment goes beyond just selling products – we're dedicated to creating an exceptional 
-                shopping experience, providing outstanding customer service, and building lasting relationships 
-                with our customers around the world.
+                You&apos;ll also find us in person at exhibitions and pop-up events, where we
+                love helping customers find the right piece and the right size. Online or in
+                person, our goal is the same — authentic Indian wear, honestly described and
+                sized for you.
               </p>
             </div>
           </div>
@@ -234,13 +236,13 @@ function MissionValuesSection({ storeSettings }: { storeSettings: any }) {
     },
     {
       icon: Shield,
-      title: 'Trust & Security',
-      description: 'Shop with confidence knowing your personal information and payments are protected with industry-leading security.'
+      title: 'Honest & Transparent',
+      description: 'Real measurements, honest descriptions, and clear policies — so you know exactly what you\'re ordering.'
     },
     {
       icon: Zap,
       title: 'Fast & Reliable',
-      description: 'Quick processing, fast shipping, and reliable delivery ensure you get your products when you need them.'
+      description: 'Quick processing and reliable delivery across the USA, so your outfit arrives in time for the occasion.'
     }
   ]
 
@@ -289,18 +291,18 @@ function ServicesOverview({ storeSettings }: { storeSettings: any }) {
   const features = [
     {
       icon: Globe,
-      title: 'Worldwide Shipping',
-      description: 'We deliver to customers around the world with reliable shipping partners and tracking.'
+      title: 'US Shipping',
+      description: 'We ship across the United States with tracking on every order.'
     },
     {
       icon: Package,
       title: 'Curated Selection',
-      description: 'Every product is hand-picked and carefully vetted to ensure quality and authenticity.'
+      description: 'Every piece is hand-picked from Indian suppliers and artisans for quality and authenticity.'
     },
     {
       icon: Sparkles,
-      title: 'Exclusive Products',
-      description: 'Discover unique items and limited editions that you won\'t find in traditional stores.'
+      title: 'Small-Batch Styles',
+      description: 'Limited quantities of each design — pieces you won\'t see everywhere.'
     },
     {
       icon: Award,
@@ -358,13 +360,13 @@ function WhyChooseUsSection({ storeSettings }: { storeSettings: any }) {
   const reasons = [
     {
       icon: CheckCircle,
-      title: 'Trusted by Thousands',
-      description: 'Join thousands of satisfied customers who trust us for quality products and excellent service.'
+      title: 'Rooted in India',
+      description: 'Our pieces come directly from Indian suppliers and artisans — authentic fabrics, prints and craftsmanship.'
     },
     {
       icon: Users,
-      title: 'Expert Curation',
-      description: 'Our team carefully selects each product to ensure it meets our standards for quality and value.'
+      title: 'We Know the Fit',
+      description: 'Indian sizing explained in US terms, with a detailed size guide and personal sizing help when you need it.'
     },
     {
       icon: Heart,
@@ -373,8 +375,8 @@ function WhyChooseUsSection({ storeSettings }: { storeSettings: any }) {
     },
     {
       icon: Star,
-      title: 'Quality Guarantee',
-      description: 'Shop with confidence knowing that every product comes with our quality guarantee and easy returns.'
+      title: 'Meet Us in Person',
+      description: 'Find us at exhibitions and pop-up events, where you can see and feel the collection yourself.'
     }
   ]
 
@@ -415,7 +417,7 @@ function WhyChooseUsSection({ storeSettings }: { storeSettings: any }) {
 
 // Call to Action Section
 function CallToActionSection({ storeSettings }: { storeSettings: any }) {
-  const storeName = storeSettings?.storeName || 'LittleWorks Inc'
+  const storeName = storeSettings?.storeName || 'Hita&Co'
   const primaryColor = storeSettings?.primaryColor || '#1f2937'
   const accentColor = storeSettings?.accentColor || '#f59e0b'
 
@@ -426,7 +428,7 @@ function CallToActionSection({ storeSettings }: { storeSettings: any }) {
           Ready to Start Shopping?
         </h2>
         <p className="text-xl text-gray-300 mb-8 max-w-2xl mx-auto">
-          Discover our curated collection of quality products and experience the {storeName} difference today.
+          From everyday kurtas to festive favorites — discover the {storeName} collection today.
         </p>
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
           <Link
@@ -456,8 +458,8 @@ function CallToActionSection({ storeSettings }: { storeSettings: any }) {
 // Main About Page Component
 export default async function AboutPage() {
   const storeSettings = await getStoreSettings()
-  const storeName = storeSettings?.storeName || 'LittleWorks Inc'
-  const tagline = storeSettings?.tagline || 'Building Digital Solutions'
+  const storeName = storeSettings?.storeName || 'Hita&Co'
+  const tagline = storeSettings?.tagline || 'Authentic Indian Ethnic Wear'
 
   // Structured data for SEO
   const structuredData = {
@@ -474,7 +476,7 @@ export default async function AboutPage() {
       logo: storeSettings?.logo,
       contactPoint: {
         '@type': 'ContactPoint',
-        email: storeSettings?.email || 'contact@littleworks.inc',
+        email: storeSettings?.email || undefined,
         telephone: storeSettings?.phone,
         contactType: 'customer service'
       }
