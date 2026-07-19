@@ -17,9 +17,12 @@
   # Prisma configuration for serverless
   PRISMA_GENERATE_SKIP_AUTOINSTALL = "true"
 
-# Force environment variables to be available during build
-[context.production.environment]
-  NODE_ENV = "production"
+# NOTE: deliberately NOT setting NODE_ENV=production here. Doing so makes
+# `npm install` skip devDependencies during the build step (autoprefixer,
+# eslint, etc. all live there), which broke the build the moment this file
+# was actually read for the first time (see deploy 6a5d55ff). Netlify's
+# Next.js Runtime already sets the correct NODE_ENV for the deployed
+# function at runtime without this override.
 
 # Build-specific settings for preview deployments
 [context.deploy-preview]
