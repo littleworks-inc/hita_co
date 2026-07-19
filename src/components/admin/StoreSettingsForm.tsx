@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle, Button, Input, Label } from '@/components/ui'
 import ColorPicker from '@/components/admin/ColorPicker'
 import ImageUpload from '@/components/admin/ImageUpload'
+import { DEFAULT_PRIMARY_COLOR, DEFAULT_ACCENT_COLOR } from '@/lib/brand'
 import {
   RotateCcw,
   Store,
@@ -92,9 +93,9 @@ interface StoreSettingsFormProps {
 
 // Constants
 const DEFAULT_VALUES = {
-  PRIMARY_COLOR: '#1f2937',
+  PRIMARY_COLOR: DEFAULT_PRIMARY_COLOR,
   SECONDARY_COLOR: '#ffffff',
-  ACCENT_COLOR: '#f59e0b',
+  ACCENT_COLOR: DEFAULT_ACCENT_COLOR,
   CURRENCY: 'USD',
   TIMEZONE: 'America/New_York'
 } as const

@@ -3,6 +3,12 @@
 
 import { db } from '@/lib/db'
 
+// Re-exported here so existing server-side imports of these constants from
+// '@/lib/store-settings' keep working. Client components should import
+// directly from '@/lib/brand' instead - this file pulls in the Prisma
+// client via '@/lib/db' above, which must never end up in a client bundle.
+export { DEFAULT_STORE_NAME, DEFAULT_PRIMARY_COLOR, DEFAULT_SECONDARY_COLOR, DEFAULT_ACCENT_COLOR } from '@/lib/brand'
+
 export interface CustomerStoreSettings {
   id: string
   storeName: string
@@ -18,6 +24,7 @@ export interface CustomerStoreSettings {
   facebook: string | null
   pinterest: string | null
   twitter: string | null
+  currency: string
   disableShoppingCart?: boolean
   catalogModeSettings?: string
   returnsEnabled: boolean
@@ -50,6 +57,7 @@ export async function getCustomerStoreSettings(): Promise<CustomerStoreSettings 
       facebook: settings.facebook,
       pinterest: settings.pinterest,
       twitter: settings.twitter,
+      currency: settings.currency,
       disableShoppingCart: settings.disableShoppingCart ?? undefined,
       catalogModeSettings: (settings.catalogModeSettings as string | undefined) ?? undefined,
       returnsEnabled: settings.returnsEnabled ?? true,

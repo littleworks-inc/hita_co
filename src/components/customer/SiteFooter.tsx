@@ -4,7 +4,7 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { Instagram, Facebook, Twitter, Mail, Phone } from 'lucide-react'
-import { getCustomerStoreSettings } from '@/lib/store-settings'
+import { getCustomerStoreSettings, DEFAULT_PRIMARY_COLOR } from '@/lib/store-settings'
 
 export default async function SiteFooter() {
   const settings = await getCustomerStoreSettings()
@@ -61,7 +61,7 @@ export default async function SiteFooter() {
               ) : (
                 <div
                   className="w-8 h-8 rounded flex items-center justify-center text-white font-bold text-sm"
-                  style={{ backgroundColor: settings?.primaryColor || '#7c3aed' }}
+                  style={{ backgroundColor: settings?.primaryColor || DEFAULT_PRIMARY_COLOR }}
                 >
                   {storeName.charAt(0)}
                 </div>

@@ -3,6 +3,7 @@ import { getSession } from '@/lib/auth'
 import { db } from '@/lib/db'
 import AdminNavigation from '@/components/admin/AdminNavigation'
 import StoreSettingsForm from '@/components/admin/StoreSettingsForm'
+import { DEFAULT_PRIMARY_COLOR, DEFAULT_ACCENT_COLOR } from '@/lib/brand'
 import { Settings } from 'lucide-react'
 
 // Force dynamic rendering - this page uses database calls
@@ -26,9 +27,9 @@ export default async function StoreSettingsPage() {
         id: 'default',
         storeName: 'Hita&Co',
         tagline: 'Authentic Indian Ethnic Wear & Lifestyle',
-        primaryColor: '#1f2937',
+        primaryColor: DEFAULT_PRIMARY_COLOR,
         secondaryColor: '#ffffff',
-        accentColor: '#f59e0b',
+        accentColor: DEFAULT_ACCENT_COLOR,
         email: 'thehitanco@gmail.com',
         currency: 'USD',
         timezone: 'America/New_York',

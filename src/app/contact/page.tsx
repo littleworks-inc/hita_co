@@ -2,7 +2,7 @@
 import Link from 'next/link'
 import CustomerNavigation from '@/components/customer/CustomerNavigation'
 import Breadcrumb from '@/components/customer/Breadcrumb'
-import { getCustomerStoreSettings, getNavCategories } from '@/lib/store-settings'
+import { getCustomerStoreSettings, getNavCategories, DEFAULT_PRIMARY_COLOR, DEFAULT_ACCENT_COLOR } from '@/lib/store-settings'
 import {
   Mail,
   Phone,
@@ -51,8 +51,8 @@ export async function generateMetadata() {
 // Dynamic Hero Section
 function ContactHero({ storeSettings }: { storeSettings: any }) {
   const storeName = storeSettings?.storeName || 'Hita&Co'
-  const primaryColor = storeSettings?.primaryColor || '#7c3aed'
-  const accentColor = storeSettings?.accentColor || '#f59e0b'
+  const primaryColor = storeSettings?.primaryColor || DEFAULT_PRIMARY_COLOR
+  const accentColor = storeSettings?.accentColor || DEFAULT_ACCENT_COLOR
 
   return (
     <section className="bg-gray-50 py-16">
@@ -89,7 +89,7 @@ function ContactHero({ storeSettings }: { storeSettings: any }) {
 
 // Dynamic Contact Information Component
 function ContactInformation({ storeSettings }: { storeSettings: any }) {
-  const primaryColor = storeSettings?.primaryColor || '#7c3aed'
+  const primaryColor = storeSettings?.primaryColor || DEFAULT_PRIMARY_COLOR
   const storeName = storeSettings?.storeName || 'Hita&Co'
 
   // Dynamic contact information with proper fallbacks
@@ -184,7 +184,7 @@ function ContactInformation({ storeSettings }: { storeSettings: any }) {
 
 // Contact Form Section
 function ContactForm({ storeSettings }: { storeSettings: any }) {
-  const primaryColor = storeSettings?.primaryColor || '#7c3aed'
+  const primaryColor = storeSettings?.primaryColor || DEFAULT_PRIMARY_COLOR
   const storeName = storeSettings?.storeName || 'Hita&Co'
 
   return (
@@ -301,7 +301,7 @@ function ContactForm({ storeSettings }: { storeSettings: any }) {
 
 // Business Hours and Additional Info
 function BusinessInfo({ storeSettings }: { storeSettings: any }) {
-  const primaryColor = storeSettings?.primaryColor || '#7c3aed'
+  const primaryColor = storeSettings?.primaryColor || DEFAULT_PRIMARY_COLOR
   const storeName = storeSettings?.storeName || 'Hita&Co'
 
   const businessHours = [

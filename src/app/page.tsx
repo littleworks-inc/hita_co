@@ -13,7 +13,7 @@ import CurrencyNotification from '@/components/customer/CurrencyNotification'
 import DynamicHeroSection from '@/components/customer/DynamicHeroSection'
 import NewArrivals from '@/components/customer/NewArrivals'
 import EnhancedFeaturedProducts from '@/components/customer/EnhancedFeaturedProducts'
-import { getNavCategories } from '@/lib/store-settings'
+import { getCustomerStoreSettings, getNavCategories, DEFAULT_PRIMARY_COLOR, DEFAULT_ACCENT_COLOR } from '@/lib/store-settings'
 import {
   Star,
   Truck,
@@ -33,38 +33,9 @@ import {
 // Force dynamic rendering - this page uses database calls
 export const dynamic = 'force-dynamic'
 
-// ✅ FIXED: Get store settings with proper type conversion for BOTH seo.ts AND components
+// Shared helper - same store settings query every customer page uses
 async function getStoreSettings() {
-  const settings = await db.storeSetting.findFirst({
-    where: { id: 'default' }
-  })
-
-  if (!settings) {
-    return null // ✅ Return null for SEO functions
-  }
-
-  // ✅ Transform database result to match StoreSettings interface in seo.ts
-  // Keep null values as null (don't convert to undefined) for seo.ts compatibility
-  return {
-    id: settings.id,
-    storeName: settings.storeName,
-    tagline: settings.tagline, // Keep as string | null
-    logo: settings.logo, // Keep as string | null
-    primaryColor: settings.primaryColor,
-    secondaryColor: settings.secondaryColor,
-    accentColor: settings.accentColor,
-    email: settings.email, // Keep as string | null
-    phone: settings.phone, // Keep as string | null
-    address: settings.address, // Keep as any
-    instagram: settings.instagram, // Keep as string | null
-    facebook: settings.facebook, // Keep as string | null
-    pinterest: settings.pinterest, // Keep as string | null
-    twitter: settings.twitter, // Keep as string | null
-    // Only convert boolean fields to undefined for component compatibility
-    disableShoppingCart: settings.disableShoppingCart ?? undefined,
-    catalogModeSettings: settings.catalogModeSettings ?? undefined,
-    currency: settings.currency, // For layout.tsx fix
-  }
+  return getCustomerStoreSettings()
 }
 
 // ✅ NEW: Helper function to convert for ProductCard (only needs specific fields)
@@ -240,7 +211,7 @@ async function CategoryShowcase() {
                   <div className="aspect-[3/4] w-full flex items-center justify-center bg-gray-50">
                     <div
                       className="w-16 h-16 rounded-full flex items-center justify-center text-white font-bold text-xl"
-                      style={{ backgroundColor: storeSettings?.primaryColor || '#7c3aed' }}
+                      style={{ backgroundColor: storeSettings?.primaryColor || DEFAULT_PRIMARY_COLOR }}
                     >
                       {category.name.charAt(0)}
                     </div>
@@ -339,7 +310,7 @@ async function FeaturedProducts({ storeSettings }: { storeSettings: Awaited<Retu
 
 // Dynamic Trust Indicators
 function DynamicTrustIndicators({ storeSettings }: { storeSettings: Awaited<ReturnType<typeof getStoreSettings>> }) {
-  const primaryColor = storeSettings?.primaryColor || '#7c3aed'
+  const primaryColor = storeSettings?.primaryColor || DEFAULT_PRIMARY_COLOR
 
   return (
     <section className="py-16 bg-gray-50">
@@ -380,7 +351,7 @@ function DynamicTrustIndicators({ storeSettings }: { storeSettings: Awaited<Retu
 
 // Store Highlights Section
 function StoreHighlights({ storeSettings }: { storeSettings: Awaited<ReturnType<typeof getStoreSettings>> }) {
-  const primaryColor = storeSettings?.primaryColor || '#7c3aed'
+  const primaryColor = storeSettings?.primaryColor || DEFAULT_PRIMARY_COLOR
 
   return (
     <section className="py-16 bg-white">

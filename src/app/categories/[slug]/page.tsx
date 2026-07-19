@@ -11,7 +11,7 @@ import Breadcrumb from '@/components/customer/Breadcrumb'
 import ProductCard from '@/components/customer/ProductCard'
 import CategorySortFilter from '@/components/customer/CategorySortFilter'
 import LoadingSpinner from '@/components/customer/LoadingSpinner'
-import { getNavCategories } from '@/lib/store-settings'
+import { getCustomerStoreSettings, getNavCategories } from '@/lib/store-settings'
 import {
   Tag,
   Grid3X3,
@@ -34,42 +34,9 @@ interface CategoryPageProps {
   }
 }
 
-// ✅ FIXED: Get store settings with proper transformation
+// Shared helper - same store settings query every customer page uses
 async function getStoreSettings() {
-  try {
-    const settings = await db.storeSetting.findFirst({
-      where: { id: 'default' }
-    })
-
-    if (!settings) {
-      return null // ✅ Return null to match SEO function signature
-    }
-
-    // ✅ Transform Prisma result to match ALL component interfaces
-    return {
-      id: settings.id,
-      storeName: settings.storeName,
-      tagline: settings.tagline,
-      logo: settings.logo,
-      primaryColor: settings.primaryColor,
-      secondaryColor: settings.secondaryColor,
-      accentColor: settings.accentColor,
-      // Required for SEO function
-      email: settings.email,
-      phone: settings.phone,
-      address: settings.address,
-      instagram: settings.instagram,
-      facebook: settings.facebook,
-      pinterest: settings.pinterest,
-      twitter: settings.twitter,
-      // Convert null to undefined for TypeScript compatibility
-      disableShoppingCart: settings.disableShoppingCart ?? undefined,
-      catalogModeSettings: settings.catalogModeSettings ?? undefined,
-    }
-  } catch (error) {
-    console.error('Error fetching store settings:', error)
-    return null // ✅ Return null to match SEO function signature
-  }
+  return getCustomerStoreSettings()
 }
 
 // Get category by slug

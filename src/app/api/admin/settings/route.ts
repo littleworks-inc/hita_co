@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth'
 import { db } from '@/lib/db'
+import { DEFAULT_PRIMARY_COLOR, DEFAULT_ACCENT_COLOR } from '@/lib/brand'
 
 // Force dynamic rendering - this route uses cookies via getSession()
 export const dynamic = 'force-dynamic'
@@ -28,9 +29,9 @@ export async function GET(request: NextRequest) {
           id: 'default',
           storeName: 'Hita&Co',
           tagline: 'Authentic Handcrafted Products',
-          primaryColor: '#1f2937',
+          primaryColor: DEFAULT_PRIMARY_COLOR,
           secondaryColor: '#ffffff',
-          accentColor: '#f59e0b',
+          accentColor: DEFAULT_ACCENT_COLOR,
           email: 'admin@hitaco.com',
           currency: 'USD',
           timezone: 'America/New_York',
@@ -68,7 +69,7 @@ export async function GET(request: NextRequest) {
         error: 'Failed to fetch store settings',
         storeSettings: {
           storeName: 'Hita&Co',
-          primaryColor: '#1f2937'
+          primaryColor: DEFAULT_PRIMARY_COLOR
         }
       },
       { status: 500 }
@@ -155,9 +156,9 @@ export async function PUT(request: NextRequest) {
       tagline: data.tagline?.trim() || null,
       logo: data.logo?.trim() || null,
       favicon: data.favicon?.trim() || null,
-      primaryColor: data.primaryColor || '#1f2937',
+      primaryColor: data.primaryColor || DEFAULT_PRIMARY_COLOR,
       secondaryColor: data.secondaryColor || '#ffffff',
-      accentColor: data.accentColor || '#f59e0b',
+      accentColor: data.accentColor || DEFAULT_ACCENT_COLOR,
       email: data.email?.trim() || null,
       phone: data.phone?.trim() || null,
       address: data.address?.trim() || null,

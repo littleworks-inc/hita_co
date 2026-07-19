@@ -2,7 +2,7 @@
 import Link from 'next/link'
 import CustomerNavigation from '@/components/customer/CustomerNavigation'
 import Breadcrumb from '@/components/customer/Breadcrumb'
-import { getCustomerStoreSettings, getNavCategories } from '@/lib/store-settings'
+import { getCustomerStoreSettings, getNavCategories, DEFAULT_PRIMARY_COLOR, DEFAULT_ACCENT_COLOR } from '@/lib/store-settings'
 import {
   Heart,
   Star,
@@ -48,8 +48,8 @@ export async function generateMetadata() {
 function AboutHero({ storeSettings }: { storeSettings: any }) {
   const storeName = storeSettings?.storeName || 'Hita&Co'
   const tagline = storeSettings?.tagline || 'Authentic Indian Ethnic Wear'
-  const primaryColor = storeSettings?.primaryColor || '#7c3aed'
-  const accentColor = storeSettings?.accentColor || '#f59e0b'
+  const primaryColor = storeSettings?.primaryColor || DEFAULT_PRIMARY_COLOR
+  const accentColor = storeSettings?.accentColor || DEFAULT_ACCENT_COLOR
 
   return (
     <section className="bg-gray-50 py-16">
@@ -88,7 +88,7 @@ function AboutHero({ storeSettings }: { storeSettings: any }) {
 // Our Story Section
 function OurStorySection({ storeSettings }: { storeSettings: any }) {
   const storeName = storeSettings?.storeName || 'Hita&Co'
-  const primaryColor = storeSettings?.primaryColor || '#7c3aed'
+  const primaryColor = storeSettings?.primaryColor || DEFAULT_PRIMARY_COLOR
 
   return (
     <section className="py-16 bg-white">
@@ -136,7 +136,7 @@ function OurStorySection({ storeSettings }: { storeSettings: any }) {
 
 // Mission & Values Section
 function MissionValuesSection({ storeSettings }: { storeSettings: any }) {
-  const primaryColor = storeSettings?.primaryColor || '#7c3aed'
+  const primaryColor = storeSettings?.primaryColor || DEFAULT_PRIMARY_COLOR
 
   const values = [
     {
@@ -201,7 +201,7 @@ function MissionValuesSection({ storeSettings }: { storeSettings: any }) {
 
 // Services Overview Section
 function ServicesOverview({ storeSettings }: { storeSettings: any }) {
-  const primaryColor = storeSettings?.primaryColor || '#7c3aed'
+  const primaryColor = storeSettings?.primaryColor || DEFAULT_PRIMARY_COLOR
 
   const features = [
     {
@@ -270,7 +270,7 @@ function ServicesOverview({ storeSettings }: { storeSettings: any }) {
 
 // Why Choose Us Section
 function WhyChooseUsSection({ storeSettings }: { storeSettings: any }) {
-  const primaryColor = storeSettings?.primaryColor || '#7c3aed'
+  const primaryColor = storeSettings?.primaryColor || DEFAULT_PRIMARY_COLOR
 
   const reasons = [
     {
@@ -333,8 +333,8 @@ function WhyChooseUsSection({ storeSettings }: { storeSettings: any }) {
 // Call to Action Section
 function CallToActionSection({ storeSettings }: { storeSettings: any }) {
   const storeName = storeSettings?.storeName || 'Hita&Co'
-  const primaryColor = storeSettings?.primaryColor || '#7c3aed'
-  const accentColor = storeSettings?.accentColor || '#f59e0b'
+  const primaryColor = storeSettings?.primaryColor || DEFAULT_PRIMARY_COLOR
+  const accentColor = storeSettings?.accentColor || DEFAULT_ACCENT_COLOR
 
   return (
     <section className="py-16 bg-gray-900 text-white">

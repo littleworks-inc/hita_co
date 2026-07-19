@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth'
 import { db } from '@/lib/db'
+import { DEFAULT_PRIMARY_COLOR, DEFAULT_ACCENT_COLOR } from '@/lib/brand'
 
 export async function GET(
   request: NextRequest,
@@ -102,9 +103,9 @@ export async function GET(
           id: 'default',
           storeName: 'Hita&Co',
           tagline: 'Authentic Indian Ethnic Wear',
-          primaryColor: '#1f2937',
+          primaryColor: DEFAULT_PRIMARY_COLOR,
           secondaryColor: '#ffffff',
-          accentColor: '#f59e0b',
+          accentColor: DEFAULT_ACCENT_COLOR,
           currency: 'USD',
           timezone: 'America/New_York'
         }

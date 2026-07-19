@@ -5,40 +5,15 @@ import { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { db } from '@/lib/db'
 import CustomerNavigation from '@/components/customer/CustomerNavigation'
-import { getNavCategories } from '@/lib/store-settings'
+import { getCustomerStoreSettings, getNavCategories } from '@/lib/store-settings'
 import OrderConfirmation from '@/components/checkout/OrderConfirmation'
 
 // Force dynamic rendering - this page uses database calls
 export const dynamic = 'force-dynamic'
 
-// ✅ FIXED: Get store settings with proper transformation
+// Shared helper - same store settings query every customer page uses
 async function getStoreSettings() {
-  try {
-    const settings = await db.storeSetting.findFirst({
-      where: { id: 'default' }
-    })
-
-    if (!settings) {
-      return null
-    }
-
-    // ✅ Transform Prisma result to match component interface
-    return {
-      id: settings.id,
-      storeName: settings.storeName,
-      tagline: settings.tagline,
-      logo: settings.logo,
-      primaryColor: settings.primaryColor,
-      secondaryColor: settings.secondaryColor,
-      accentColor: settings.accentColor,
-      // Convert null to undefined for TypeScript compatibility
-      disableShoppingCart: settings.disableShoppingCart ?? undefined,
-      catalogModeSettings: settings.catalogModeSettings ?? undefined,
-    }
-  } catch (error) {
-    console.error('Error fetching store settings:', error)
-    return null
-  }
+  return getCustomerStoreSettings()
 }
 
 // Get order details by order number

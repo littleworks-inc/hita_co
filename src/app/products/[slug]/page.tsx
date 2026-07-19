@@ -7,7 +7,7 @@ import Link from 'next/link'
 import { db } from '@/lib/db'
 import { generateProductMetadata, generateProductJsonLd } from '@/lib/seo'
 import CustomerNavigation from '@/components/customer/CustomerNavigation'
-import { getNavCategories } from '@/lib/store-settings'
+import { getCustomerStoreSettings, getNavCategories } from '@/lib/store-settings'
 import ProductGallery from '@/components/customer/ProductGallery'
 import ProductSizeSelector from '@/components/customer/ProductSizeSelector'
 import AddToCartButton from '@/components/cart/AddToCartButton'
@@ -36,36 +36,9 @@ interface ProductPageProps {
   }
 }
 
-// Get store settings
+// Shared helper - same store settings query every customer page uses
 async function getStoreSettings() {
-  const settings = await db.storeSetting.findFirst({
-    where: { id: 'default' }
-  })
-
-  if (!settings) {
-    return null
-  }
-
-  // ✅ Transform database result to match component interface
-  return {
-    id: settings.id,
-    storeName: settings.storeName,
-    tagline: settings.tagline,
-    logo: settings.logo,
-    primaryColor: settings.primaryColor,
-    secondaryColor: settings.secondaryColor,
-    accentColor: settings.accentColor,
-    email: settings.email,
-    phone: settings.phone,
-    address: settings.address,
-    instagram: settings.instagram,
-    facebook: settings.facebook,
-    pinterest: settings.pinterest,
-    twitter: settings.twitter,
-    // ✅ Convert null to undefined for TypeScript compatibility
-    disableShoppingCart: settings.disableShoppingCart ?? undefined,
-    catalogModeSettings: settings.catalogModeSettings ?? undefined,
-  }
+  return getCustomerStoreSettings()
 }
 
 // Get product by slug

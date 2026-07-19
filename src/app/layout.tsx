@@ -9,7 +9,7 @@ import { Inter } from 'next/font/google'
 import { ThemeProvider } from '@/contexts/ThemeContext'
 import ConditionalLayoutWrapper from '@/components/ConditionalLayoutWrapper'
 import SiteFooter from '@/components/customer/SiteFooter'
-import { db } from '@/lib/db'
+import { getCustomerStoreSettings } from '@/lib/store-settings'
 import { SupportedCurrency, isValidCurrency, initializeExchangeRates } from '@/lib/currency'
 import './globals.css'
 
@@ -75,42 +75,9 @@ export const viewport: Viewport = {
   ]
 }
 
-// ✅ FIXED: Get store settings with correct table name and error handling
+// Shared helper - same store settings query every customer page uses
 async function getStoreSettings() {
-  try {
-    // ✅ CRITICAL FIX: Changed from db.storeSettings to db.storeSetting (singular)
-    const settings = await db.storeSetting.findFirst({
-      where: { id: 'default' }
-    })
-
-    if (!settings) {
-      console.warn('No store settings found, using defaults')
-      return null
-    }
-
-    return {
-      id: settings.id,
-      storeName: settings.storeName,
-      tagline: settings.tagline,
-      logo: settings.logo,
-      primaryColor: settings.primaryColor,
-      secondaryColor: settings.secondaryColor,
-      accentColor: settings.accentColor,
-      email: settings.email,
-      phone: settings.phone,
-      address: settings.address,
-      instagram: settings.instagram,
-      facebook: settings.facebook,
-      pinterest: settings.pinterest,
-      twitter: settings.twitter,
-      currency: settings.currency,
-      disableShoppingCart: settings.disableShoppingCart ?? undefined,
-      catalogModeSettings: settings.catalogModeSettings ?? undefined,
-    }
-  } catch (error) {
-    console.error('Error fetching store settings:', error)
-    return null
-  }
+  return getCustomerStoreSettings()
 }
 
 // ✅ FIXED: Get initial currency data with proper error handling

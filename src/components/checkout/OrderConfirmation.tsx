@@ -56,10 +56,10 @@ interface OrderData {
 }
 
 interface StoreSettings {
-  storeName?: string
-  email?: string
-  phone?: string
-  address?: string
+  storeName?: string | null
+  email?: string | null
+  phone?: string | null
+  address?: string | null
 }
 
 interface OrderConfirmationProps {

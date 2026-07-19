@@ -1,40 +1,15 @@
 import { Metadata } from 'next'
 import { redirect } from 'next/navigation'
-import { db } from '@/lib/db'
 import CustomerNavigation from '@/components/customer/CustomerNavigation'
 import CheckoutContent from '@/components/checkout/CheckoutContent'
-import { getNavCategories } from '@/lib/store-settings'
+import { getCustomerStoreSettings, getNavCategories } from '@/lib/store-settings'
 
 // Force dynamic rendering - this page uses database calls
 export const dynamic = 'force-dynamic'
 
-// Get store settings for branding
+// Shared helper - same store settings query every customer page uses
 async function getStoreSettings() {
-  try {
-    const settings = await db.storeSetting.findFirst({
-      where: { id: 'default' }
-    })
-
-    if (!settings) {
-      return null
-    }
-
-    // Transform to match CustomerNavigation interface
-    return {
-      id: settings.id,
-      storeName: settings.storeName,
-      tagline: settings.tagline,
-      logo: settings.logo,
-      primaryColor: settings.primaryColor,
-      secondaryColor: settings.secondaryColor,
-      accentColor: settings.accentColor,
-      disableShoppingCart: settings.disableShoppingCart ?? undefined,
-      catalogModeSettings: settings.catalogModeSettings ?? undefined,
-    }
-  } catch (error) {
-    console.error('Error fetching store settings:', error)
-    return null
-  }
+  return getCustomerStoreSettings()
 }
 
 // Generate metadata for checkout page

@@ -19,6 +19,7 @@ import {
 import CurrencySelector from '@/components/customer/CurrencySelector'
 import { useCart } from '@/contexts/CartContext'
 import { useCurrency } from '@/contexts/CurrencyContext'
+import { DEFAULT_PRIMARY_COLOR } from '@/lib/brand'
 
 interface Category {
   id: string
@@ -80,7 +81,7 @@ export default function CustomerNavigation({ storeSettings, initialCategories }:
   }, [initialCategories])
 
   const storeName = storeSettings?.storeName || 'Hita&Co'
-  const primaryColor = storeSettings?.primaryColor || '#7c3aed'
+  const primaryColor = storeSettings?.primaryColor || DEFAULT_PRIMARY_COLOR
   const logo = storeSettings?.logo
 
   const mainNavigation = [
