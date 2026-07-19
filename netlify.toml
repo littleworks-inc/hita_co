@@ -1,17 +1,19 @@
 [build]
   # Build command with connection-safe Prisma generation
   command = "SKIP_DB_ON_BUILD=true prisma generate && npm run build"
-  
+
   # Publish directory
   publish = ".next"
-  
-  # Node.js version
-  environment = { NODE_VERSION = "18" }
 
 [build.environment]
+  # Match the Node version Netlify is already building with in production
+  # (was pinned to 18 here, which never actually applied since this file
+  # had the wrong name until now - don't downgrade a working build)
+  NODE_VERSION = "22"
+
   # Disable Next.js telemetry for faster builds
   NEXT_TELEMETRY_DISABLED = "1"
-  
+
   # Prisma configuration for serverless
   PRISMA_GENERATE_SKIP_AUTOINSTALL = "true"
 
