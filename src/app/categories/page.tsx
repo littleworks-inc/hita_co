@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { db } from '@/lib/db'
 import CustomerNavigation from '@/components/customer/CustomerNavigation'
 import LoadingSpinner from '@/components/customer/LoadingSpinner'
+import Breadcrumb from '@/components/customer/Breadcrumb'
 import { generateStoreMetadata } from '@/lib/seo'
 import { getNavCategories } from '@/lib/store-settings'
 import {
@@ -181,6 +182,8 @@ async function DynamicContent() {
   
   return (
     <>
+      <Breadcrumb items={[{ label: 'Categories' }]} />
+
       {/* Header Section - Dynamic from store settings */}
       <div className="text-center mb-16">
         <div className="inline-flex items-center gap-2 bg-purple-100 text-purple-700 px-4 py-2 rounded-full text-sm font-medium mb-6">

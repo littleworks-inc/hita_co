@@ -1,6 +1,7 @@
 // src/app/contact/page.tsx
 import Link from 'next/link'
 import CustomerNavigation from '@/components/customer/CustomerNavigation'
+import Breadcrumb from '@/components/customer/Breadcrumb'
 import { getCustomerStoreSettings, getNavCategories } from '@/lib/store-settings'
 import {
   Mail,
@@ -50,11 +51,11 @@ export async function generateMetadata() {
 // Dynamic Hero Section
 function ContactHero({ storeSettings }: { storeSettings: any }) {
   const storeName = storeSettings?.storeName || 'Hita&Co'
-  const primaryColor = storeSettings?.primaryColor || '#1f2937'
+  const primaryColor = storeSettings?.primaryColor || '#7c3aed'
   const accentColor = storeSettings?.accentColor || '#f59e0b'
 
   return (
-    <section className="bg-gradient-to-br from-gray-50 to-blue-50 py-16">
+    <section className="bg-gray-50 py-16">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
         <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-6">
           Contact{' '}
@@ -88,7 +89,7 @@ function ContactHero({ storeSettings }: { storeSettings: any }) {
 
 // Dynamic Contact Information Component
 function ContactInformation({ storeSettings }: { storeSettings: any }) {
-  const primaryColor = storeSettings?.primaryColor || '#1f2937'
+  const primaryColor = storeSettings?.primaryColor || '#7c3aed'
   const storeName = storeSettings?.storeName || 'Hita&Co'
 
   // Dynamic contact information with proper fallbacks
@@ -98,41 +99,30 @@ function ContactInformation({ storeSettings }: { storeSettings: any }) {
       title: 'Email Us',
       description: 'Send us an email and we\'ll respond within 24 hours',
       value: storeSettings?.email || undefined, // Updated fallback
-      action: `mailto:${storeSettings?.email || undefined}`,
-      color: 'blue'
+      action: `mailto:${storeSettings?.email || undefined}`
     },
     {
       icon: Phone,
       title: 'Call Us',
       description: 'Speak directly with our customer service team',
       value: storeSettings?.phone || '+1 (555) 123-4567', // Keep generic fallback
-      action: `tel:${storeSettings?.phone?.replace(/\s/g, '') || '+15551234567'}`,
-      color: 'green'
+      action: `tel:${storeSettings?.phone?.replace(/\s/g, '') || '+15551234567'}`
     },
     {
       icon: MessageCircle,
       title: 'Live Chat',
       description: 'Chat with us in real-time for instant support',
       value: 'Available Mon-Fri, 9 AM - 6 PM EST',
-      action: '#',
-      color: 'purple'
+      action: '#'
     },
     {
       icon: MapPin,
       title: 'Our Location',
       description: 'Business address and office location',
       value: storeSettings?.address || 'Shipping Worldwide - Online Store', // Updated fallback
-      action: storeSettings?.address ? `https://maps.google.com/?q=${encodeURIComponent(storeSettings.address)}` : '#',
-      color: 'red'
+      action: storeSettings?.address ? `https://maps.google.com/?q=${encodeURIComponent(storeSettings.address)}` : '#'
     }
   ]
-
-  const colorClasses = {
-    blue: 'border-blue-200 hover:bg-blue-50',
-    green: 'border-green-200 hover:bg-green-50',
-    purple: 'border-purple-200 hover:bg-purple-50',
-    red: 'border-red-200 hover:bg-red-50'
-  }
 
   return (
     <section className="py-16 bg-white">
@@ -152,7 +142,7 @@ function ContactInformation({ storeSettings }: { storeSettings: any }) {
             return (
               <div
                 key={index}
-                className={`p-6 bg-white border-2 rounded-xl transition-all duration-300 hover:shadow-lg ${colorClasses[method.color as keyof typeof colorClasses]}`}
+                className="p-6 bg-white border-2 border-purple-200 rounded-xl transition-all duration-300 hover:shadow-lg hover:bg-purple-50"
               >
                 <div
                   className="w-12 h-12 rounded-full flex items-center justify-center mb-4"
@@ -194,7 +184,7 @@ function ContactInformation({ storeSettings }: { storeSettings: any }) {
 
 // Contact Form Section
 function ContactForm({ storeSettings }: { storeSettings: any }) {
-  const primaryColor = storeSettings?.primaryColor || '#1f2937'
+  const primaryColor = storeSettings?.primaryColor || '#7c3aed'
   const storeName = storeSettings?.storeName || 'Hita&Co'
 
   return (
@@ -234,6 +224,7 @@ function ContactForm({ storeSettings }: { storeSettings: any }) {
                   type="text"
                   required
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent focus:outline-none"
+                  style={{ '--tw-ring-color': primaryColor } as React.CSSProperties}
                   placeholder="Enter your last name"
                 />
               </div>
@@ -248,6 +239,7 @@ function ContactForm({ storeSettings }: { storeSettings: any }) {
                   type="email"
                   required
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent focus:outline-none"
+                  style={{ '--tw-ring-color': primaryColor } as React.CSSProperties}
                   placeholder="your.email@example.com"
                 />
               </div>
@@ -258,6 +250,7 @@ function ContactForm({ storeSettings }: { storeSettings: any }) {
                 <input
                   type="tel"
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent focus:outline-none"
+                  style={{ '--tw-ring-color': primaryColor } as React.CSSProperties}
                   placeholder="+1 (555) 123-4567"
                 />
               </div>
@@ -271,6 +264,7 @@ function ContactForm({ storeSettings }: { storeSettings: any }) {
                 type="text"
                 required
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent focus:outline-none"
+                style={{ '--tw-ring-color': primaryColor } as React.CSSProperties}
                 placeholder="What can we help you with? (e.g., Product inquiry, Order status, Shipping question)"
               />
             </div>
@@ -283,6 +277,7 @@ function ContactForm({ storeSettings }: { storeSettings: any }) {
                 required
                 rows={6}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent focus:outline-none resize-none"
+                style={{ '--tw-ring-color': primaryColor } as React.CSSProperties}
                 placeholder="Tell us more about your inquiry... (e.g., product details you're looking for, order number, delivery address, etc.)"
               />
             </div>
@@ -306,7 +301,7 @@ function ContactForm({ storeSettings }: { storeSettings: any }) {
 
 // Business Hours and Additional Info
 function BusinessInfo({ storeSettings }: { storeSettings: any }) {
-  const primaryColor = storeSettings?.primaryColor || '#1f2937'
+  const primaryColor = storeSettings?.primaryColor || '#7c3aed'
   const storeName = storeSettings?.storeName || 'Hita&Co'
 
   const businessHours = [
@@ -384,9 +379,9 @@ function BusinessInfo({ storeSettings }: { storeSettings: any }) {
             )}
 
             {/* Customer Service Notice */}
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
-              <h4 className="font-semibold text-blue-900 mb-2">Customer Support</h4>
-              <p className="text-sm text-blue-700">
+            <div className="bg-purple-50 border border-purple-200 rounded-lg p-6">
+              <h4 className="font-semibold text-purple-900 mb-2">Customer Support</h4>
+              <p className="text-sm text-purple-700">
                 {storeName} is committed to providing exceptional customer service.
                 Whether you need help with product selection, order tracking, or returns, we're here to help!
               </p>
@@ -452,6 +447,9 @@ export default async function ContactPage() {
 
       {/* Page Content */}
       <main>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
+          <Breadcrumb items={[{ label: 'Contact' }]} className="mb-0" />
+        </div>
         <ContactHero storeSettings={storeSettings} />
         <ContactInformation storeSettings={storeSettings} />
         <ContactForm storeSettings={storeSettings} />

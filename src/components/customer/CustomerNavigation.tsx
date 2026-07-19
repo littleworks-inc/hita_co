@@ -80,7 +80,7 @@ export default function CustomerNavigation({ storeSettings, initialCategories }:
   }, [initialCategories])
 
   const storeName = storeSettings?.storeName || 'Hita&Co'
-  const primaryColor = storeSettings?.primaryColor || '#1f2937'
+  const primaryColor = storeSettings?.primaryColor || '#7c3aed'
   const logo = storeSettings?.logo
 
   const mainNavigation = [

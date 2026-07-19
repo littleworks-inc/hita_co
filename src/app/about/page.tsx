@@ -1,6 +1,7 @@
 // src/app/about/page.tsx
 import Link from 'next/link'
 import CustomerNavigation from '@/components/customer/CustomerNavigation'
+import Breadcrumb from '@/components/customer/Breadcrumb'
 import { getCustomerStoreSettings, getNavCategories } from '@/lib/store-settings'
 import {
   Heart,
@@ -47,11 +48,11 @@ export async function generateMetadata() {
 function AboutHero({ storeSettings }: { storeSettings: any }) {
   const storeName = storeSettings?.storeName || 'Hita&Co'
   const tagline = storeSettings?.tagline || 'Authentic Indian Ethnic Wear'
-  const primaryColor = storeSettings?.primaryColor || '#1f2937'
+  const primaryColor = storeSettings?.primaryColor || '#7c3aed'
   const accentColor = storeSettings?.accentColor || '#f59e0b'
 
   return (
-    <section className="bg-gradient-to-br from-gray-50 to-blue-50 py-16">
+    <section className="bg-gray-50 py-16">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-12">
           <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-6">
@@ -87,7 +88,7 @@ function AboutHero({ storeSettings }: { storeSettings: any }) {
 // Our Story Section
 function OurStorySection({ storeSettings }: { storeSettings: any }) {
   const storeName = storeSettings?.storeName || 'Hita&Co'
-  const primaryColor = storeSettings?.primaryColor || '#1f2937'
+  const primaryColor = storeSettings?.primaryColor || '#7c3aed'
 
   return (
     <section className="py-16 bg-white">
@@ -135,7 +136,7 @@ function OurStorySection({ storeSettings }: { storeSettings: any }) {
 
 // Mission & Values Section
 function MissionValuesSection({ storeSettings }: { storeSettings: any }) {
-  const primaryColor = storeSettings?.primaryColor || '#1f2937'
+  const primaryColor = storeSettings?.primaryColor || '#7c3aed'
 
   const values = [
     {
@@ -200,7 +201,7 @@ function MissionValuesSection({ storeSettings }: { storeSettings: any }) {
 
 // Services Overview Section
 function ServicesOverview({ storeSettings }: { storeSettings: any }) {
-  const primaryColor = storeSettings?.primaryColor || '#1f2937'
+  const primaryColor = storeSettings?.primaryColor || '#7c3aed'
 
   const features = [
     {
@@ -269,7 +270,7 @@ function ServicesOverview({ storeSettings }: { storeSettings: any }) {
 
 // Why Choose Us Section
 function WhyChooseUsSection({ storeSettings }: { storeSettings: any }) {
-  const primaryColor = storeSettings?.primaryColor || '#1f2937'
+  const primaryColor = storeSettings?.primaryColor || '#7c3aed'
 
   const reasons = [
     {
@@ -295,7 +296,7 @@ function WhyChooseUsSection({ storeSettings }: { storeSettings: any }) {
   ]
 
   return (
-    <section className="py-16 bg-gradient-to-br from-gray-50 to-blue-50">
+    <section className="py-16 bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-12">
           <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
@@ -332,7 +333,7 @@ function WhyChooseUsSection({ storeSettings }: { storeSettings: any }) {
 // Call to Action Section
 function CallToActionSection({ storeSettings }: { storeSettings: any }) {
   const storeName = storeSettings?.storeName || 'Hita&Co'
-  const primaryColor = storeSettings?.primaryColor || '#1f2937'
+  const primaryColor = storeSettings?.primaryColor || '#7c3aed'
   const accentColor = storeSettings?.accentColor || '#f59e0b'
 
   return (
@@ -415,6 +416,9 @@ export default async function AboutPage() {
 
       {/* Page Content */}
       <main>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
+          <Breadcrumb items={[{ label: 'About' }]} className="mb-0" />
+        </div>
         <AboutHero storeSettings={storeSettings} />
         <OurStorySection storeSettings={storeSettings} />
         <MissionValuesSection storeSettings={storeSettings} />

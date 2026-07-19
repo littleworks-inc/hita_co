@@ -7,6 +7,7 @@ import Link from 'next/link'
 import { db } from '@/lib/db'
 import { generateCategoryMetadata, generateBreadcrumbJsonLd } from '@/lib/seo'
 import CustomerNavigation from '@/components/customer/CustomerNavigation'
+import Breadcrumb from '@/components/customer/Breadcrumb'
 import ProductCard from '@/components/customer/ProductCard'
 import CategorySortFilter from '@/components/customer/CategorySortFilter'
 import LoadingSpinner from '@/components/customer/LoadingSpinner'
@@ -234,8 +235,10 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
       />
 
       <CustomerNavigation storeSettings={storeSettings} initialCategories={navCategories} />
-      
+
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <Breadcrumb items={[{ label: 'Categories', href: '/categories' }, { label: category.name }]} />
+
         {/* Category Header */}
         <div className="mb-8">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
