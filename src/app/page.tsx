@@ -13,6 +13,7 @@ import CurrencyNotification from '@/components/customer/CurrencyNotification'
 import DynamicHeroSection from '@/components/customer/DynamicHeroSection'
 import NewArrivals from '@/components/customer/NewArrivals'
 import EnhancedFeaturedProducts from '@/components/customer/EnhancedFeaturedProducts'
+import { getNavCategories } from '@/lib/store-settings'
 import {
   Star,
   Truck,
@@ -137,6 +138,34 @@ async function getFeaturedProducts() {
       { createdAt: 'desc' }
     ]
   })
+}
+
+// Get active hero slides server-side so the hero renders with real content on
+// first paint instead of a client-fetched skeleton.
+async function getHeroSlides() {
+  try {
+    const slides = await db.heroSlide.findMany({
+      where: { isActive: true },
+      orderBy: { order: 'asc' }
+    })
+
+    // Convert Prisma's null to undefined to match the HeroSlide prop type
+    return slides.map(slide => ({
+      id: slide.id,
+      title: slide.title,
+      subtitle: slide.subtitle ?? undefined,
+      description: slide.description ?? undefined,
+      ctaText: slide.ctaText ?? undefined,
+      ctaLink: slide.ctaLink ?? undefined,
+      image: slide.image ?? undefined,
+      gradient: slide.gradient ?? undefined,
+      order: slide.order,
+      isActive: slide.isActive,
+    }))
+  } catch (error) {
+    console.error('Error fetching hero slides:', error)
+    return []
+  }
 }
 
 // Get categories with product counts and a sample product image for the tile
@@ -405,20 +434,24 @@ function StoreHighlights({ storeSettings }: { storeSettings: Awaited<ReturnType<
 
 // ✅ MAIN HOME PAGE COMPONENT - Now with New Arrivals and Enhanced Featured Products
 export default async function HomePage() {
-  const storeSettingsRaw = await getStoreSettings() // ✅ Returns StoreSettings | null for SEO and most components
+  const [storeSettingsRaw, heroSlides, navCategories] = await Promise.all([
+    getStoreSettings(), // ✅ Returns StoreSettings | null for SEO and most components
+    getHeroSlides(),
+    getNavCategories()
+  ])
 
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Dynamic Navigation - Uses raw version since it expects string | null */}
-      <CustomerNavigation storeSettings={storeSettingsRaw} />
+      <CustomerNavigation storeSettings={storeSettingsRaw} initialCategories={navCategories} />
 
       {/* Currency Notification */}
       <CurrencyNotification />
 
       {/* Main Content */}
       <main>
-        {/* ✅ UPDATED: Dynamic Hero Section - Now uses database slides */}
-        <DynamicHeroSection storeSettings={storeSettingsRaw} />
+        {/* ✅ UPDATED: Dynamic Hero Section - slides fetched server-side, no loading flash */}
+        <DynamicHeroSection storeSettings={storeSettingsRaw} initialSlides={heroSlides} />
 
         {/* Category Showcase - MOVED TO SECOND POSITION */}
         <Suspense fallback={<LoadingSpinner size="lg" text="Loading categories..." />}>

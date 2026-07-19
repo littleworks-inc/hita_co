@@ -5,6 +5,7 @@ import { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { db } from '@/lib/db'
 import CustomerNavigation from '@/components/customer/CustomerNavigation'
+import { getNavCategories } from '@/lib/store-settings'
 import OrderConfirmation from '@/components/checkout/OrderConfirmation'
 
 // Force dynamic rendering - this page uses database calls
@@ -98,9 +99,10 @@ export default async function CheckoutSuccessPage({ searchParams }: CheckoutSucc
   const { orderNumber } = searchParams
   
   // Get store settings and order data
-  const [storeSettings, orderRaw] = await Promise.all([
+  const [storeSettings, orderRaw, navCategories] = await Promise.all([
     getStoreSettings(),
-    orderNumber ? getOrderByNumber(orderNumber) : null
+    orderNumber ? getOrderByNumber(orderNumber) : null,
+    getNavCategories()
   ])
 
   // If no order number provided or order not found, show 404
@@ -116,7 +118,7 @@ export default async function CheckoutSuccessPage({ searchParams }: CheckoutSucc
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <CustomerNavigation storeSettings={storeSettings} />
+      <CustomerNavigation storeSettings={storeSettings} initialCategories={navCategories} />
       
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <OrderConfirmation order={order} storeSettings={storeSettings} />

@@ -41,14 +41,15 @@ interface StoreSettings {
 
 interface CustomerNavigationProps {
   storeSettings: StoreSettings | null
+  initialCategories?: Category[]
 }
 
-export default function CustomerNavigation({ storeSettings }: CustomerNavigationProps) {
+export default function CustomerNavigation({ storeSettings, initialCategories }: CustomerNavigationProps) {
   const pathname = usePathname()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [showSearch, setShowSearch] = useState(false)
-  const [categories, setCategories] = useState<Category[]>([])
+  const [categories, setCategories] = useState<Category[]>(initialCategories || [])
 
   // Cart integration (✅ PRESERVED - Existing functionality)
   const { totalItems, totalPriceUSD, toggleCart, isClient } = useCart()
@@ -58,8 +59,12 @@ export default function CustomerNavigation({ storeSettings }: CustomerNavigation
   const isECommerceMode = !storeSettings?.disableShoppingCart
   const showCartFeatures = isECommerceMode // Hide cart when in catalog mode
 
-  // Fetch categories for navigation (✅ UNCHANGED)
+  // Fallback path: only used on the rare page that doesn't pass
+  // initialCategories from the server (avoids a client round trip + flash
+  // in the mobile menu's category list on every other page).
   useEffect(() => {
+    if (initialCategories) return
+
     const fetchCategories = async () => {
       try {
         const response = await fetch('/api/categories')
@@ -72,7 +77,7 @@ export default function CustomerNavigation({ storeSettings }: CustomerNavigation
       }
     }
     fetchCategories()
-  }, [])
+  }, [initialCategories])
 
   const storeName = storeSettings?.storeName || 'Hita&Co'
   const primaryColor = storeSettings?.primaryColor || '#1f2937'
@@ -219,10 +224,15 @@ export default function CustomerNavigation({ storeSettings }: CustomerNavigation
                 </button>
               )}
 
-              {/* User Account (✅ UNCHANGED) */}
-              <button className="text-gray-700 dark:text-gray-300 hover:text-purple-600 dark:hover:text-purple-400 transition-colors">
+              {/* Account/order questions - no customer account system exists;
+                  route to Contact so the icon isn't a dead click */}
+              <Link
+                href="/contact"
+                aria-label="Order questions or contact us"
+                className="text-gray-700 dark:text-gray-300 hover:text-purple-600 dark:hover:text-purple-400 transition-colors"
+              >
                 <User className="h-6 w-6" />
-              </button>
+              </Link>
 
               {/* Mobile menu button (✅ UNCHANGED) */}
               <button

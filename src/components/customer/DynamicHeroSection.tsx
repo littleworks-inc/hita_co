@@ -35,14 +35,10 @@ interface HeroSlide {
 
 interface DynamicHeroSectionProps {
   storeSettings: StoreSettings | null
+  initialSlides?: HeroSlide[]
 }
 
-export default function DynamicHeroSection({ storeSettings }: DynamicHeroSectionProps) {
-  const [slides, setSlides] = useState<HeroSlide[]>([])
-  const [currentSlide, setCurrentSlide] = useState(0)
-  const [loading, setLoading] = useState(true)
-  const [isPaused, setIsPaused] = useState(false)
-
+export default function DynamicHeroSection({ storeSettings, initialSlides }: DynamicHeroSectionProps) {
   const storeName = storeSettings?.storeName || 'Hita&Co'
   const tagline = storeSettings?.tagline || 'Authentic Indian Ethnic Wear & Lifestyle'
 
@@ -86,18 +82,27 @@ export default function DynamicHeroSection({ storeSettings }: DynamicHeroSection
     }
   ]
 
-  // Load slides from database
+  // When the parent server component already fetched slides, resolve the
+  // initial state synchronously (DB slides, or the fallback set if the DB
+  // has none) so the server-rendered HTML already shows real content — no
+  // skeleton, no blank flash, no client round trip.
+  const [slides, setSlides] = useState<HeroSlide[]>(() =>
+    initialSlides ? (initialSlides.length > 0 ? initialSlides : fallbackSlides) : []
+  )
+  const [currentSlide, setCurrentSlide] = useState(0)
+  const [loading, setLoading] = useState(!initialSlides)
+  const [isPaused, setIsPaused] = useState(false)
+
+  // Fallback path: only used if no slides were passed in from the server.
   useEffect(() => {
+    if (initialSlides) return
+
     const fetchSlides = async () => {
       try {
         const response = await fetch('/api/hero-slides')
         if (response.ok) {
           const data = await response.json()
-          if (data.length > 0) {
-            setSlides(data)
-          } else {
-            setSlides(fallbackSlides)
-          }
+          setSlides(data.length > 0 ? data : fallbackSlides)
         } else {
           setSlides(fallbackSlides)
         }
@@ -110,7 +115,7 @@ export default function DynamicHeroSection({ storeSettings }: DynamicHeroSection
     }
 
     fetchSlides()
-  }, [])
+  }, [initialSlides])
 
   // Auto-slide functionality
   useEffect(() => {

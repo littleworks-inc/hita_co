@@ -11,6 +11,7 @@ import ProductCard from '@/components/customer/ProductCard'
 import ProductFilters from '@/components/customer/ProductFilters'
 import LoadingSpinner from '@/components/customer/LoadingSpinner'
 import CustomerNavigation from '@/components/customer/CustomerNavigation'
+import { getNavCategories } from '@/lib/store-settings'
 import { 
   Package, 
   ArrowLeft, 
@@ -432,11 +433,14 @@ async function ProductsData({ searchParams }: { searchParams: ProductsPageProps[
 
 // Main Products Page Component
 export default async function ProductsPage({ searchParams }: ProductsPageProps) {
-  const storeSettings = await getStoreSettings()
+  const [storeSettings, navCategories] = await Promise.all([
+    getStoreSettings(),
+    getNavCategories()
+  ])
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <CustomerNavigation storeSettings={storeSettings} />
+      <CustomerNavigation storeSettings={storeSettings} initialCategories={navCategories} />
       
       {/* 🔧 FIXED: Proper container with max-width and padding */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">

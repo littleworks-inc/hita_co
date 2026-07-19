@@ -1,6 +1,7 @@
 // src/app/about/page.tsx
 import Link from 'next/link'
-import { db } from '@/lib/db'
+import CustomerNavigation from '@/components/customer/CustomerNavigation'
+import { getCustomerStoreSettings, getNavCategories } from '@/lib/store-settings'
 import {
   Heart,
   Star,
@@ -8,12 +9,8 @@ import {
   Users,
   Award,
   Sparkles,
-  ShoppingBag,
   ArrowRight,
   CheckCircle,
-  Search,
-  Menu,
-  User,
   Package,
   Target,
   Shield,
@@ -23,16 +20,10 @@ import {
 // Force dynamic rendering - this page uses database calls
 export const dynamic = 'force-dynamic'
 
-// Get store settings for dynamic content
+// Get store settings for dynamic content - shared helper so About matches
+// every other customer page (colors, catalog mode, contact info)
 async function getStoreSettings() {
-  try {
-    return await db.storeSetting.findFirst({
-      where: { id: 'default' }
-    })
-  } catch (error) {
-    console.error('Error fetching store settings:', error)
-    return null
-  }
+  return getCustomerStoreSettings()
 }
 
 // Generate dynamic metadata
@@ -50,83 +41,6 @@ export async function generateMetadata() {
       type: 'website'
     }
   }
-}
-
-// Dynamic Navigation Component
-function DynamicNavigation({ storeSettings }: { storeSettings: any }) {
-  const storeName = storeSettings?.storeName || 'Hita&Co'
-  const tagline = storeSettings?.tagline || 'Authentic Indian Ethnic Wear'
-  const primaryColor = storeSettings?.primaryColor || '#1f2937'
-  const accentColor = storeSettings?.accentColor || '#f59e0b'
-  const logo = storeSettings?.logo
-
-  return (
-    <>
-      {/* Dynamic Top Banner */}
-      <div 
-        className="text-white text-center py-2 px-4"
-        style={{ 
-          background: `linear-gradient(to right, ${primaryColor}, ${accentColor})` 
-        }}
-      >
-        <p className="text-sm font-medium">
-          ✨ Authentic Indian ethnic wear for women | Shipped across the USA
-        </p>
-      </div>
-
-      <nav className="bg-white shadow-lg sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center">
-              <Link href="/" className="flex items-center space-x-3">
-                {logo ? (
-                  <img
-                    src={logo}
-                    alt={storeName}
-                    className="h-8 w-auto"
-                  />
-                ) : (
-                  <div 
-                    className="w-8 h-8 rounded flex items-center justify-center text-white font-bold text-sm"
-                    style={{ backgroundColor: primaryColor }}
-                  >
-                    {storeName.split(' ').map((word: string) => word.charAt(0)).join('').substring(0, 2)}
-                  </div>
-                )}
-                <div>
-                  <h1 className="text-xl font-bold text-gray-900">{storeName}</h1>
-                  <p className="text-xs text-gray-600">{tagline}</p>
-                </div>
-              </Link>
-            </div>
-
-            {/* Navigation Links */}
-            <div className="hidden md:flex space-x-8">
-              <Link href="/" className="text-gray-700 hover:text-purple-600">Home</Link>
-              <Link href="/products" className="text-gray-700 hover:text-purple-600">Products</Link>
-              <Link href="/about" className="text-purple-600 font-medium">About</Link>
-              <Link href="/contact" className="text-gray-700 hover:text-purple-600">Contact</Link>
-            </div>
-
-            {/* Action buttons */}
-            <div className="flex items-center space-x-4">
-              <Search className="h-5 w-5 text-gray-600 hover:text-purple-600 cursor-pointer" />
-              <div className="relative">
-                <ShoppingBag className="h-6 w-6 text-gray-700 hover:text-purple-600 cursor-pointer" />
-                <span 
-                  className="absolute -top-2 -right-2 h-4 w-4 rounded-full text-xs font-bold text-white flex items-center justify-center"
-                  style={{ backgroundColor: primaryColor }}
-                >
-                  0
-                </span>
-              </div>
-              <User className="h-6 w-6 text-gray-700 hover:text-purple-600 cursor-pointer" />
-            </div>
-          </div>
-        </div>
-      </nav>
-    </>
-  )
 }
 
 // About Hero Section
@@ -457,7 +371,10 @@ function CallToActionSection({ storeSettings }: { storeSettings: any }) {
 
 // Main About Page Component
 export default async function AboutPage() {
-  const storeSettings = await getStoreSettings()
+  const [storeSettings, navCategories] = await Promise.all([
+    getStoreSettings(),
+    getNavCategories()
+  ])
   const storeName = storeSettings?.storeName || 'Hita&Co'
   const tagline = storeSettings?.tagline || 'Authentic Indian Ethnic Wear'
 
@@ -493,8 +410,8 @@ export default async function AboutPage() {
         }}
       />
 
-      {/* Dynamic Navigation */}
-      <DynamicNavigation storeSettings={storeSettings} />
+      {/* Shared site navigation - same component every other customer page uses */}
+      <CustomerNavigation storeSettings={storeSettings} initialCategories={navCategories} />
 
       {/* Page Content */}
       <main>

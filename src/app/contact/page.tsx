@@ -1,6 +1,7 @@
 // src/app/contact/page.tsx
 import Link from 'next/link'
-import { db } from '@/lib/db'
+import CustomerNavigation from '@/components/customer/CustomerNavigation'
+import { getCustomerStoreSettings, getNavCategories } from '@/lib/store-settings'
 import {
   Mail,
   Phone,
@@ -18,31 +19,22 @@ import {
   CheckCircle,
   Headphones,
   Package,
-  CreditCard,
-  Search,
-  User,
-  ShoppingBag
+  CreditCard
 } from 'lucide-react'
 
 // Force dynamic rendering - this page uses database calls
 export const dynamic = 'force-dynamic'
 
-// Get store settings for dynamic content
+// Get store settings for dynamic content - shared helper so Contact matches
+// every other customer page (colors, catalog mode, contact info)
 async function getStoreSettings() {
-  try {
-    return await db.storeSetting.findFirst({
-      where: { id: 'default' }
-    })
-  } catch (error) {
-    console.error('Error fetching store settings:', error)
-    return null
-  }
+  return getCustomerStoreSettings()
 }
 
 // Generate dynamic metadata
 export async function generateMetadata() {
   const storeSettings = await getStoreSettings()
-  const storeName = storeSettings?.storeName || 'LittleWorks Inc' // Updated default
+  const storeName = storeSettings?.storeName || 'Hita&Co'
 
   return {
     title: `Contact Us - ${storeName}`,
@@ -55,85 +47,9 @@ export async function generateMetadata() {
   }
 }
 
-// Dynamic Navigation Component
-function DynamicNavigation({ storeSettings }: { storeSettings: any }) {
-  const storeName = storeSettings?.storeName || 'LittleWorks Inc' // Updated default
-  const tagline = storeSettings?.tagline || 'Building Digital Solutions' // Updated default
-  const primaryColor = storeSettings?.primaryColor || '#1f2937' // Updated default
-  const logo = storeSettings?.logo
-
-  return (
-    <>
-      {/* Dynamic Top Banner */}
-      <div
-        className="text-white text-center py-2 px-4"
-        style={{
-          background: `linear-gradient(to right, ${primaryColor}, ${storeSettings?.accentColor || '#f59e0b'})`
-        }}
-      >
-        <p className="text-sm font-medium">
-          ✨ Authentic Indian ethnic wear for women | Shipped across the USA
-        </p>
-      </div>
-
-      <nav className="bg-white shadow-lg sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center">
-              <Link href="/" className="flex items-center space-x-3">
-                {logo ? (
-                  <img
-                    src={logo}
-                    alt={storeName}
-                    className="h-8 w-auto"
-                  />
-                ) : (
-                  <div
-                    className="w-8 h-8 rounded flex items-center justify-center text-white font-bold text-sm"
-                    style={{ backgroundColor: primaryColor }}
-                  >
-                    {storeName.split(' ').map((word: string) => word.charAt(0)).join('').substring(0, 2)}
-                  </div>
-                )}
-                <div>
-                  <h1 className="text-xl font-bold text-gray-900">{storeName}</h1>
-                  <p className="text-xs text-gray-600">{tagline}</p>
-                </div>
-              </Link>
-            </div>
-
-            {/* Navigation Links */}
-            <div className="hidden md:flex space-x-8">
-              <Link href="/" className="text-gray-700 hover:text-purple-600">Home</Link>
-              <Link href="/products" className="text-gray-700 hover:text-purple-600">Products</Link>
-              <Link href="/about" className="text-gray-700 hover:text-purple-600">About</Link>
-              <Link href="/contact" className="text-purple-600 font-medium">Contact</Link>
-            </div>
-
-            {/* Action buttons */}
-            <div className="flex items-center space-x-4">
-              <Search className="h-5 w-5 text-gray-600 hover:text-purple-600 cursor-pointer" />
-              <div className="relative">
-                <ShoppingBag className="h-6 w-6 text-gray-700 hover:text-purple-600 cursor-pointer" />
-                <span
-                  className="absolute -top-2 -right-2 h-4 w-4 rounded-full text-xs font-bold text-white flex items-center justify-center"
-                  style={{ backgroundColor: primaryColor }}
-                >
-                  0
-                </span>
-              </div>
-              <User className="h-6 w-6 text-gray-700 hover:text-purple-600 cursor-pointer" />
-            </div>
-          </div>
-        </div>
-      </nav>
-    </>
-  )
-}
-
 // Dynamic Hero Section
 function ContactHero({ storeSettings }: { storeSettings: any }) {
-  const storeName = storeSettings?.storeName || 'LittleWorks Inc'
+  const storeName = storeSettings?.storeName || 'Hita&Co'
   const primaryColor = storeSettings?.primaryColor || '#1f2937'
   const accentColor = storeSettings?.accentColor || '#f59e0b'
 
@@ -173,7 +89,7 @@ function ContactHero({ storeSettings }: { storeSettings: any }) {
 // Dynamic Contact Information Component
 function ContactInformation({ storeSettings }: { storeSettings: any }) {
   const primaryColor = storeSettings?.primaryColor || '#1f2937'
-  const storeName = storeSettings?.storeName || 'LittleWorks Inc'
+  const storeName = storeSettings?.storeName || 'Hita&Co'
 
   // Dynamic contact information with proper fallbacks
   const contactMethods = [
@@ -181,8 +97,8 @@ function ContactInformation({ storeSettings }: { storeSettings: any }) {
       icon: Mail,
       title: 'Email Us',
       description: 'Send us an email and we\'ll respond within 24 hours',
-      value: storeSettings?.email || 'contact@littleworks.inc', // Updated fallback
-      action: `mailto:${storeSettings?.email || 'contact@littleworks.inc'}`,
+      value: storeSettings?.email || undefined, // Updated fallback
+      action: `mailto:${storeSettings?.email || undefined}`,
       color: 'blue'
     },
     {
@@ -279,7 +195,7 @@ function ContactInformation({ storeSettings }: { storeSettings: any }) {
 // Contact Form Section
 function ContactForm({ storeSettings }: { storeSettings: any }) {
   const primaryColor = storeSettings?.primaryColor || '#1f2937'
-  const storeName = storeSettings?.storeName || 'LittleWorks Inc'
+  const storeName = storeSettings?.storeName || 'Hita&Co'
 
   return (
     <section className="py-16 bg-gray-50">
@@ -391,7 +307,7 @@ function ContactForm({ storeSettings }: { storeSettings: any }) {
 // Business Hours and Additional Info
 function BusinessInfo({ storeSettings }: { storeSettings: any }) {
   const primaryColor = storeSettings?.primaryColor || '#1f2937'
-  const storeName = storeSettings?.storeName || 'LittleWorks Inc'
+  const storeName = storeSettings?.storeName || 'Hita&Co'
 
   const businessHours = [
     { day: 'Monday - Friday', hours: '9:00 AM - 6:00 PM EST' },
@@ -484,8 +400,11 @@ function BusinessInfo({ storeSettings }: { storeSettings: any }) {
 
 // Main Contact Page Component
 export default async function ContactPage() {
-  const storeSettings = await getStoreSettings()
-  const storeName = storeSettings?.storeName || 'LittleWorks Inc'
+  const [storeSettings, navCategories] = await Promise.all([
+    getStoreSettings(),
+    getNavCategories()
+  ])
+  const storeName = storeSettings?.storeName || 'Hita&Co'
 
   // Structured data for SEO
   const structuredData = {
@@ -497,12 +416,12 @@ export default async function ContactPage() {
     mainEntity: {
       '@type': 'Organization',
       name: storeName,
-      email: storeSettings?.email || 'contact@littleworks.inc',
+      email: storeSettings?.email || undefined,
       telephone: storeSettings?.phone,
       address: storeSettings?.address,
       contactPoint: {
         '@type': 'ContactPoint',
-        email: storeSettings?.email || 'contact@littleworks.inc',
+        email: storeSettings?.email || undefined,
         telephone: storeSettings?.phone,
         contactType: 'customer service',
         availableLanguage: ['English'],
@@ -528,8 +447,8 @@ export default async function ContactPage() {
         }}
       />
 
-      {/* Dynamic Navigation */}
-      <DynamicNavigation storeSettings={storeSettings} />
+      {/* Shared site navigation - same component every other customer page uses */}
+      <CustomerNavigation storeSettings={storeSettings} initialCategories={navCategories} />
 
       {/* Page Content */}
       <main>

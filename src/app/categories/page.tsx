@@ -7,6 +7,7 @@ import { db } from '@/lib/db'
 import CustomerNavigation from '@/components/customer/CustomerNavigation'
 import LoadingSpinner from '@/components/customer/LoadingSpinner'
 import { generateStoreMetadata } from '@/lib/seo'
+import { getNavCategories } from '@/lib/store-settings'
 import {
   Tag,
   ArrowRight,
@@ -231,11 +232,14 @@ async function DynamicContent() {
 
 // Main Categories Page Component - Completely Dynamic
 export default async function CategoriesPage() {
-  const storeSettings = await getStoreSettings()
+  const [storeSettings, navCategories] = await Promise.all([
+    getStoreSettings(),
+    getNavCategories()
+  ])
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <CustomerNavigation storeSettings={storeSettings} />
+      <CustomerNavigation storeSettings={storeSettings} initialCategories={navCategories} />
       
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <DynamicContent />

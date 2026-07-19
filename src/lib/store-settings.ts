@@ -63,3 +63,40 @@ export async function getCustomerStoreSettings(): Promise<CustomerStoreSettings 
     return null
   }
 }
+
+export interface NavCategory {
+  id: string
+  name: string
+  slug: string
+}
+
+// Top-level categories with at least one active, in-stock product — same
+// query /api/categories runs with no query params. Fetched server-side so
+// CustomerNavigation doesn't need a client round trip on every page load.
+export async function getNavCategories(): Promise<NavCategory[]> {
+  try {
+    const categories = await db.category.findMany({
+      where: { parentId: null },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        _count: {
+          select: {
+            products: {
+              where: { isActive: true, stockQuantity: { gt: 0 } }
+            }
+          }
+        }
+      },
+      orderBy: { name: 'asc' }
+    })
+
+    return categories
+      .filter(category => category._count.products > 0)
+      .map(({ id, name, slug }) => ({ id, name, slug }))
+  } catch (error) {
+    console.error('Error fetching nav categories:', error)
+    return []
+  }
+}

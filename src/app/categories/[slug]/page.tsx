@@ -10,6 +10,7 @@ import CustomerNavigation from '@/components/customer/CustomerNavigation'
 import ProductCard from '@/components/customer/ProductCard'
 import CategorySortFilter from '@/components/customer/CategorySortFilter'
 import LoadingSpinner from '@/components/customer/LoadingSpinner'
+import { getNavCategories } from '@/lib/store-settings'
 import {
   Tag,
   Grid3X3,
@@ -200,9 +201,10 @@ export async function generateMetadata({ params }: CategoryPageProps) {
 
 export default async function CategoryPage({ params, searchParams }: CategoryPageProps) {
   // Fetch data in parallel
-  const [category, storeSettings] = await Promise.all([
+  const [category, storeSettings, navCategories] = await Promise.all([
     getCategory(params.slug),
-    getStoreSettings()
+    getStoreSettings(),
+    getNavCategories()
   ])
 
   // Handle category not found
@@ -231,7 +233,7 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
         dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
       />
 
-      <CustomerNavigation storeSettings={storeSettings} />
+      <CustomerNavigation storeSettings={storeSettings} initialCategories={navCategories} />
       
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Category Header */}

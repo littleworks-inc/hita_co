@@ -7,6 +7,7 @@ import Link from 'next/link'
 import { db } from '@/lib/db'
 import { generateProductMetadata, generateProductJsonLd } from '@/lib/seo'
 import CustomerNavigation from '@/components/customer/CustomerNavigation'
+import { getNavCategories } from '@/lib/store-settings'
 import ProductGallery from '@/components/customer/ProductGallery'
 import ProductSizeSelector from '@/components/customer/ProductSizeSelector'
 import AddToCartButton from '@/components/cart/AddToCartButton'
@@ -159,9 +160,10 @@ export async function generateMetadata({ params }: ProductPageProps) {
 
 // Main Product Detail Page
 export default async function ProductDetailPage({ params }: ProductPageProps) {
-  const [storeSettings, product] = await Promise.all([
+  const [storeSettings, product, navCategories] = await Promise.all([
     getStoreSettings(),
-    getProduct(params.slug)
+    getProduct(params.slug),
+    getNavCategories()
   ])
 
   // Handle 404 for missing or draft products
@@ -188,7 +190,7 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
       />
 
       <div className="min-h-screen bg-gray-50">
-        <CustomerNavigation storeSettings={storeSettings} />
+        <CustomerNavigation storeSettings={storeSettings} initialCategories={navCategories} />
         
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           {/* Breadcrumb */}
