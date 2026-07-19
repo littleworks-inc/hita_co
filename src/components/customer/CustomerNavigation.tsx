@@ -11,14 +11,12 @@ import {
   Menu,
   X,
   ShoppingBag,
-  Heart,
   User,
   ChevronDown,
   Home,
   Package
 } from 'lucide-react'
 import CurrencySelector from '@/components/customer/CurrencySelector'
-import ThemeToggle from '@/components/ThemeToggle'
 import { useCart } from '@/contexts/CartContext'
 import { useCurrency } from '@/contexts/CurrencyContext'
 
@@ -100,7 +98,7 @@ export default function CustomerNavigation({ storeSettings }: CustomerNavigation
       {/* Top Banner (✅ UNCHANGED) */}
       <div className="bg-gradient-to-r from-purple-600 to-pink-600 text-white text-center py-2 px-4">
         <p className="text-sm font-medium">
-          ✨ Free shipping on orders over $100 | Authentic handcrafted products
+          ✨ Authentic Indian ethnic wear for women | Shipped across the USA
         </p>
       </div>
 
@@ -197,17 +195,6 @@ export default function CustomerNavigation({ storeSettings }: CustomerNavigation
 
               {/* Currency Selector (✅ UNCHANGED) */}
               <CurrencySelector className="hidden sm:block" />
-
-              {/* Theme Toggle (✅ UNCHANGED) */}
-              <ThemeToggle className="hidden sm:block" />
-
-              {/* Wishlist (✅ UNCHANGED) */}
-              <button className="text-gray-700 dark:text-gray-300 hover:text-red-500 transition-colors relative">
-                <Heart className="h-6 w-6" />
-                <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                  0
-                </span>
-              </button>
 
               {/* ✅ CONDITIONAL: Cart Button - Only show in eCommerce mode */}
               {showCartFeatures && (
@@ -324,14 +311,6 @@ export default function CustomerNavigation({ storeSettings }: CustomerNavigation
                       Currency
                     </label>
                     <CurrencySelector showName={true} />
-                  </div>
-
-                  {/* Mobile Theme Toggle */}
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-900 dark:text-white mb-2">
-                      Theme
-                    </label>
-                    <ThemeToggle size="lg" className="w-full flex justify-center" />
                   </div>
                 </div>
               </div>

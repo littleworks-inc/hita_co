@@ -32,8 +32,10 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
   const [systemTheme, setSystemTheme] = useState<ResolvedTheme>('light')
   const [mounted, setMounted] = useState(false)
 
-  // Calculate resolved theme based on mode and system preference
-  const resolvedTheme: ResolvedTheme = mode === 'system' ? systemTheme : mode as ResolvedTheme
+  // Dark mode is intentionally disabled app-wide: only a few components were
+  // ever styled for it, so a system/dark visitor would see a broken UI. Force
+  // light everywhere. (Provider/hook kept so existing imports keep working.)
+  const resolvedTheme: ResolvedTheme = 'light'
   const isSystemMode = mode === 'system'
 
   // Initialize client-side state (hydration safe)
@@ -73,13 +75,8 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
   useEffect(() => {
     if (!mounted) return
 
-    const root = document.documentElement
-    
-    if (resolvedTheme === 'dark') {
-      root.classList.add('dark')
-    } else {
-      root.classList.remove('dark')
-    }
+    // Dark mode disabled app-wide: always ensure the dark class is absent.
+    document.documentElement.classList.remove('dark')
   }, [resolvedTheme, mounted])
 
   // Set theme mode with persistence

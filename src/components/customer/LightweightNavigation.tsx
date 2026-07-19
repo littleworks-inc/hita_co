@@ -62,7 +62,7 @@ export default function LightweightNavigation({ storeSettings }: LightweightNavi
     <>
       {/* Simplified Top Banner */}
       <div className="bg-gradient-to-r from-purple-600 to-purple-700 text-white text-center py-1.5 px-4">
-        <p className="text-sm">✨ Free shipping on orders over $100</p>
+        <p className="text-sm">✨ Authentic Indian ethnic wear for women | Shipped across the USA</p>
       </div>
 
       {/* Lightweight Navigation */}

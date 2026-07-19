@@ -49,6 +49,16 @@
 
 ## 🎉 **RECENT ACHIEVEMENTS**
 
+### **🎨 UI / CONTENT REVIEW FIXES (July 19, 2026)**
+
+Addressed a code-review findings list (verified each in-browser):
+- 🖼️ **Hero copy now renders** — the hero was painting only the background image/dots; the slide headline, subtitle, description, and CTA button were computed but never shown. Fixed → homepage now leads with "Welcome to Hita & Co" + Shop Collection button.
+- 🐛 **Hero slides were build-cached** — `/api/hero-slides` lacked `force-dynamic`, so slides added in admin would never appear live. Fixed. Also deleted 5 leftover placeholder test slides ("1"–"5") from the DB.
+- 🎨 **One brand color** — admin nav used stray blue-600; changed to the site's purple.
+- 🌙 **Dark mode removed** — was only styled on the customer nav, so system-dark visitors saw a broken UI; now forced light app-wide, toggles removed.
+- 💔 **Wishlist removed** — the heart button/badge never saved anything (TODO stub); removed for the DM-to-order model.
+- 🧾 **Honest banner** — remaining "Free shipping over $100" top-banner claims replaced with on-brand copy.
+
 ### **🔒 SECURITY HARDENING (July 18, 2026) — Pre-Launch Audit**
 
 Fixed 5 issues found in a pre-launch security review:

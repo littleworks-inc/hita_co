@@ -72,7 +72,7 @@ function DynamicNavigation({ storeSettings }: { storeSettings: any }) {
         }}
       >
         <p className="text-sm font-medium">
-          ✨ Free shipping on orders over $100 | Quality products delivered worldwide
+          ✨ Authentic Indian ethnic wear for women | Shipped across the USA
         </p>
       </div>
 

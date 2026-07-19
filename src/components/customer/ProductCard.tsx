@@ -10,7 +10,6 @@ import { formatPrice } from '@/lib/utils'
 import AddToCartButton from '@/components/cart/AddToCartButton'
 import ContactButtons from '@/components/customer/ContactButtons'
 import {
-  Heart,
   Package,
   Eye,
   Tag,
@@ -63,8 +62,7 @@ export default function ProductCard({
 }: ProductCardProps) {
   const [imageLoading, setImageLoading] = useState(true)
   const [imageError, setImageError] = useState(false)
-  const [isWishlisted, setIsWishlisted] = useState(false)
-  
+
   // ✅ FIXED: Use 'currency' instead of 'currentCurrency'
   const { currency, convertPrice } = useCurrency()
 
@@ -104,11 +102,6 @@ export default function ProductCard({
 
   // Product slug for URL
   const productSlug = `${product.name.toLowerCase().replace(/\s+/g, '-')}-${product.sku}`
-
-  const toggleWishlist = () => {
-    setIsWishlisted(!isWishlisted)
-    // TODO: Implement wishlist API call
-  }
 
   return (
     <div className={`group relative bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden hover:shadow-lg transition-shadow duration-300 ${className}`}>
@@ -171,14 +164,6 @@ export default function ProductCard({
             </span>
           )}
         </div>
-
-        {/* Wishlist button */}
-        <button
-          onClick={toggleWishlist}
-          className="absolute top-3 right-3 p-2 rounded-full bg-white/80 backdrop-blur-sm hover:bg-white transition-colors"
-        >
-          <Heart className={`h-4 w-4 ${isWishlisted ? 'fill-red-500 text-red-500' : 'text-gray-600'}`} />
-        </button>
 
         {/* Stock status overlay */}
         {isOutOfStock && (
