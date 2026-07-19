@@ -49,6 +49,17 @@
 
 ## 🎉 **RECENT ACHIEVEMENTS**
 
+### **🔒 SECURITY HARDENING (July 18, 2026) — Pre-Launch Audit**
+
+Fixed 5 issues found in a pre-launch security review:
+- 🔴 **Secrets removed from client bundle** — next.config.js `env` block was inlining DATABASE_URL + JWT_SECRET into public JS (readable by any visitor). Removed.
+- 🔴 **test-login page deleted** — contained the admin password in plaintext, now scrubbed from working tree (still in git history — see action below).
+- 🟠 **No more fallback JWT secret** — auth.ts threw out `'fallback-secret-key'`; now requires a real JWT_SECRET (≥32 chars) or the app refuses to start.
+- 🟠 **admin/orders API secured** — GET/POST were public and leaked all orders + customer PII; now require a valid admin session.
+- 🟡 **Middleware verifies token signature** — previously only checked length ≥ 10 (a fake cookie passed); now cryptographically verifies via jose.
+
+**⚠️ ACTION REQUIRED before/at launch:** rotate `JWT_SECRET` (generate a new random value) and change the admin password — the old values were committed to git history and can't be un-committed.
+
 ### **✅ JUST COMPLETED (July 18, 2026) — Trust & Content Overhaul**
 
 **📄 Policy & Help Pages (all new)**

@@ -10,11 +10,11 @@ const nextConfig = {
       'utfs.io',
     ],
   },
-  env: {
-    DATABASE_URL: process.env.DATABASE_URL,
-    JWT_SECRET: process.env.JWT_SECRET,
-  },
-  
+  // NOTE: Do NOT add a top-level `env` block for DATABASE_URL / JWT_SECRET.
+  // Next.js inlines `env` values into the CLIENT bundle, which would leak
+  // these secrets to every visitor. Server code reads them directly from
+  // process.env (they are available server-side without being declared here).
+
   // Production optimizations
   poweredByHeader: false,
   compress: true,

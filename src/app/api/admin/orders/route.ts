@@ -7,6 +7,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { getSession } from '@/lib/auth'
 
 // Force dynamic rendering - this route uses cookies or request.url
 export const dynamic = 'force-dynamic'
@@ -396,6 +397,12 @@ function generateOrderNumber(): string {
 
 export async function POST(request: NextRequest) {
   try {
+    // Admin-only: manual order creation. Customer checkout uses /api/orders.
+    const session = await getSession()
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const data: OrderCreateRequest = await request.json()
 
     console.log('🔄 SHARED STOCK: Processing new order with items:', data.items.length)
@@ -461,6 +468,12 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
+    // Admin-only: lists all orders with customer info. Require a valid session.
+    const session = await getSession()
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const { searchParams } = new URL(request.url)
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '10')

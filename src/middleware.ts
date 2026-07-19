@@ -5,6 +5,27 @@
 // =====================================
 
 import { NextRequest, NextResponse } from 'next/server'
+import { jwtVerify } from 'jose'
+
+// Edge-compatible JWT verification. Uses the same HS256 secret as src/lib/auth.ts.
+// jose works on the Edge runtime (Web Crypto), unlike the bcrypt-based auth module.
+const secret = process.env.JWT_SECRET
+const secretKey = secret ? new TextEncoder().encode(secret) : null
+
+async function hasValidSession(request: NextRequest): Promise<boolean> {
+  const token =
+    request.cookies.get('session')?.value ||
+    request.cookies.get('auth-token')?.value
+
+  if (!token || !secretKey) return false
+
+  try {
+    await jwtVerify(token, secretKey, { algorithms: ['HS256'] })
+    return true
+  } catch {
+    return false
+  }
+}
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
@@ -29,28 +50,14 @@ export async function middleware(request: NextRequest) {
       return NextResponse.next()
     }
 
-    // Check for admin authentication
-    const sessionToken = request.cookies.get('session')?.value || 
-                        request.cookies.get('auth-token')?.value
-    
-    if (!sessionToken) {
-      console.log('❌ No admin session token, redirecting to admin login')
+    // Verify the session token's signature (not just its presence/length)
+    if (!(await hasValidSession(request))) {
+      console.log('❌ Invalid or missing admin session, redirecting to admin login')
       return NextResponse.redirect(new URL('/admin/login', request.url))
     }
 
-    // Basic token validation
-    try {
-      if (sessionToken.length < 10) {
-        console.log('❌ Invalid admin session token format')
-        return NextResponse.redirect(new URL('/admin/login', request.url))
-      }
-      
-      console.log('✅ Admin session valid, allowing access')
-      return NextResponse.next()
-    } catch (error) {
-      console.error('❌ Error validating admin session token:', error)
-      return NextResponse.redirect(new URL('/admin/login', request.url))
-    }
+    console.log('✅ Admin session valid, allowing access')
+    return NextResponse.next()
   }
 
   // ✅ FIXED: Exhibition route protection with specific path handling
@@ -67,30 +74,16 @@ export async function middleware(request: NextRequest) {
       return NextResponse.next()
     }
 
-    // ✅ For ALL other exhibition routes, check authentication
+    // ✅ For ALL other exhibition routes, verify the session signature
     console.log(`🔐 Checking auth for exhibition route: ${pathname}`)
-    
-    const sessionToken = request.cookies.get('session')?.value || 
-                        request.cookies.get('auth-token')?.value
-    
-    if (!sessionToken) {
-      console.log('❌ No exhibition session token, redirecting to exhibition login')
+
+    if (!(await hasValidSession(request))) {
+      console.log('❌ Invalid or missing exhibition session, redirecting to exhibition login')
       return NextResponse.redirect(new URL('/exhibition/login', request.url))
     }
 
-    // Basic token validation for exhibition access
-    try {
-      if (sessionToken.length < 10) {
-        console.log('❌ Invalid exhibition session token format')
-        return NextResponse.redirect(new URL('/exhibition/login', request.url))
-      }
-      
-      console.log('✅ Exhibition session valid, allowing access')
-      return NextResponse.next()
-    } catch (error) {
-      console.error('❌ Error validating exhibition session token:', error)
-      return NextResponse.redirect(new URL('/exhibition/login', request.url))
-    }
+    console.log('✅ Exhibition session valid, allowing access')
+    return NextResponse.next()
   }
 
   // ✅ Allow all other routes (customer portal, public pages, etc.)

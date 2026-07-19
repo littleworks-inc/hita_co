@@ -3,7 +3,16 @@ import { cookies } from 'next/headers'
 import { NextRequest } from 'next/server'
 import bcrypt from 'bcryptjs'
 
-const secretKey = process.env.JWT_SECRET || 'fallback-secret-key'
+const secretKey = process.env.JWT_SECRET
+if (!secretKey || secretKey.length < 32) {
+  // Fail loudly instead of silently using a guessable fallback secret, which
+  // would let anyone forge admin/exhibition sessions. JWT_SECRET must be set to
+  // a long random value in every environment (local .env and the host).
+  throw new Error(
+    'JWT_SECRET environment variable is missing or too short (min 32 chars). ' +
+    'Set a long random value in your environment before starting the app.'
+  )
+}
 const key = new TextEncoder().encode(secretKey)
 
 export async function encrypt(payload: any) {
