@@ -67,8 +67,8 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
+  // Pinch-to-zoom must stay enabled: locking it out blocks anyone zooming in
+  // on product photos or small text on mobile, a real accessibility issue.
   themeColor: [
     { media: '(prefers-color-scheme: light)', color: '#8b5cf6' },
     { media: '(prefers-color-scheme: dark)', color: '#7c3aed' }
