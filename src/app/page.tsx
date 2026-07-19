@@ -24,7 +24,9 @@ import {
   Eye,
   Users,
   Award,
-  CheckCircle
+  CheckCircle,
+  Ruler,
+  MessageCircle
 } from 'lucide-react'
 
 // Force dynamic rendering - this page uses database calls
@@ -137,7 +139,7 @@ async function getFeaturedProducts() {
   })
 }
 
-// Get categories with product counts
+// Get categories with product counts and a sample product image for the tile
 async function getCategories() {
   return await db.category.findMany({
     include: {
@@ -150,6 +152,16 @@ async function getCategories() {
             }
           }
         }
+      },
+      products: {
+        where: {
+          status: 'PUBLISHED',
+          stockQuantity: { gt: 0 },
+          images: { isEmpty: false }
+        },
+        select: { images: true },
+        orderBy: { createdAt: 'desc' },
+        take: 1
       }
     },
     orderBy: { name: 'asc' },
@@ -172,33 +184,50 @@ async function CategoryShowcase() {
             Shop by Category
           </h2>
           <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-            Explore our carefully curated collections at {storeSettings?.storeName || 'our store'}
+            From everyday kurtas to festive sets — explore the collections at {storeSettings?.storeName || 'our store'}
           </p>
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-          {categories.map((category) => (
-            <Link
-              key={category.id}
-              href={`/categories/${category.slug}`}
-              className="group p-4 border border-gray-200 rounded-xl hover:border-purple-300 hover:shadow-lg transition-all duration-300 text-center"
-            >
-              <div className="mb-4">
-                <div
-                  className="w-16 h-16 mx-auto rounded-full flex items-center justify-center text-white font-bold text-xl"
-                  style={{ backgroundColor: storeSettings?.primaryColor || '#7c3aed' }}
-                >
-                  {category.name.charAt(0)}
+          {categories.map((category) => {
+            const tileImage = category.products[0]?.images[0]
+            return (
+              <Link
+                key={category.id}
+                href={`/categories/${category.slug}`}
+                className="group border border-gray-200 rounded-xl overflow-hidden hover:border-purple-300 hover:shadow-lg transition-all duration-300 text-center"
+              >
+                {tileImage ? (
+                  <div className="relative aspect-[3/4] w-full overflow-hidden bg-gray-100">
+                    <Image
+                      src={tileImage}
+                      alt={category.name}
+                      fill
+                      sizes="(max-width: 768px) 50vw, (max-width: 1024px) 33vw, 17vw"
+                      className="object-cover group-hover:scale-105 transition-transform duration-300"
+                    />
+                  </div>
+                ) : (
+                  <div className="aspect-[3/4] w-full flex items-center justify-center bg-gray-50">
+                    <div
+                      className="w-16 h-16 rounded-full flex items-center justify-center text-white font-bold text-xl"
+                      style={{ backgroundColor: storeSettings?.primaryColor || '#7c3aed' }}
+                    >
+                      {category.name.charAt(0)}
+                    </div>
+                  </div>
+                )}
+                <div className="p-3">
+                  <h3 className="font-semibold text-gray-900 text-sm group-hover:text-purple-600 transition-colors">
+                    {category.name}
+                  </h3>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {category._count.products} products
+                  </p>
                 </div>
-              </div>
-              <h3 className="font-semibold text-gray-900 text-sm group-hover:text-purple-600 transition-colors">
-                {category.name}
-              </h3>
-              <p className="text-xs text-gray-500 mt-1">
-                {category._count.products} products
-              </p>
-            </Link>
-          ))}
+              </Link>
+            )
+          })}
         </div>
 
         <div className="text-center mt-8">
@@ -226,7 +255,7 @@ async function FeaturedProducts({ storeSettings }: { storeSettings: Awaited<Retu
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h2 className="text-3xl font-bold text-gray-900 mb-4">Featured Products</h2>
           <p className="text-lg text-gray-600 mb-8">
-            Our featured collection is being updated. Check back soon for amazing products from {storeSettings?.storeName}!
+            Our featured collection is being updated. Check back soon for new arrivals from {storeSettings?.storeName}!
           </p>
           <Link
             href="/products"
@@ -248,7 +277,7 @@ async function FeaturedProducts({ storeSettings }: { storeSettings: Awaited<Retu
             Featured Products
           </h2>
           <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-            Discover our handpicked selection of exceptional products from {storeSettings?.storeName || 'our collection'}
+            Handpicked kurtas, sets and ethnic wear from the latest {storeSettings?.storeName || 'store'} collection
           </p>
         </div>
 
@@ -297,10 +326,10 @@ function DynamicTrustIndicators({ storeSettings }: { storeSettings: Awaited<Retu
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
           {[
-            { icon: CheckCircle, title: 'Authentic Products', desc: 'Genuine and verified items' },
-            { icon: Users, title: 'Customer Focused', desc: 'Your satisfaction is our priority' },
-            { icon: Award, title: 'Quality Assured', desc: 'Rigorous quality standards' },
-            { icon: Heart, title: 'Trusted Brand', desc: 'Built on trust and reliability' }
+            { icon: Sparkles, title: 'Authentic Indian Wear', desc: 'Kurtas, sets and ethnic wear sourced directly from India' },
+            { icon: CheckCircle, title: 'Handpicked Pieces', desc: 'Every style is personally selected for fabric, finish and fit' },
+            { icon: Package, title: 'Small-Batch Collections', desc: 'Limited quantities — when a piece is gone, it\'s gone' },
+            { icon: Heart, title: 'Personal Service', desc: 'Questions about fit or fabric? We\'re happy to help' }
           ].map((item, index) => {
             const Icon = item.icon
             return (
@@ -331,28 +360,32 @@ function StoreHighlights({ storeSettings }: { storeSettings: Awaited<ReturnType<
           {[
             {
               icon: Truck,
-              title: 'Free Shipping',
-              description: 'Free shipping on orders over $100 worldwide',
-              color: 'green'
+              title: 'Ships Across the USA',
+              description: 'Carefully packed and delivered to your door — see our shipping policy',
+              href: '/shipping-policy'
             },
             {
-              icon: Shield,
-              title: 'Secure Payment',
-              description: '100% secure payment processing',
-              color: 'blue'
+              icon: Ruler,
+              title: 'US-Friendly Sizing',
+              description: 'Clear size charts with US conversions for every piece',
+              href: '/size-guide'
             },
             {
-              icon: Heart,
-              title: '24/7 Support',
-              description: 'Dedicated customer support team',
-              color: 'purple'
+              icon: MessageCircle,
+              title: 'DM to Order',
+              description: 'See something you love? Message us on Instagram or send a note to order',
+              href: '/contact'
             }
           ].map((item, index) => {
             const Icon = item.icon
             return (
-              <div key={index} className="flex items-center gap-4 p-6 border border-gray-200 rounded-xl hover:shadow-lg transition-all duration-300">
+              <Link
+                key={index}
+                href={item.href}
+                className="flex items-center gap-4 p-6 border border-gray-200 rounded-xl hover:shadow-lg transition-all duration-300"
+              >
                 <div
-                  className="w-12 h-12 rounded-full flex items-center justify-center text-white"
+                  className="w-12 h-12 rounded-full flex items-center justify-center text-white flex-shrink-0"
                   style={{ backgroundColor: primaryColor }}
                 >
                   <Icon className="h-6 w-6" />
@@ -361,7 +394,7 @@ function StoreHighlights({ storeSettings }: { storeSettings: Awaited<ReturnType<
                   <h3 className="font-semibold text-gray-900 mb-1">{item.title}</h3>
                   <p className="text-sm text-gray-600">{item.description}</p>
                 </div>
-              </div>
+              </Link>
             )
           })}
         </div>

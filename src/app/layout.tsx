@@ -8,6 +8,7 @@ import type { Metadata, Viewport } from 'next'
 import { Inter } from 'next/font/google'
 import { ThemeProvider } from '@/contexts/ThemeContext'
 import ConditionalLayoutWrapper from '@/components/ConditionalLayoutWrapper'
+import SiteFooter from '@/components/customer/SiteFooter'
 import { db } from '@/lib/db'
 import { SupportedCurrency, isValidCurrency, initializeExchangeRates } from '@/lib/currency'
 import './globals.css'
@@ -20,11 +21,11 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: {
-    default: 'Hita&Co - Premium Artisan Products',
+    default: 'Hita&Co - Indian Ethnic Wear for Women in the USA',
     template: '%s | Hita&Co'
   },
-  description: 'Discover unique artisan products from skilled craftsmen around the world. Premium quality, authentic craftsmanship.',
-  keywords: ['artisan', 'handmade', 'crafts', 'premium', 'unique', 'authentic'],
+  description: 'Authentic Indian ethnic wear for women, shipped within the USA. Handpicked kurtas, kurta sets, and festive wear with US-friendly sizing.',
+  keywords: ['Indian ethnic wear USA', 'kurtas for women', 'kurta sets', 'Indian clothing USA', 'festive wear', 'ethnic wear online'],
   authors: [{ name: 'Hita&Co' }],
   creator: 'Hita&Co',
   publisher: 'Hita&Co',
@@ -193,9 +194,10 @@ export default async function RootLayout({
       </head>
       <body className={`${inter.className} antialiased`}>
         <ThemeProvider>
-          <ConditionalLayoutWrapper 
+          <ConditionalLayoutWrapper
             initialCurrency={currencyData.initialCurrency}
             initialRates={currencyData.initialRates}
+            footer={<SiteFooter />}
           >
             {children}
           </ConditionalLayoutWrapper>
