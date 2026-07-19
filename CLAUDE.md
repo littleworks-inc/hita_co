@@ -1,8 +1,8 @@
 # CLAUDE.md - AI Assistant Guide for Hita&Co eCommerce Platform
 
-> **Last Updated**: 2025-11-21
+> **Last Updated**: 2026-07-18
 > **Platform Version**: 1.0.0
-> **Completion**: 96%
+> **Completion**: 96% (payment gateway decision pending)
 
 This document provides comprehensive guidance for AI assistants working on the Hita&Co eCommerce platform. It covers architecture, conventions, workflows, and best practices.
 
@@ -130,7 +130,12 @@ hita_co/
 │   │   ├── contact/          # Contact page
 │   │   ├── exhibition/       # Exhibition POS system
 │   │   ├── products/         # Product pages
-│   │   ├── layout.tsx        # Root layout
+│   │   ├── privacy-policy/   # Privacy policy page
+│   │   ├── returns/          # Returns & exchanges policy (driven by admin return settings)
+│   │   ├── shipping-policy/  # Shipping policy (pulls live shipping zone rates)
+│   │   ├── size-guide/       # Indian-to-US size conversion charts
+│   │   ├── terms/            # Terms of service
+│   │   ├── layout.tsx        # Root layout (renders SiteFooter via ConditionalLayoutWrapper)
 │   │   └── page.tsx          # Homepage
 │   ├── components/           # React components
 │   │   ├── admin/           # Admin-specific components
@@ -153,6 +158,7 @@ hita_co/
 │   │   ├── seo.ts          # SEO utilities
 │   │   ├── shipping-utils.ts # Shipping calculations
 │   │   ├── stock-sync.ts   # Stock synchronization
+│   │   ├── store-settings.ts # Shared store settings fetcher for customer pages
 │   │   └── utils.ts        # General utilities
 │   └── types/              # TypeScript type definitions
 ├── styles/                  # Global styles
@@ -200,6 +206,26 @@ hita_co/
 - **Atomic Design Principles**: UI components are composable
 - **Feature-based**: Admin/customer/exhibition components separated
 - **Shadcn/UI Pattern**: Copy-paste components, modify as needed
+
+### 4.5 **Customer Pages, Footer & Brand Voice**
+
+- **Site footer**: `src/components/customer/SiteFooter.tsx` is a server component passed
+  into `ConditionalLayoutWrapper` via its `footer` prop from `layout.tsx`. It renders only
+  on customer-facing routes (not admin/exhibition/login).
+- **Policy & help pages**: `/shipping-policy`, `/returns`, `/privacy-policy`, `/terms`,
+  `/size-guide` all use `src/components/customer/PolicyPageShell.tsx` (nav + header +
+  prose container). New static/help pages should reuse this shell.
+- **Store settings**: use `getCustomerStoreSettings()` from `src/lib/store-settings.ts`
+  on customer pages instead of duplicating a local `getStoreSettings()`. Returns page
+  content is driven by admin return settings (`returnsEnabled`, `returnPeriodDays`, etc.);
+  shipping policy pulls live rates from `ShippingZone`/`ShippingRate`.
+- **Brand voice**: Hita&Co sells Indian women's ethnic wear (kurtas, sets, festive wear)
+  to customers in the USA. Copy should reflect that — not generic "artisan products" or
+  template text. Fallback store name is `Hita&Co`, never `LittleWorks Inc`.
+- **No unverifiable claims**: do not add marketing claims the business can't back up
+  (e.g., "free worldwide shipping", "24/7 support", "trusted by thousands", payment
+  security claims while no gateway is integrated). Prefer claims backed by settings/data
+  or link to the policy pages.
 
 ### 5. **State Management**
 
@@ -1319,10 +1345,10 @@ npm run db:migrate
 
 Based on `roadmap.md`, priorities are:
 
-1. **Payment Integration** (Priority #1)
-   - Stripe integration
-   - PayPal support
-   - Multi-currency payments
+1. **Payment Integration** (Priority #1 — gateway NOT yet decided as of 2026-07-18)
+   - Business owner has deferred the Stripe vs PayPal vs other decision
+   - Checkout currently records orders without charging; do not claim payment security in copy
+   - Once decided: integrate gateway + sales tax handling (e.g., Stripe Tax)
 
 2. **Catalog/eCommerce Toggle** (Priority #2)
    - Admin setting to disable cart
@@ -1367,6 +1393,8 @@ See [Troubleshooting](#troubleshooting) section above.
 | Date | Version | Changes |
 |------|---------|---------|
 | 2025-11-21 | 1.0.0 | Initial CLAUDE.md creation - comprehensive guide |
+| 2026-07-18 | 1.1.0 | Added site footer (SiteFooter + ConditionalLayoutWrapper `footer` prop), policy pages (/shipping-policy, /returns, /privacy-policy, /terms), /size-guide with product-page link, PolicyPageShell + lib/store-settings.ts. Rewrote homepage/About/metadata brand copy for Indian women's ethnic wear in the USA; removed unverifiable claims. Homepage category tiles now show newest product photo per category. |
+| 2026-07-18 | 1.2.0 | Configured real store settings in DB (row id `default` created; orphaned `test-settings` row deleted — code always queried `default`, so the site had been running on fallbacks). Catalog Mode ENABLED (matches "DM to order" Instagram business model), returns DISABLED (matches Instagram "No returns & refunds"), brand set: "Hita & Co", tagline "Timeless Indian elegance for modern spirit", black/white/amber colors, Instagram link. Homepage third highlight card is now "DM to Order"; footer/pages say "Sales Policy". NOTE: catalog has zero published products; WhatsApp order button needs a number in admin settings. |
 
 ---
 

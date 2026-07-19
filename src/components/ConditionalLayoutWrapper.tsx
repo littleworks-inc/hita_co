@@ -18,12 +18,14 @@ interface ConditionalLayoutWrapperProps {
   children: ReactNode
   initialCurrency: SupportedCurrency
   initialRates: Record<string, number>
+  footer?: ReactNode
 }
 
 export default function ConditionalLayoutWrapper({
   children,
   initialCurrency,
-  initialRates
+  initialRates,
+  footer
 }: ConditionalLayoutWrapperProps) {
   const pathname = usePathname()
   
@@ -73,8 +75,9 @@ export default function ConditionalLayoutWrapper({
           <main className="flex-1">
             {children}
           </main>
+          {footer}
         </div>
-        
+
         {/* Cart Drawer - Only available on customer pages */}
         <CartDrawer />
       </CartProvider>
