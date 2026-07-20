@@ -19,48 +19,59 @@ const inter = Inter({
   variable: '--font-inter'
 })
 
-export const metadata: Metadata = {
-  title: {
-    default: 'Hita&Co - Indian Ethnic Wear for Women in the USA',
-    template: '%s | Hita&Co'
-  },
-  description: 'Authentic Indian ethnic wear for women, shipped within the USA. Handpicked kurtas, kurta sets, and festive wear with US-friendly sizing.',
-  keywords: ['Indian ethnic wear USA', 'kurtas for women', 'kurta sets', 'Indian clothing USA', 'festive wear', 'ethnic wear online'],
-  authors: [{ name: 'Hita&Co' }],
-  creator: 'Hita&Co',
-  publisher: 'Hita&Co',
-  formatDetection: {
-    email: false,
-    address: false,
-    telephone: false,
-  },
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'),
-  manifest: '/manifest.json',
-  appleWebApp: {
-    capable: true,
-    statusBarStyle: 'default',
-    title: 'Hita&Co Mobile',
-    startupImage: [
-      {
-        media: '(device-width: 320px) and (device-height: 568px) and (-webkit-device-pixel-ratio: 2)',
-        url: '/icons/apple-touch-startup-image-640x1136.png'
-      },
-      {
-        media: '(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2)',
-        url: '/icons/apple-touch-startup-image-750x1334.png'
-      },
-      {
-        media: '(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 2)',
-        url: '/icons/apple-touch-startup-image-828x1792.png'
-      }
-    ]
-  },
-  other: {
-    'mobile-web-app-capable': 'yes',
-    'apple-mobile-web-app-capable': 'yes',
-    'apple-mobile-web-app-status-bar-style': 'black-translucent',
-    'msapplication-TileColor': '#8b5cf6',
-    'msapplication-config': '/browserconfig.xml'
+// Dynamic metadata - reads storeName/tagline/metaTitle/metaDescription/favicon
+// from admin settings (StoreSetting) instead of hardcoding the brand name.
+export async function generateMetadata(): Promise<Metadata> {
+  const storeSettings = await getCustomerStoreSettings()
+  const storeName = storeSettings?.storeName || 'Hita&Co'
+  const tagline = storeSettings?.tagline || 'Indian Ethnic Wear for Women in the USA'
+
+  return {
+    title: {
+      default: storeSettings?.metaTitle || `${storeName} - ${tagline}`,
+      template: `%s | ${storeName}`
+    },
+    description: storeSettings?.metaDescription || 'Authentic Indian ethnic wear for women, shipped within the USA. Handpicked kurtas, kurta sets, and festive wear with US-friendly sizing.',
+    keywords: ['Indian ethnic wear USA', 'kurtas for women', 'kurta sets', 'Indian clothing USA', 'festive wear', 'ethnic wear online'],
+    authors: [{ name: storeName }],
+    creator: storeName,
+    publisher: storeName,
+    formatDetection: {
+      email: false,
+      address: false,
+      telephone: false,
+    },
+    metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'),
+    manifest: '/manifest.json',
+    icons: {
+      icon: storeSettings?.favicon || '/favicon.ico'
+    },
+    appleWebApp: {
+      capable: true,
+      statusBarStyle: 'default',
+      title: `${storeName} Mobile`,
+      startupImage: [
+        {
+          media: '(device-width: 320px) and (device-height: 568px) and (-webkit-device-pixel-ratio: 2)',
+          url: '/icons/apple-touch-startup-image-640x1136.png'
+        },
+        {
+          media: '(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2)',
+          url: '/icons/apple-touch-startup-image-750x1334.png'
+        },
+        {
+          media: '(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 2)',
+          url: '/icons/apple-touch-startup-image-828x1792.png'
+        }
+      ]
+    },
+    other: {
+      'mobile-web-app-capable': 'yes',
+      'apple-mobile-web-app-capable': 'yes',
+      'apple-mobile-web-app-status-bar-style': 'black-translucent',
+      'msapplication-TileColor': '#8b5cf6',
+      'msapplication-config': '/browserconfig.xml'
+    }
   }
 }
 
@@ -120,13 +131,16 @@ export default async function RootLayout({
 }) {
   // Get initial data with error handling
   let currencyData
+  let storeName = 'Hita&Co'
   try {
+    const storeSettings = await getStoreSettings()
+    storeName = storeSettings?.storeName || storeName
     currencyData = await getInitialCurrencyData()
   } catch (error) {
     console.error('Layout currency data error:', error)
-    currencyData = { 
-      initialCurrency: 'USD' as SupportedCurrency, 
-      initialRates: {} 
+    currencyData = {
+      initialCurrency: 'USD' as SupportedCurrency,
+      initialRates: {}
     }
   }
 
@@ -138,16 +152,15 @@ export default async function RootLayout({
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-        <meta name="apple-mobile-web-app-title" content="Hita&Co" />
-        <meta name="application-name" content="Hita&Co" />
+        <meta name="apple-mobile-web-app-title" content={storeName} />
+        <meta name="application-name" content={storeName} />
         <meta name="msapplication-TileColor" content="#8b5cf6" />
         <meta name="msapplication-config" content="/browserconfig.xml" />
-        
-        {/* Favicon and Icons */}
-        <link rel="icon" href="/favicon.ico" sizes="any" />
+
+        {/* Static icon assets (favicon itself comes from generateMetadata's `icons` field) */}
         <link rel="icon" href="/icon.svg" type="image/svg+xml" />
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-        
+
         {/* PWA Manifest */}
         <link rel="manifest" href="/manifest.json" />
         

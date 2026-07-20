@@ -51,7 +51,10 @@ export async function GET(request: NextRequest) {
           twitter: '',
           aiProvider: 'openrouter',
           aiApiKey: '',
-          aiModel: 'mistralai/mistral-small-3.2-24b-instruct:free'
+          aiModel: 'mistralai/mistral-small-3.2-24b-instruct:free',
+          announcementBar: '✨ Authentic Indian ethnic wear for women | Shipped across the USA',
+          businessHours: 'Monday - Friday: 9:00 AM - 6:00 PM EST\nSaturday: 10:00 AM - 4:00 PM EST\nSunday: Closed',
+          footerDescription: 'Kurtas, sets and ethnic wear curated from India, shipped within the USA.'
         }
       })
     }
@@ -183,7 +186,13 @@ export async function PUT(request: NextRequest) {
       noReturnsReason: data.noReturnsReason?.trim() || null,
       // Catalog mode fields
       disableShoppingCart: data.disableShoppingCart ?? false,
-      catalogModeSettings: data.catalogModeSettings || null
+      catalogModeSettings: data.catalogModeSettings || null,
+      // Site content fields
+      announcementBar: data.announcementBar?.trim() || null,
+      metaTitle: data.metaTitle?.trim() || null,
+      metaDescription: data.metaDescription?.trim() || null,
+      businessHours: data.businessHours?.trim() || null,
+      footerDescription: data.footerDescription?.trim() || null
     }
 
     console.log('📝 Prepared update data:', updateData)

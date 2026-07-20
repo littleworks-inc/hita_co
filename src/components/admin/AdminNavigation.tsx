@@ -22,7 +22,8 @@ import {
   FolderTree,
   Share2,
   Truck,
-  ImageIcon
+  ImageIcon,
+  Mail
   // 🗑️ REMOVED: Printer icon - no longer needed
 } from 'lucide-react'
 
@@ -40,6 +41,7 @@ const navigation = [
   { name: 'Social Media', href: '/admin/social', icon: Share2 },
   { name: 'Analytics', href: '/admin/analytics', icon: BarChart3 },
   { name: 'Customers', href: '/admin/customers', icon: Users },
+  { name: 'Contact Messages', href: '/admin/contact-messages', icon: Mail },
   { name: 'Settings', href: '/admin/settings', icon: Settings },
 ]
 

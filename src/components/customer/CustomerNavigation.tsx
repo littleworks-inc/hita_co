@@ -38,6 +38,7 @@ interface StoreSettings {
   accentColor: string
   disableShoppingCart?: boolean // ✅ NEW - Catalog mode toggle
   catalogModeSettings?: string  // ✅ NEW - Contact settings
+  announcementBar?: string | null
 }
 
 interface CustomerNavigationProps {
@@ -101,12 +102,14 @@ export default function CustomerNavigation({ storeSettings, initialCategories }:
 
   return (
     <>
-      {/* Top Banner (✅ UNCHANGED) */}
-      <div className="bg-gradient-to-r from-purple-600 to-pink-600 text-white text-center py-2 px-4">
-        <p className="text-sm font-medium">
-          ✨ Authentic Indian ethnic wear for women | Shipped across the USA
-        </p>
-      </div>
+      {/* Top Announcement Banner - admin-editable, hidden when not set */}
+      {storeSettings?.announcementBar && (
+        <div className="bg-gradient-to-r from-purple-600 to-pink-600 text-white text-center py-2 px-4">
+          <p className="text-sm font-medium">
+            {storeSettings.announcementBar}
+          </p>
+        </div>
+      )}
 
       {/* Main Navigation */}
       <nav className="bg-white dark:bg-gray-900 shadow-lg sticky top-0 z-50 transition-colors duration-300">

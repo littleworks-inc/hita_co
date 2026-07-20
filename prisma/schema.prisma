@@ -23,52 +23,51 @@ model User {
 }
 
 model Category {
-  id                    String     @id @default(cuid())
-  name                  String     @unique
-  description           String?
-  slug                  String     @unique
-  parentId              String?
-  
-  
+  id          String  @id @default(cuid())
+  name        String  @unique
+  description String?
+  slug        String  @unique
+  parentId    String?
+
   // Size system defaults
-  defaultRequiresSizes  Boolean    @default(false)
-  
-  createdAt             DateTime   @default(now())
-  updatedAt             DateTime   @updatedAt
-  
+  defaultRequiresSizes Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   // Relations
-  parent                Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id])
-  children              Category[] @relation("CategoryHierarchy")
+  parent                Category?              @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children              Category[]             @relation("CategoryHierarchy")
   products              Product[]
   configurationSettings ConfigurationSetting[]
-  
+
   @@map("categories")
 }
 
 model Country {
-  id                    String    @id @default(cuid())
-  name                  String    @unique
-  code                  String    @unique
-  currency              String
-  currencySymbol        String
-  exchangeRate          Float?
-  isDefault             Boolean   @default(false)
-  
+  id             String  @id @default(cuid())
+  name           String  @unique
+  code           String  @unique
+  currency       String
+  currencySymbol String
+  exchangeRate   Float?
+  isDefault      Boolean @default(false)
+
   // ✅ NEW: Country-specific business defaults
-  defaultGstPercentage  Float?    // Default GST/Tax rate for this country
-  defaultShippingCost   Float?    // Typical shipping cost within country
-  defaultTaxName        String?   // "GST", "VAT", "Sales Tax", etc.
-  businessHours         String?   // JSON string for business hours
-  holidays              String[]  // Array of holiday dates
-  
-  createdAt             DateTime  @default(now())
-  updatedAt             DateTime  @updatedAt
-  
+  defaultGstPercentage Float? // Default GST/Tax rate for this country
+  defaultShippingCost  Float? // Typical shipping cost within country
+  defaultTaxName       String? // "GST", "VAT", "Sales Tax", etc.
+  businessHours        String? // JSON string for business hours
+  holidays             String[] // Array of holiday dates
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   // Relations
   products              Product[]
   countryZones          CountryShippingZone[]
   configurationSettings ConfigurationSetting[]
-  
+
   @@map("countries")
 }
 
@@ -149,8 +148,8 @@ enum ExhibitionPaymentMethod {
 }
 
 model Product {
-  id                      String              @id @default(cuid())
-  sku                     String              @unique
+  id                      String        @id @default(cuid())
+  sku                     String        @unique
   name                    String
   description             String?
   shortDescription        String?
@@ -162,90 +161,90 @@ model Product {
   supplierId              String
   purchaseDate            DateTime?
   invoiceNumber           String?
-  quantity                Int                 @default(1)
-  gstPercentage           Float               @default(0)
-  shippingCost            Float               @default(0)
-  conversionCharges       Float               @default(0)
-  additionalExpenses      Float               @default(0)
+  quantity                Int           @default(1)
+  gstPercentage           Float         @default(0)
+  shippingCost            Float         @default(0)
+  conversionCharges       Float         @default(0)
+  additionalExpenses      Float         @default(0)
   costPriceUSD            Float
   piecePriceUSD           Float
-  profitMargin            Float               @default(0)
-  discountPercentage      Float               @default(0)
+  profitMargin            Float         @default(0)
+  discountPercentage      Float         @default(0)
   sellingPriceUSD         Float
-  stockQuantity           Int                 @default(0)
-  lowStockAlert           Int                 @default(5)
+  stockQuantity           Int           @default(0)
+  lowStockAlert           Int           @default(5)
   seoTitle                String?
   seoDescription          String?
   tags                    String[]
-  isActive                Boolean             @default(true)
-  isFeatured              Boolean             @default(false)
-  createdAt               DateTime            @default(now())
-  updatedAt               DateTime            @updatedAt
-  barcode                 String?             @unique
-  barcodeType             String?             @default("CODE128")
+  isActive                Boolean       @default(true)
+  isFeatured              Boolean       @default(false)
+  createdAt               DateTime      @default(now())
+  updatedAt               DateTime      @updatedAt
+  barcode                 String?       @unique
+  barcodeType             String?       @default("CODE128")
   publishedAt             DateTime?
-  status                  ProductStatus       @default(DRAFT)
+  status                  ProductStatus @default(DRAFT)
   archivedAt              DateTime?
-  showDiscountToCustomers Boolean             @default(false)
-  
+  showDiscountToCustomers Boolean       @default(false)
+
   // ✅ SIMPLIFIED: Size system fields - remove sizeType
-  requiresSizes           Boolean             @default(false)  // Keep this
+  requiresSizes Boolean @default(false) // Keep this
   // sizeType             SizeType?                           // ✅ REMOVE THIS LINE
-  
+
   // Relations
-  exhibitionItems         ExhibitionProduct[]
-  orderItems              OrderItem[]
-  exhibitionSaleItems     ExhibitionSaleItem[]
-  productSizes            ProductSize[]       
-  cartItems               CartItem[]          
-  category                Category            @relation(fields: [categoryId], references: [id])
-  country                 Country             @relation(fields: [countryId], references: [id])
-  supplier                Supplier            @relation(fields: [supplierId], references: [id])
+  exhibitionItems     ExhibitionProduct[]
+  orderItems          OrderItem[]
+  exhibitionSaleItems ExhibitionSaleItem[]
+  productSizes        ProductSize[]
+  cartItems           CartItem[]
+  category            Category             @relation(fields: [categoryId], references: [id])
+  country             Country              @relation(fields: [countryId], references: [id])
+  supplier            Supplier             @relation(fields: [supplierId], references: [id])
 
   @@map("products")
 }
 
 // ✅ NEW: Product Size Variants Model
 model ProductSize {
-  id                    String                 @id @default(cuid())
-  productId             String
-  size                  String                 // "XS", "S", "M", "L", "XL", "XXL", etc.
-  sku                   String                 @unique // "KURTA-001-S", "KURTA-001-M"
-  
+  id        String @id @default(cuid())
+  productId String
+  size      String // "XS", "S", "M", "L", "XL", "XXL", etc.
+  sku       String @unique // "KURTA-001-S", "KURTA-001-M"
+
   // ✅ NEW: Individual barcode for each size variant
-  barcode               String?                @unique // "HC-BLUE-100941-XXL", "HC-BLUE-100941-XL"
-  barcodeType           String?                @default("CODE128")
-  
-  stockQuantity         Int                    @default(0)
-  lowStockAlert         Int                    @default(5)
-  isActive              Boolean                @default(true)
-  sortOrder             Int                    @default(0)
-  createdAt             DateTime               @default(now())
-  updatedAt             DateTime               @updatedAt
-  
+  barcode     String? @unique // "HC-BLUE-100941-XXL", "HC-BLUE-100941-XL"
+  barcodeType String? @default("CODE128")
+
+  stockQuantity Int      @default(0)
+  lowStockAlert Int      @default(5)
+  isActive      Boolean  @default(true)
+  sortOrder     Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
   // Relations remain the same
-  product               Product                @relation(fields: [productId], references: [id], onDelete: Cascade)
-  exhibitionSizes       ExhibitionProductSize[]
-  orderItems            OrderItem[]
-  cartItems             CartItem[]
-  exhibitionSaleItems   ExhibitionSaleItem[]
+  product             Product                 @relation(fields: [productId], references: [id], onDelete: Cascade)
+  exhibitionSizes     ExhibitionProductSize[]
+  orderItems          OrderItem[]
+  cartItems           CartItem[]
+  exhibitionSaleItems ExhibitionSaleItem[]
 
   @@map("product_sizes")
 }
 
 // ✅ NEW: Exhibition Size Tracking
 model ExhibitionProductSize {
-  id                    String              @id @default(cuid())
-  exhibitionProductId   String
-  productSizeId         String
-  quantityTaken         Int                 @default(0)  // How many of this size taken to exhibition
-  quantitySold          Int                 @default(0)  // How many sold at exhibition
-  createdAt             DateTime            @default(now())
-  updatedAt             DateTime            @updatedAt
-  
+  id                  String   @id @default(cuid())
+  exhibitionProductId String
+  productSizeId       String
+  quantityTaken       Int      @default(0) // How many of this size taken to exhibition
+  quantitySold        Int      @default(0) // How many sold at exhibition
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
   // Relations
-  exhibitionProduct     ExhibitionProduct   @relation(fields: [exhibitionProductId], references: [id], onDelete: Cascade)
-  productSize           ProductSize         @relation(fields: [productSizeId], references: [id], onDelete: Cascade)
+  exhibitionProduct ExhibitionProduct @relation(fields: [exhibitionProductId], references: [id], onDelete: Cascade)
+  productSize       ProductSize       @relation(fields: [productSizeId], references: [id], onDelete: Cascade)
 
   @@unique([exhibitionProductId, productSizeId])
   @@map("exhibition_product_sizes")
@@ -280,85 +279,85 @@ model Order {
 }
 
 model OrderItem {
-  id             String       @id @default(cuid())
-  orderId        String
-  productId      String
-  productSizeId  String?      // ✅ NEW: Optional size reference
-  sizeLabel      String?      // ✅ NEW: Size display text ("Medium", "Large")
-  quantity       Int
-  pricePerItem   Float
-  totalPrice     Float
-  order          Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  product        Product      @relation(fields: [productId], references: [id])
-  productSize    ProductSize? @relation(fields: [productSizeId], references: [id])
+  id            String       @id @default(cuid())
+  orderId       String
+  productId     String
+  productSizeId String? // ✅ NEW: Optional size reference
+  sizeLabel     String? // ✅ NEW: Size display text ("Medium", "Large")
+  quantity      Int
+  pricePerItem  Float
+  totalPrice    Float
+  order         Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product       Product      @relation(fields: [productId], references: [id])
+  productSize   ProductSize? @relation(fields: [productSizeId], references: [id])
 
   @@map("order_items")
 }
 
 // ✅ NEW: Cart Item Model (for persistent cart)
 model CartItem {
-  id             String       @id @default(cuid())
-  sessionId      String       // For guest users
-  userId         String?      // For logged-in users (future)
-  productId      String
-  productSizeId  String?      // ✅ NEW: Optional size reference
-  quantity       Int
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
-  
+  id            String   @id @default(cuid())
+  sessionId     String // For guest users
+  userId        String? // For logged-in users (future)
+  productId     String
+  productSizeId String? // ✅ NEW: Optional size reference
+  quantity      Int
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
   // Relations
-  product        Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
-  productSize    ProductSize? @relation(fields: [productSizeId], references: [id])
+  product     Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productSize ProductSize? @relation(fields: [productSizeId], references: [id])
 
   @@unique([sessionId, productId, productSizeId])
   @@map("cart_items")
 }
 
 model Exhibition {
-  id               String              @id @default(cuid())
+  id               String   @id @default(cuid())
   title            String
   description      String?
   location         String
   startDate        DateTime
   endDate          DateTime
-  participationFee Float               @default(0)
+  participationFee Float    @default(0)
   images           String[]
-  isActive         Boolean             @default(true)
-  createdAt        DateTime            @default(now())
-  updatedAt        DateTime            @updatedAt
-  
+  isActive         Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
   // Relations
-  products         ExhibitionProduct[]
-  orders           Order[]
-  sales            ExhibitionSale[]
+  products ExhibitionProduct[]
+  orders   Order[]
+  sales    ExhibitionSale[]
 
   @@map("exhibitions")
 }
 
 model ExhibitionProduct {
-  id            String     @id @default(cuid())
+  id            String @id @default(cuid())
   exhibitionId  String
   productId     String
   quantityTaken Int
-  quantitySold  Int        @default(0)
-  
+  quantitySold  Int    @default(0)
+
   // Exhibition-specific pricing fields
-  exhibitionPrice     Float?    // Override price for this exhibition
-  originalPrice       Float?    // Store the original price for reference
-  discountPercentage  Float?    @default(0) // Clearance discount
-  isClearance         Boolean   @default(false) // Mark as clearance item
-  priceHistory        Json?     // Track price changes during exhibition
-  
+  exhibitionPrice    Float? // Override price for this exhibition
+  originalPrice      Float? // Store the original price for reference
+  discountPercentage Float?  @default(0) // Clearance discount
+  isClearance        Boolean @default(false) // Mark as clearance item
+  priceHistory       Json? // Track price changes during exhibition
+
   // Sales tracking fields
-  salesNotes          String?   // Notes about sales performance
-  lastSaleDate        DateTime? // When was last item sold
-  priceChangedAt      DateTime? // When price was last updated
-  
+  salesNotes     String? // Notes about sales performance
+  lastSaleDate   DateTime? // When was last item sold
+  priceChangedAt DateTime? // When price was last updated
+
   // Relations
-  exhibition    Exhibition @relation(fields: [exhibitionId], references: [id], onDelete: Cascade)
-  product       Product    @relation(fields: [productId], references: [id])
-  saleItems     ExhibitionSaleItem[]
-  exhibitionSizes ExhibitionProductSize[]  // ✅ NEW: Size tracking
+  exhibition      Exhibition              @relation(fields: [exhibitionId], references: [id], onDelete: Cascade)
+  product         Product                 @relation(fields: [productId], references: [id])
+  saleItems       ExhibitionSaleItem[]
+  exhibitionSizes ExhibitionProductSize[] // ✅ NEW: Size tracking
 
   @@unique([exhibitionId, productId])
   @@map("exhibition_products")
@@ -366,145 +365,152 @@ model ExhibitionProduct {
 
 // Exhibition Sales (POS System)
 model ExhibitionSale {
-  id                    String                    @id @default(cuid())
-  exhibitionId          String
-  saleNumber            String                    @unique // EXH001, EXH002, etc.
-  
+  id           String @id @default(cuid())
+  exhibitionId String
+  saleNumber   String @unique // EXH001, EXH002, etc.
+
   // Customer Info
-  customerName          String?
-  customerPhone         String?
-  customerEmail         String?
-  
+  customerName  String?
+  customerPhone String?
+  customerEmail String?
+
   // Sale Details
-  subtotal              Float
-  tax                   Float                     @default(0)
-  discount              Float                     @default(0)
-  total                 Float
-  
+  subtotal Float
+  tax      Float @default(0)
+  discount Float @default(0)
+  total    Float
+
   // Payment Info
-  paymentMethod         ExhibitionPaymentMethod
-  paymentDetails        Json?                     // For split payments, references, etc.
-  cashReceived          Float?                    // For cash transactions
-  changeGiven           Float?                    // For cash transactions
-  
+  paymentMethod  ExhibitionPaymentMethod
+  paymentDetails Json? // For split payments, references, etc.
+  cashReceived   Float? // For cash transactions
+  changeGiven    Float? // For cash transactions
+
   // Status & Tracking
-  isCompleted           Boolean                   @default(false)
-  completedAt           DateTime?
-  receiptPrinted        Boolean                   @default(false)
-  receiptEmailSent      Boolean                   @default(false)
-  staffNotes            String?
-  
-  createdAt             DateTime                  @default(now())
-  updatedAt             DateTime                  @updatedAt
-  
+  isCompleted      Boolean   @default(false)
+  completedAt      DateTime?
+  receiptPrinted   Boolean   @default(false)
+  receiptEmailSent Boolean   @default(false)
+  staffNotes       String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   // Relations
-  exhibition            Exhibition                @relation(fields: [exhibitionId], references: [id])
-  items                 ExhibitionSaleItem[]
+  exhibition Exhibition           @relation(fields: [exhibitionId], references: [id])
+  items      ExhibitionSaleItem[]
 
   @@map("exhibition_sales")
 }
 
 // Individual items within an exhibition sale
 model ExhibitionSaleItem {
-  id                    String            @id @default(cuid())
-  saleId                String
-  exhibitionProductId   String
-  productId             String
-  productSizeId         String?           // ✅ Size reference
-  sizeLabel             String?           // ✅ Size display text ("Medium", "Large")
-  
+  id                  String  @id @default(cuid())
+  saleId              String
+  exhibitionProductId String
+  productId           String
+  productSizeId       String? // ✅ Size reference
+  sizeLabel           String? // ✅ Size display text ("Medium", "Large")
+
   // ✅ ADD: Product information (for receipt and reporting)
-  productName           String            // Product name at time of sale
-  productSku            String            // Product SKU at time of sale
-  categoryName          String            // Category name at time of sale
-  
+  productName  String // Product name at time of sale
+  productSku   String // Product SKU at time of sale
+  categoryName String // Category name at time of sale
+
   // ✅ ADD: Quantity and pricing details
-  quantity              Int               // Quantity sold
-  originalPrice         Float             // Original store price
-  exhibitionPrice       Float             // Exhibition price (before discounts)
-  finalPrice            Float             // Final price per item (after all discounts)
-  lineTotal             Float             // Final price × quantity
-  discount              Float             @default(0) // Total discount amount for this line
-  
+  quantity        Int // Quantity sold
+  originalPrice   Float // Original store price
+  exhibitionPrice Float // Exhibition price (before discounts)
+  finalPrice      Float // Final price per item (after all discounts)
+  lineTotal       Float // Final price × quantity
+  discount        Float @default(0) // Total discount amount for this line
+
   // ✅ ADD: Timestamps
-  createdAt             DateTime          @default(now())
-  updatedAt             DateTime          @updatedAt
-  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   // Relations
-  sale                  ExhibitionSale    @relation(fields: [saleId], references: [id], onDelete: Cascade)
-  exhibitionProduct     ExhibitionProduct @relation(fields: [exhibitionProductId], references: [id])
-  product               Product           @relation(fields: [productId], references: [id])
-  productSize           ProductSize?      @relation(fields: [productSizeId], references: [id])
+  sale              ExhibitionSale    @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  exhibitionProduct ExhibitionProduct @relation(fields: [exhibitionProductId], references: [id])
+  product           Product           @relation(fields: [productId], references: [id])
+  productSize       ProductSize?      @relation(fields: [productSizeId], references: [id])
 
   @@map("exhibition_sale_items")
 }
 
 model StoreSetting {
-  id                        String        @id @default(cuid())
-  storeName                 String        @default("LittleWorks Inc")
-  tagline                   String?
-  logo                      String?
-  favicon                   String?
-  primaryColor              String        @default("#000000")
-  secondaryColor            String        @default("#ffffff")
-  accentColor               String        @default("#f59e0b")
-  email                     String?
-  phone                     String?
-  address                   Json?
-  instagram                 String?
-  facebook                  String?
-  pinterest                 String?
-  twitter                   String?
-  aiProvider                String?
-  aiApiKey                  String?
-  aiModel                   String?
-  currency                  String        @default("USD")
-  timezone                  String        @default("America/New_York")
-  defaultShippingZoneId     String?
-  
+  id                    String  @id @default(cuid())
+  storeName             String  @default("LittleWorks Inc")
+  tagline               String?
+  logo                  String?
+  favicon               String?
+  primaryColor          String  @default("#000000")
+  secondaryColor        String  @default("#ffffff")
+  accentColor           String  @default("#f59e0b")
+  email                 String?
+  phone                 String?
+  address               Json?
+  instagram             String?
+  facebook              String?
+  pinterest             String?
+  twitter               String?
+  aiProvider            String?
+  aiApiKey              String?
+  aiModel               String?
+  currency              String  @default("USD")
+  timezone              String  @default("America/New_York")
+  defaultShippingZoneId String?
+
   // Return Policy Fields (existing)
-  returnsEnabled            Boolean?      @default(true)
-  returnPeriodDays          Int?          @default(30)
-  returnPolicyUrl           String?
-  hasRestockingFee          Boolean?      @default(false)
-  restockingFeePercentage   Float?        @default(0)
-  returnPolicyDescription   String?
-  noReturnsReason           String?
-  
+  returnsEnabled          Boolean? @default(true)
+  returnPeriodDays        Int?     @default(30)
+  returnPolicyUrl         String?
+  hasRestockingFee        Boolean? @default(false)
+  restockingFeePercentage Float?   @default(0)
+  returnPolicyDescription String?
+  noReturnsReason         String?
+
   // ✅ NEW: Catalog/eCommerce Toggle Fields (just added to database)
-  disableShoppingCart       Boolean?      @default(false)  // false = eCommerce, true = Catalog
-  catalogModeSettings       String?       // JSON string for contact settings
-  
-  createdAt                 DateTime      @default(now())
-  updatedAt                 DateTime      @updatedAt
-  defaultShippingZone       ShippingZone? @relation(fields: [defaultShippingZoneId], references: [id])
+  disableShoppingCart Boolean? @default(false) // false = eCommerce, true = Catalog
+  catalogModeSettings String? // JSON string for contact settings
+
+  // Site content fields (admin-editable, previously hardcoded in components)
+  announcementBar   String? // Top promo banner text shown on every customer page
+  metaTitle         String? // Overrides default SEO <title> when set
+  metaDescription   String? // Overrides default SEO meta description when set
+  businessHours     String? // Free-text business hours shown on Contact page
+  footerDescription String? // Short descriptive sentence shown in site footer
+
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+  defaultShippingZone ShippingZone? @relation(fields: [defaultShippingZoneId], references: [id])
 
   @@map("store_settings")
 }
 
 // Shipping Zone Model (groups countries/regions)
 model ShippingZone {
-  id              String         @id @default(cuid())
-  name            String         @unique
-  description     String?
-  isDefault       Boolean        @default(false)
-  isActive        Boolean        @default(true)
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
-  zoneCountries   CountryShippingZone[]
-  shippingRates   ShippingRate[]
-  storeSettings   StoreSetting[]
+  id            String                @id @default(cuid())
+  name          String                @unique
+  description   String?
+  isDefault     Boolean               @default(false)
+  isActive      Boolean               @default(true)
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
+  zoneCountries CountryShippingZone[]
+  shippingRates ShippingRate[]
+  storeSettings StoreSetting[]
 
   @@map("shipping_zones")
 }
 
 model CountryShippingZone {
-  id              String       @id @default(cuid())
-  countryId       String
-  shippingZoneId  String
-  createdAt       DateTime     @default(now())
-  country         Country      @relation(fields: [countryId], references: [id], onDelete: Cascade)
-  shippingZone    ShippingZone @relation(fields: [shippingZoneId], references: [id], onDelete: Cascade)
+  id             String       @id @default(cuid())
+  countryId      String
+  shippingZoneId String
+  createdAt      DateTime     @default(now())
+  country        Country      @relation(fields: [countryId], references: [id], onDelete: Cascade)
+  shippingZone   ShippingZone @relation(fields: [shippingZoneId], references: [id], onDelete: Cascade)
 
   @@unique([countryId, shippingZoneId])
   @@map("country_shipping_zones")
@@ -529,23 +535,23 @@ model ShippingRate {
 }
 
 model ConfigurationSetting {
-  id              String   @id @default(cuid())
-  category        String   // 'PRICING', 'BUSINESS_RULES', 'UI_SETTINGS', etc.
-  key             String   // 'profit_margin', 'low_stock_alert', etc.
-  value           String   // JSON string for complex values, simple string for basic values
-  dataType        String   // 'number', 'string', 'boolean', 'json'
-  description     String?  // Human-readable description
-  countryId       String?  // For country-specific settings
-  categoryId      String?  // For category-specific settings
-  isUserEditable  Boolean  @default(true)  // Can admin modify this?
-  isActive        Boolean  @default(true)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  
+  id             String   @id @default(cuid())
+  category       String // 'PRICING', 'BUSINESS_RULES', 'UI_SETTINGS', etc.
+  key            String // 'profit_margin', 'low_stock_alert', etc.
+  value          String // JSON string for complex values, simple string for basic values
+  dataType       String // 'number', 'string', 'boolean', 'json'
+  description    String? // Human-readable description
+  countryId      String? // For country-specific settings
+  categoryId     String? // For category-specific settings
+  isUserEditable Boolean  @default(true) // Can admin modify this?
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
   // ✅ FIXED: Relations use proper field names
-  country         Country?  @relation(fields: [countryId], references: [id])
-  categoryRef     Category? @relation(fields: [categoryId], references: [id])
-  
+  country     Country?  @relation(fields: [countryId], references: [id])
+  categoryRef Category? @relation(fields: [categoryId], references: [id])
+
   // ✅ FIXED: Unique constraint uses scalar fields only
   @@unique([category, key, countryId, categoryId])
   @@map("configuration_settings")
@@ -553,29 +559,43 @@ model ConfigurationSetting {
 
 model ConfigurationTemplate {
   id          String   @id @default(cuid())
-  name        String   @unique  // 'ETHNIC_FASHION_DEFAULT', 'JEWELRY_TEMPLATE', etc.
+  name        String   @unique // 'ETHNIC_FASHION_DEFAULT', 'JEWELRY_TEMPLATE', etc.
   description String?
   isActive    Boolean  @default(true)
-  settings    String   // JSON string of configuration values
+  settings    String // JSON string of configuration values
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  
+
   @@map("configuration_templates")
 }
 
 model HeroSlide {
-  id              String    @id @default(cuid())
-  title           String    // Main headline text
-  subtitle        String?   // Secondary text
-  description     String?   // Supporting description
-  ctaText         String?   // Call-to-action button text
-  ctaLink         String?   // Call-to-action button link
-  image           String?   // Hero image URL
-  gradient        String?   // Fallback gradient (e.g., "from-purple-600 to-pink-600")
-  order           Int       @default(0)  // Display order (0 = first)
-  isActive        Boolean   @default(true)  // Can be enabled/disabled
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  id          String   @id @default(cuid())
+  title       String // Main headline text
+  subtitle    String? // Secondary text
+  description String? // Supporting description
+  ctaText     String? // Call-to-action button text
+  ctaLink     String? // Call-to-action button link
+  image       String? // Hero image URL
+  gradient    String? // Fallback gradient (e.g., "from-purple-600 to-pink-600")
+  order       Int      @default(0) // Display order (0 = first)
+  isActive    Boolean  @default(true) // Can be enabled/disabled
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   @@map("hero_slides")
+}
+
+model ContactMessage {
+  id          String   @id @default(cuid())
+  name        String
+  email       String
+  phone       String?
+  subject     String
+  message     String
+  inquiryType String
+  status      String   @default("new") // new, read, replied
+  createdAt   DateTime @default(now())
+
+  @@map("contact_messages")
 }

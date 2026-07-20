@@ -69,8 +69,8 @@ export default async function SiteFooter() {
               <span className="text-lg font-bold text-white">{storeName}</span>
             </div>
             <p className="text-sm text-gray-400 leading-relaxed">
-              {tagline}. Kurtas, sets and ethnic wear curated from India, shipped
-              within the USA.
+              {tagline}
+              {settings?.footerDescription ? `. ${settings.footerDescription}` : '.'}
             </p>
             {socialLinks.length > 0 && (
               <div className="flex gap-4 mt-4">

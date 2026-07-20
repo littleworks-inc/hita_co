@@ -43,7 +43,8 @@ import {
   Key,
   Shield,
   Info,
-  Lightbulb
+  Lightbulb,
+  Clock
 } from 'lucide-react'
 
 interface StoreSettings {
@@ -80,7 +81,14 @@ interface StoreSettings {
   // ✅ ADDED: Missing catalog mode fields
   disableShoppingCart: boolean | null
   catalogModeSettings: string | null
-  
+
+  // Site content fields
+  announcementBar: string | null
+  metaTitle: string | null
+  metaDescription: string | null
+  businessHours: string | null
+  footerDescription: string | null
+
   // Database fields
   createdAt?: Date
   updatedAt?: Date
@@ -391,6 +399,11 @@ export default function StoreSettingsForm({ storeSettings }: StoreSettingsFormPr
       showInstagram: true,
       customContactText: 'Contact us for pricing and availability'
     }),
+    announcementBar: storeSettings.announcementBar || '',
+    metaTitle: storeSettings.metaTitle || '',
+    metaDescription: storeSettings.metaDescription || '',
+    businessHours: storeSettings.businessHours || '',
+    footerDescription: storeSettings.footerDescription || '',
   })
 
   useEffect(() => {
@@ -1016,6 +1029,23 @@ export default function StoreSettingsForm({ storeSettings }: StoreSettingsFormPr
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
                 />
               </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="businessHours" className="flex items-center gap-2">
+                  <Clock className="h-4 w-4" />
+                  Business Hours
+                </Label>
+                <textarea
+                  id="businessHours"
+                  value={formData.businessHours}
+                  onChange={(e) => handleInputChange('businessHours', e.target.value)}
+                  placeholder={'Monday - Friday: 9:00 AM - 6:00 PM EST\nSaturday: 10:00 AM - 4:00 PM EST\nSunday: Closed'}
+                  rows={3}
+                  disabled={loading}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                />
+                <p className="text-xs text-gray-500">One line per day/schedule. Shown as-is on the Contact page. Leave blank to hide the Business Hours section.</p>
+              </div>
             </CardContent>
           </Card>
         )}
@@ -1401,6 +1431,72 @@ export default function StoreSettingsForm({ storeSettings }: StoreSettingsFormPr
                       </option>
                     ))}
                   </select>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Site Content Tab (shares the General tab) */}
+        {activeTab === 'general' && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Type className="h-5 w-5" />
+                Site Content
+              </CardTitle>
+              <p className="text-sm text-gray-600">
+                Text shown across the customer-facing site. Leave blank to hide.
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="announcementBar">Top Announcement Banner</Label>
+                <Input
+                  id="announcementBar"
+                  value={formData.announcementBar}
+                  onChange={(e) => handleInputChange('announcementBar', e.target.value)}
+                  placeholder="e.g., ✨ Authentic Indian ethnic wear for women | Shipped across the USA"
+                  disabled={loading}
+                />
+                <p className="text-xs text-gray-500">Shown in the purple bar at the very top of every customer page. Leave blank to hide it.</p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="footerDescription">Footer Description</Label>
+                <textarea
+                  id="footerDescription"
+                  rows={2}
+                  value={formData.footerDescription}
+                  onChange={(e) => handleInputChange('footerDescription', e.target.value)}
+                  placeholder="e.g., Kurtas, sets and ethnic wear curated from India, shipped within the USA."
+                  disabled={loading}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                />
+                <p className="text-xs text-gray-500">Short sentence shown under your tagline in the site footer.</p>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="metaTitle">SEO Title Override</Label>
+                  <Input
+                    id="metaTitle"
+                    value={formData.metaTitle}
+                    onChange={(e) => handleInputChange('metaTitle', e.target.value)}
+                    placeholder={`${formData.storeName || 'Hita&Co'} - Indian Ethnic Wear for Women in the USA`}
+                    disabled={loading}
+                  />
+                  <p className="text-xs text-gray-500">Shown in the browser tab and search results. Leave blank to use store name.</p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="metaDescription">SEO Description Override</Label>
+                  <Input
+                    id="metaDescription"
+                    value={formData.metaDescription}
+                    onChange={(e) => handleInputChange('metaDescription', e.target.value)}
+                    placeholder="Shown under your listing in Google search results"
+                    disabled={loading}
+                  />
                 </div>
               </div>
             </CardContent>

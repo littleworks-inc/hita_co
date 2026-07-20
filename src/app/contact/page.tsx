@@ -2,14 +2,13 @@
 import Link from 'next/link'
 import CustomerNavigation from '@/components/customer/CustomerNavigation'
 import Breadcrumb from '@/components/customer/Breadcrumb'
+import ContactFormClient from '@/components/customer/ContactFormClient'
 import { getCustomerStoreSettings, getNavCategories, DEFAULT_PRIMARY_COLOR, DEFAULT_ACCENT_COLOR } from '@/lib/store-settings'
 import {
   Mail,
   Phone,
   MapPin,
   Clock,
-  MessageCircle,
-  Send,
   Heart,
   Star,
   Globe,
@@ -92,37 +91,31 @@ function ContactInformation({ storeSettings }: { storeSettings: any }) {
   const primaryColor = storeSettings?.primaryColor || DEFAULT_PRIMARY_COLOR
   const storeName = storeSettings?.storeName || 'Hita&Co'
 
-  // Dynamic contact information with proper fallbacks
+  // Dynamic contact information - each method only appears when the admin
+  // has actually configured it (no fake placeholder phone numbers etc).
   const contactMethods = [
-    {
+    storeSettings?.email && {
       icon: Mail,
       title: 'Email Us',
       description: 'Send us an email and we\'ll respond within 24 hours',
-      value: storeSettings?.email || undefined, // Updated fallback
-      action: `mailto:${storeSettings?.email || undefined}`
+      value: storeSettings.email,
+      action: `mailto:${storeSettings.email}`
     },
-    {
+    storeSettings?.phone && {
       icon: Phone,
       title: 'Call Us',
       description: 'Speak directly with our customer service team',
-      value: storeSettings?.phone || '+1 (555) 123-4567', // Keep generic fallback
-      action: `tel:${storeSettings?.phone?.replace(/\s/g, '') || '+15551234567'}`
-    },
-    {
-      icon: MessageCircle,
-      title: 'Live Chat',
-      description: 'Chat with us in real-time for instant support',
-      value: 'Available Mon-Fri, 9 AM - 6 PM EST',
-      action: '#'
+      value: storeSettings.phone,
+      action: `tel:${storeSettings.phone.replace(/\s/g, '')}`
     },
     {
       icon: MapPin,
       title: 'Our Location',
       description: 'Business address and office location',
-      value: storeSettings?.address || 'Shipping Worldwide - Online Store', // Updated fallback
+      value: storeSettings?.address || 'Shipping Worldwide - Online Store',
       action: storeSettings?.address ? `https://maps.google.com/?q=${encodeURIComponent(storeSettings.address)}` : '#'
     }
-  ]
+  ].filter((method): method is NonNullable<typeof method> => Boolean(method))
 
   return (
     <section className="py-16 bg-white">
@@ -185,7 +178,6 @@ function ContactInformation({ storeSettings }: { storeSettings: any }) {
 // Contact Form Section
 function ContactForm({ storeSettings }: { storeSettings: any }) {
   const primaryColor = storeSettings?.primaryColor || DEFAULT_PRIMARY_COLOR
-  const storeName = storeSettings?.storeName || 'Hita&Co'
 
   return (
     <section className="py-16 bg-gray-50">
@@ -200,99 +192,7 @@ function ContactForm({ storeSettings }: { storeSettings: any }) {
         </div>
 
         <div className="bg-white rounded-2xl shadow-xl p-8">
-          <form className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  First Name *
-                </label>
-                <input
-                  type="text"
-                  required
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent focus:outline-none"
-                  style={{
-                    '--tw-ring-color': primaryColor
-                  } as React.CSSProperties}
-                  placeholder="Enter your first name"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Last Name *
-                </label>
-                <input
-                  type="text"
-                  required
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent focus:outline-none"
-                  style={{ '--tw-ring-color': primaryColor } as React.CSSProperties}
-                  placeholder="Enter your last name"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Email Address *
-                </label>
-                <input
-                  type="email"
-                  required
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent focus:outline-none"
-                  style={{ '--tw-ring-color': primaryColor } as React.CSSProperties}
-                  placeholder="your.email@example.com"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Phone Number
-                </label>
-                <input
-                  type="tel"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent focus:outline-none"
-                  style={{ '--tw-ring-color': primaryColor } as React.CSSProperties}
-                  placeholder="+1 (555) 123-4567"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Subject *
-              </label>
-              <input
-                type="text"
-                required
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent focus:outline-none"
-                style={{ '--tw-ring-color': primaryColor } as React.CSSProperties}
-                placeholder="What can we help you with? (e.g., Product inquiry, Order status, Shipping question)"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Message *
-              </label>
-              <textarea
-                required
-                rows={6}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent focus:outline-none resize-none"
-                style={{ '--tw-ring-color': primaryColor } as React.CSSProperties}
-                placeholder="Tell us more about your inquiry... (e.g., product details you're looking for, order number, delivery address, etc.)"
-              />
-            </div>
-
-            <div>
-              <button
-                type="submit"
-                className="w-full text-white px-8 py-4 rounded-lg font-semibold text-lg transition-all duration-300 hover:transform hover:scale-105 shadow-lg"
-                style={{ backgroundColor: primaryColor }}
-              >
-                <Send className="inline h-5 w-5 mr-2" />
-                Send Message
-              </button>
-            </div>
-          </form>
+          <ContactFormClient primaryColor={primaryColor} />
         </div>
       </div>
     </section>
@@ -304,11 +204,11 @@ function BusinessInfo({ storeSettings }: { storeSettings: any }) {
   const primaryColor = storeSettings?.primaryColor || DEFAULT_PRIMARY_COLOR
   const storeName = storeSettings?.storeName || 'Hita&Co'
 
-  const businessHours = [
-    { day: 'Monday - Friday', hours: '9:00 AM - 6:00 PM EST' },
-    { day: 'Saturday', hours: '10:00 AM - 4:00 PM EST' },
-    { day: 'Sunday', hours: 'Closed' }
-  ]
+  // Admin-editable free text (one line per schedule), set in Store Settings > Contact Info
+  const businessHoursLines: string[] = (storeSettings?.businessHours || '')
+    .split('\n')
+    .map((line: string) => line.trim())
+    .filter(Boolean)
 
   const socialMedia = [
     { name: 'Instagram', url: storeSettings?.instagram, icon: Instagram },
@@ -320,23 +220,35 @@ function BusinessInfo({ storeSettings }: { storeSettings: any }) {
     <section className="py-16 bg-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-start">
-          {/* Business Hours */}
+          {/* Business Hours - admin-editable via Store Settings > Contact Info */}
           <div>
             <h3 className="text-2xl font-bold text-gray-900 mb-6">
               <Clock className="inline h-6 w-6 mr-2" />
               Business Hours
             </h3>
-            <p className="text-gray-600 mb-8">
-              Our customer service team is available during these hours for phone and live chat support
-            </p>
-            <div className="space-y-3">
-              {businessHours.map((schedule, index) => (
-                <div key={index} className="flex justify-between items-center py-3 border-b border-gray-200 last:border-b-0">
-                  <span className="font-medium text-gray-900">{schedule.day}</span>
-                  <span className="text-gray-600">{schedule.hours}</span>
+            {businessHoursLines.length > 0 ? (
+              <>
+                <p className="text-gray-600 mb-8">
+                  Our customer service team is available during these hours for phone support
+                </p>
+                <div className="space-y-3">
+                  {businessHoursLines.map((line, index) => {
+                    const [day, ...rest] = line.split(':')
+                    const hours = rest.join(':').trim()
+                    return (
+                      <div key={index} className="flex justify-between items-center py-3 border-b border-gray-200 last:border-b-0">
+                        <span className="font-medium text-gray-900">{day.trim()}</span>
+                        {hours && <span className="text-gray-600">{hours}</span>}
+                      </div>
+                    )
+                  })}
                 </div>
-              ))}
-            </div>
+              </>
+            ) : (
+              <p className="text-gray-600 mb-8">
+                Reach us by email anytime - we respond within 24 hours.
+              </p>
+            )}
             <div className="mt-6 p-4 bg-gray-50 rounded-lg">
               <p className="text-sm text-gray-600">
                 <CheckCircle className="inline h-4 w-4 text-green-500 mr-2" />

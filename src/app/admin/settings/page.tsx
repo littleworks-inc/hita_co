@@ -33,6 +33,9 @@ export default async function StoreSettingsPage() {
         email: 'thehitanco@gmail.com',
         currency: 'USD',
         timezone: 'America/New_York',
+        announcementBar: '✨ Authentic Indian ethnic wear for women | Shipped across the USA',
+        businessHours: 'Monday - Friday: 9:00 AM - 6:00 PM EST\nSaturday: 10:00 AM - 4:00 PM EST\nSunday: Closed',
+        footerDescription: 'Kurtas, sets and ethnic wear curated from India, shipped within the USA.'
       }
     })
   }

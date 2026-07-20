@@ -14,6 +14,7 @@ export interface CustomerStoreSettings {
   storeName: string
   tagline: string | null
   logo: string | null
+  favicon: string | null
   primaryColor: string
   secondaryColor: string
   accentColor: string
@@ -32,6 +33,11 @@ export interface CustomerStoreSettings {
   hasRestockingFee: boolean
   restockingFeePercentage: number
   noReturnsReason: string | null
+  announcementBar: string | null
+  metaTitle: string | null
+  metaDescription: string | null
+  businessHours: string | null
+  footerDescription: string | null
 }
 
 export async function getCustomerStoreSettings(): Promise<CustomerStoreSettings | null> {
@@ -47,6 +53,7 @@ export async function getCustomerStoreSettings(): Promise<CustomerStoreSettings 
       storeName: settings.storeName,
       tagline: settings.tagline,
       logo: settings.logo,
+      favicon: settings.favicon,
       primaryColor: settings.primaryColor,
       secondaryColor: settings.secondaryColor,
       accentColor: settings.accentColor,
@@ -65,6 +72,11 @@ export async function getCustomerStoreSettings(): Promise<CustomerStoreSettings 
       hasRestockingFee: settings.hasRestockingFee || false,
       restockingFeePercentage: settings.restockingFeePercentage || 0,
       noReturnsReason: settings.noReturnsReason || null,
+      announcementBar: settings.announcementBar || null,
+      metaTitle: settings.metaTitle || null,
+      metaDescription: settings.metaDescription || null,
+      businessHours: settings.businessHours || null,
+      footerDescription: settings.footerDescription || null,
     }
   } catch (error) {
     console.error('Error fetching store settings:', error)

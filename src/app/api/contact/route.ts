@@ -69,36 +69,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Rate limiting check (simple implementation)
-    const clientIP = request.headers.get('x-forwarded-for') || 
-                     request.headers.get('x-real-ip') || 
-                     'unknown'
-    
-    // You can implement more sophisticated rate limiting here
-    // For now, we'll just proceed
-
-    // Store the contact message in database (you may want to create a ContactMessage model)
-    // For now, we'll log it and simulate sending an email
-    
-    console.log('Contact form submission:', {
-      name: data.name,
-      email: data.email,
-      phone: data.phone || 'Not provided',
-      subject: data.subject,
-      message: data.message,
-      inquiryType: data.inquiryType,
-      timestamp: new Date().toISOString(),
-      ip: clientIP
-    })
-
-    // Here you would typically:
-    // 1. Save to database
-    // 2. Send email notification to admin
-    // 3. Send confirmation email to customer
-    // 4. Integrate with CRM or support system
-
-    // Example of saving to database (you'll need to create the ContactMessage model):
-    /*
+    // Persist the message so it's retrievable from /admin/contact-messages -
+    // previously this only console.logged, which silently discarded every submission.
     await db.contactMessage.create({
       data: {
         name: data.name.trim(),
@@ -107,39 +79,12 @@ export async function POST(request: NextRequest) {
         subject: data.subject.trim(),
         message: data.message.trim(),
         inquiryType: data.inquiryType,
-        ipAddress: clientIP,
-        userAgent: request.headers.get('user-agent') || null,
         status: 'new'
       }
     })
-    */
 
-    // Example of sending email notification (you'll need to configure email service):
-    /*
-    await sendEmailNotification({
-      to: process.env.ADMIN_EMAIL || 'admin@hitaandco.com',
-      subject: `New Contact Form: ${data.subject}`,
-      template: 'contact-form-notification',
-      data: {
-        name: data.name,
-        email: data.email,
-        phone: data.phone,
-        subject: data.subject,
-        message: data.message,
-        inquiryType: data.inquiryType
-      }
-    })
-
-    await sendEmailConfirmation({
-      to: data.email,
-      subject: 'Thank you for contacting us',
-      template: 'contact-confirmation',
-      data: {
-        name: data.name,
-        subject: data.subject
-      }
-    })
-    */
+    // TODO: email notifications (to admin + confirmation to customer) are not
+    // yet wired up - requires picking an email service (see launch TODO).
 
     return NextResponse.json(
       { 
@@ -154,35 +99,6 @@ export async function POST(request: NextRequest) {
     
     return NextResponse.json(
       { error: 'Internal server error. Please try again later.' },
-      { status: 500 }
-    )
-  }
-}
-
-// Optional: GET method to retrieve contact messages (admin only)
-export async function GET(request: NextRequest) {
-  try {
-    // You would add admin authentication here
-    // const session = await getSession()
-    // if (!session || session.role !== 'admin') {
-    //   return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    // }
-
-    // Retrieve contact messages from database
-    // const messages = await db.contactMessage.findMany({
-    //   orderBy: { createdAt: 'desc' },
-    //   take: 50
-    // })
-
-    return NextResponse.json(
-      { message: 'Contact messages endpoint - admin authentication required' },
-      { status: 200 }
-    )
-
-  } catch (error) {
-    console.error('Contact GET error:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
       { status: 500 }
     )
   }
