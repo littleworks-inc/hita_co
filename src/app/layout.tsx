@@ -5,18 +5,27 @@
 // =====================================
 
 import type { Metadata, Viewport } from 'next'
-import { Inter } from 'next/font/google'
+import { Inter, Playfair_Display } from 'next/font/google'
 import { ThemeProvider } from '@/contexts/ThemeContext'
 import ConditionalLayoutWrapper from '@/components/ConditionalLayoutWrapper'
 import SiteFooter from '@/components/customer/SiteFooter'
 import { getCustomerStoreSettings } from '@/lib/store-settings'
 import { SupportedCurrency, isValidCurrency, initializeExchangeRates } from '@/lib/currency'
+import { DEFAULT_PRIMARY_COLOR, DEFAULT_ACCENT_COLOR } from '@/lib/brand'
+import { hexToHslString, readableForeground } from '@/lib/color-utils'
 import './globals.css'
 
-const inter = Inter({ 
+const inter = Inter({
   subsets: ['latin'],
   display: 'swap',
   variable: '--font-inter'
+})
+
+const playfairDisplay = Playfair_Display({
+  subsets: ['latin'],
+  display: 'swap',
+  variable: '--font-display',
+  weight: ['500', '600', '700', '800'],
 })
 
 // Dynamic metadata - reads storeName/tagline/metaTitle/metaDescription/favicon
@@ -25,6 +34,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const storeSettings = await getCustomerStoreSettings()
   const storeName = storeSettings?.storeName || 'Hita&Co'
   const tagline = storeSettings?.tagline || 'Indian Ethnic Wear for Women in the USA'
+  const primaryHex = storeSettings?.primaryColor || DEFAULT_PRIMARY_COLOR
 
   return {
     title: {
@@ -69,21 +79,29 @@ export async function generateMetadata(): Promise<Metadata> {
       'mobile-web-app-capable': 'yes',
       'apple-mobile-web-app-capable': 'yes',
       'apple-mobile-web-app-status-bar-style': 'black-translucent',
-      'msapplication-TileColor': '#8b5cf6',
+      'msapplication-TileColor': primaryHex,
       'msapplication-config': '/browserconfig.xml'
     }
   }
 }
 
-export const viewport: Viewport = {
-  width: 'device-width',
-  initialScale: 1,
-  // Pinch-to-zoom must stay enabled: locking it out blocks anyone zooming in
-  // on product photos or small text on mobile, a real accessibility issue.
-  themeColor: [
-    { media: '(prefers-color-scheme: light)', color: '#8b5cf6' },
-    { media: '(prefers-color-scheme: dark)', color: '#7c3aed' }
-  ]
+// Dynamic viewport - themeColor reflects the admin's configured brand color
+// instead of a hardcoded purple (dark mode is forced off site-wide, but both
+// media queries are kept for OS-level chrome like Android's browser bar tint).
+export async function generateViewport(): Promise<Viewport> {
+  const storeSettings = await getCustomerStoreSettings()
+  const primaryHex = storeSettings?.primaryColor || DEFAULT_PRIMARY_COLOR
+
+  return {
+    width: 'device-width',
+    initialScale: 1,
+    // Pinch-to-zoom must stay enabled: locking it out blocks anyone zooming in
+    // on product photos or small text on mobile, a real accessibility issue.
+    themeColor: [
+      { media: '(prefers-color-scheme: light)', color: primaryHex },
+      { media: '(prefers-color-scheme: dark)', color: primaryHex }
+    ]
+  }
 }
 
 // Shared helper - same store settings query every customer page uses
@@ -132,9 +150,13 @@ export default async function RootLayout({
   // Get initial data with error handling
   let currencyData
   let storeName = 'Hita&Co'
+  let primaryHex = DEFAULT_PRIMARY_COLOR
+  let accentHex = DEFAULT_ACCENT_COLOR
   try {
     const storeSettings = await getStoreSettings()
     storeName = storeSettings?.storeName || storeName
+    primaryHex = storeSettings?.primaryColor || DEFAULT_PRIMARY_COLOR
+    accentHex = storeSettings?.accentColor || DEFAULT_ACCENT_COLOR
     currencyData = await getInitialCurrencyData()
   } catch (error) {
     console.error('Layout currency data error:', error)
@@ -144,17 +166,39 @@ export default async function RootLayout({
     }
   }
 
+  const primaryHsl = hexToHslString(primaryHex)
+  const accentHsl = hexToHslString(accentHex)
+  const primaryForeground = readableForeground(primaryHex)
+  const accentForeground = readableForeground(accentHex)
+
   return (
-    <html lang="en" className={inter.variable}>
+    <html lang="en" className={`${inter.variable} ${playfairDisplay.variable}`}>
       <head>
+        {/* Brand colors from admin settings (StoreSetting.primaryColor/accentColor),
+            overriding globals.css's stock shadcn :root variables so every shadcn
+            primitive (Button, Input, Badge) picks up the real brand color. */}
+        <style
+          dangerouslySetInnerHTML={{
+            __html: `
+              :root {
+                --primary: ${primaryHsl};
+                --primary-foreground: ${primaryForeground};
+                --accent: ${accentHsl};
+                --accent-foreground: ${accentForeground};
+                --ring: ${primaryHsl};
+              }
+            `,
+          }}
+        />
+
         {/* PWA Meta Tags */}
-        <meta name="theme-color" content="#8b5cf6" />
+        <meta name="theme-color" content={primaryHex} />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="apple-mobile-web-app-title" content={storeName} />
         <meta name="application-name" content={storeName} />
-        <meta name="msapplication-TileColor" content="#8b5cf6" />
+        <meta name="msapplication-TileColor" content={primaryHex} />
         <meta name="msapplication-config" content="/browserconfig.xml" />
 
         {/* Static icon assets (favicon itself comes from generateMetadata's `icons` field) */}

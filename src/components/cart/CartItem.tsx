@@ -120,7 +120,7 @@ export default function CartItem({
             <div className="flex-1 min-w-0">
               <Link
                 href={`/products/${productSlug}`}
-                className="font-medium text-gray-900 hover:text-purple-600 transition-colors line-clamp-2"
+                className="font-medium text-gray-900 hover:text-primary transition-colors line-clamp-2"
               >
                 {item.name}
               </Link>

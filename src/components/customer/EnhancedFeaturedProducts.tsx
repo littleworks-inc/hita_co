@@ -111,11 +111,11 @@ export default function EnhancedFeaturedProducts({ storeSettings }: EnhancedFeat
     return (
       <section className="py-16 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <div className="inline-flex items-center gap-2 bg-gradient-to-r from-purple-100 to-pink-100 text-purple-800 px-4 py-2 rounded-full text-sm font-medium mb-6">
+          <div className="inline-flex items-center gap-2 bg-primary/10 text-primary px-4 py-2 rounded-full text-sm font-medium mb-6">
             <Star className="h-4 w-4" />
             Featured Collection
           </div>
-          <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
+          <h2 className="font-display text-3xl md:text-4xl font-bold text-gray-900 mb-4">
             Curating Our Best
           </h2>
           <p className="text-lg text-gray-600 mb-8 max-w-2xl mx-auto">
@@ -123,7 +123,7 @@ export default function EnhancedFeaturedProducts({ storeSettings }: EnhancedFeat
           </p>
           <Link
             href="/products"
-            className="inline-flex items-center gap-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white px-8 py-4 rounded-full font-semibold text-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300"
+            className="inline-flex items-center gap-2 bg-gradient-to-r from-primary to-accent text-primary-foreground px-8 py-4 rounded-full font-semibold text-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300"
           >
             Browse All Products
             <ArrowRight className="h-5 w-5" />
@@ -140,11 +140,11 @@ export default function EnhancedFeaturedProducts({ storeSettings }: EnhancedFeat
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Section Header */}
         <div className="text-center mb-12">
-          <div className="inline-flex items-center gap-2 bg-gradient-to-r from-purple-100 to-pink-100 text-purple-800 px-4 py-2 rounded-full text-sm font-medium mb-6">
+          <div className="inline-flex items-center gap-2 bg-primary/10 text-primary px-4 py-2 rounded-full text-sm font-medium mb-6">
             <Star className="h-4 w-4" />
             Featured Collection ⭐
           </div>
-          <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
+          <h2 className="font-display text-3xl md:text-4xl font-bold text-gray-900 mb-4">
             Staff Picks & Customer Favorites
           </h2>
           <p className="text-lg text-gray-600 max-w-2xl mx-auto">
@@ -162,7 +162,7 @@ export default function EnhancedFeaturedProducts({ storeSettings }: EnhancedFeat
               />
               {/* Featured Badge */}
               <div className="absolute -top-3 -right-3 z-10">
-                <div className="bg-gradient-to-r from-purple-600 to-pink-600 text-white p-2 rounded-full shadow-lg">
+                <div className="bg-gradient-to-r from-primary to-accent text-primary-foreground p-2 rounded-full shadow-lg">
                   <Crown className="h-4 w-4" />
                 </div>
               </div>
@@ -182,7 +182,7 @@ export default function EnhancedFeaturedProducts({ storeSettings }: EnhancedFeat
         <div className="text-center">
           <Link
             href="/products?featured=true"
-            className="inline-flex items-center gap-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white px-8 py-4 rounded-full font-semibold text-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300"
+            className="inline-flex items-center gap-2 bg-gradient-to-r from-primary to-accent text-primary-foreground px-8 py-4 rounded-full font-semibold text-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300"
           >
             View All Featured Products
             <ArrowRight className="h-5 w-5" />

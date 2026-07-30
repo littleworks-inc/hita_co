@@ -104,7 +104,7 @@ export default function CustomerNavigation({ storeSettings, initialCategories }:
     <>
       {/* Top Announcement Banner - admin-editable, hidden when not set */}
       {storeSettings?.announcementBar && (
-        <div className="bg-gradient-to-r from-purple-600 to-pink-600 text-white text-center py-2 px-4">
+        <div className="bg-gradient-to-r from-primary to-accent text-white text-center py-2 px-4">
           <p className="text-sm font-medium">
             {storeSettings.announcementBar}
           </p>
@@ -155,8 +155,8 @@ export default function CustomerNavigation({ storeSettings, initialCategories }:
                   href={item.href}
                   className={`text-sm font-medium transition-colors ${
                     item.current
-                      ? 'text-purple-600 border-b-2 border-purple-600'
-                      : 'text-gray-700 dark:text-gray-300 hover:text-purple-600 dark:hover:text-purple-400'
+                      ? 'text-primary border-b-2 border-primary'
+                      : 'text-gray-700 dark:text-gray-300 hover:text-primary dark:hover:text-primary'
                   }`}
                 >
                   {item.name}
@@ -175,12 +175,12 @@ export default function CustomerNavigation({ storeSettings, initialCategories }:
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       placeholder="Search products..."
-                      className="w-64 px-4 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-l-full focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none"
+                      className="w-64 px-4 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-l-full focus:ring-2 focus:ring-ring focus:border-transparent outline-none"
                       autoFocus
                     />
                     <button
                       type="submit"
-                      className="bg-purple-600 text-white px-4 py-2 rounded-r-full hover:bg-purple-700 transition-colors"
+                      className="bg-primary text-primary-foreground px-4 py-2 rounded-r-full hover:bg-primary/90 transition-colors"
                     >
                       <Search className="h-5 w-5" />
                     </button>
@@ -195,7 +195,7 @@ export default function CustomerNavigation({ storeSettings, initialCategories }:
                 ) : (
                   <button
                     onClick={() => setShowSearch(true)}
-                    className="text-gray-700 dark:text-gray-300 hover:text-purple-600 dark:hover:text-purple-400 transition-colors"
+                    className="text-gray-700 dark:text-gray-300 hover:text-primary dark:hover:text-primary transition-colors"
                   >
                     <Search className="h-6 w-6" />
                   </button>
@@ -209,12 +209,12 @@ export default function CustomerNavigation({ storeSettings, initialCategories }:
               {showCartFeatures && (
                 <button 
                   onClick={toggleCart}
-                  className="text-gray-700 dark:text-gray-300 hover:text-purple-600 dark:hover:text-purple-400 transition-colors relative group"
+                  className="text-gray-700 dark:text-gray-300 hover:text-primary dark:hover:text-primary transition-colors relative group"
                 >
                   <ShoppingBag className="h-6 w-6" />
                   {/* Cart count badge */}
                   {isClient && totalItems > 0 && (
-                    <span className="absolute -top-2 -right-2 bg-purple-600 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center animate-pulse">
+                    <span className="absolute -top-2 -right-2 bg-primary text-primary-foreground text-xs rounded-full h-5 w-5 flex items-center justify-center animate-pulse">
                       {totalItems > 99 ? '99+' : totalItems}
                     </span>
                   )}
@@ -233,7 +233,7 @@ export default function CustomerNavigation({ storeSettings, initialCategories }:
               <Link
                 href="/contact"
                 aria-label="Order questions or contact us"
-                className="text-gray-700 dark:text-gray-300 hover:text-purple-600 dark:hover:text-purple-400 transition-colors"
+                className="text-gray-700 dark:text-gray-300 hover:text-primary dark:hover:text-primary transition-colors"
               >
                 <User className="h-6 w-6" />
               </Link>
@@ -241,7 +241,7 @@ export default function CustomerNavigation({ storeSettings, initialCategories }:
               {/* Mobile menu button (✅ UNCHANGED) */}
               <button
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                className="md:hidden text-gray-700 dark:text-gray-300 hover:text-purple-600 dark:hover:text-purple-400"
+                className="md:hidden text-gray-700 dark:text-gray-300 hover:text-primary dark:hover:text-primary"
               >
                 {mobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
               </button>
@@ -260,11 +260,11 @@ export default function CustomerNavigation({ storeSettings, initialCategories }:
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Search products..."
-                  className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-l-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none"
+                  className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-l-lg focus:ring-2 focus:ring-ring focus:border-transparent outline-none"
                 />
                 <button
                   type="submit"
-                  className="bg-purple-600 text-white px-4 py-2 rounded-r-lg hover:bg-purple-700 transition-colors"
+                  className="bg-primary text-primary-foreground px-4 py-2 rounded-r-lg hover:bg-primary/90 transition-colors"
                 >
                   <Search className="h-5 w-5" />
                 </button>
@@ -278,8 +278,8 @@ export default function CustomerNavigation({ storeSettings, initialCategories }:
                   onClick={() => setMobileMenuOpen(false)}
                   className={`block px-4 py-3 text-base font-medium rounded-lg transition-colors ${
                     item.current
-                      ? 'bg-purple-100 dark:bg-purple-900 text-purple-600 dark:text-purple-400'
-                      : 'text-gray-700 dark:text-gray-300 hover:text-purple-600 dark:hover:text-purple-400 hover:bg-gray-50 dark:hover:bg-gray-800'
+                      ? 'bg-primary/10 dark:bg-primary/20 text-primary dark:text-primary'
+                      : 'text-gray-700 dark:text-gray-300 hover:text-primary dark:hover:text-primary hover:bg-gray-50 dark:hover:bg-gray-800'
                   }`}
                 >
                   {item.name}
@@ -295,7 +295,7 @@ export default function CustomerNavigation({ storeSettings, initialCategories }:
                       toggleCart()
                       setMobileMenuOpen(false)
                     }}
-                    className="w-full flex items-center justify-between p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg text-purple-600 dark:text-purple-400"
+                    className="w-full flex items-center justify-between p-3 bg-primary/10 dark:bg-primary/20 rounded-lg text-primary dark:text-primary"
                   >
                     <div className="flex items-center gap-2">
                       <ShoppingBag className="h-5 w-5" />
@@ -341,7 +341,7 @@ export default function CustomerNavigation({ storeSettings, initialCategories }:
                         key={category.id}
                         href={`/categories/${category.slug}`}
                         onClick={() => setMobileMenuOpen(false)}
-                        className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:text-purple-600 dark:hover:text-purple-400 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg transition-colors"
+                        className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:text-primary dark:hover:text-primary hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg transition-colors"
                       >
                         {category.name}
                       </Link>

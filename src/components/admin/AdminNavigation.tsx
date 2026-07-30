@@ -114,8 +114,8 @@ export default function AdminNavigation() {
                 className="h-8 w-8 rounded object-cover"
               />
             ) : (
-              <div className="h-8 w-8 bg-purple-600 rounded flex items-center justify-center">
-                <span className="text-white font-bold text-sm">
+              <div className="h-8 w-8 bg-primary rounded flex items-center justify-center">
+                <span className="text-primary-foreground font-bold text-sm">
                   {storeSettings.storeName.charAt(0)}
                 </span>
               </div>
@@ -144,14 +144,14 @@ export default function AdminNavigation() {
                 href={item.href}
                 className={`group flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors ${
                   isActive
-                    ? 'bg-purple-100 text-purple-900'
+                    ? 'bg-primary/10 text-primary'
                     : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
                 }`}
                 onClick={() => setSidebarOpen(false)}
               >
                 <item.icon
                   className={`mr-3 h-5 w-5 ${
-                    isActive ? 'text-purple-500' : 'text-gray-400 group-hover:text-gray-500'
+                    isActive ? 'text-primary' : 'text-gray-400 group-hover:text-gray-500'
                   }`}
                 />
                 {item.name}
@@ -185,8 +185,8 @@ export default function AdminNavigation() {
               className="h-8 w-8 rounded object-cover"
             />
           ) : (
-            <div className="h-8 w-8 bg-purple-600 rounded flex items-center justify-center">
-              <span className="text-white font-bold text-sm">
+            <div className="h-8 w-8 bg-primary rounded flex items-center justify-center">
+              <span className="text-primary-foreground font-bold text-sm">
                 {storeSettings.storeName.charAt(0)}
               </span>
             </div>
@@ -207,13 +207,13 @@ export default function AdminNavigation() {
                 href={item.href}
                 className={`group flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors ${
                   isActive
-                    ? 'bg-purple-100 text-purple-900'
+                    ? 'bg-primary/10 text-primary'
                     : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
                 }`}
               >
                 <item.icon
                   className={`mr-3 h-5 w-5 ${
-                    isActive ? 'text-purple-500' : 'text-gray-400 group-hover:text-gray-500'
+                    isActive ? 'text-primary' : 'text-gray-400 group-hover:text-gray-500'
                   }`}
                 />
                 {item.name}
@@ -256,8 +256,8 @@ export default function AdminNavigation() {
               className="h-8 w-8 rounded object-cover"
             />
           ) : (
-            <div className="h-8 w-8 bg-purple-600 rounded flex items-center justify-center">
-              <span className="text-white font-bold text-sm">
+            <div className="h-8 w-8 bg-primary rounded flex items-center justify-center">
+              <span className="text-primary-foreground font-bold text-sm">
                 {storeSettings.storeName.charAt(0)}
               </span>
             </div>

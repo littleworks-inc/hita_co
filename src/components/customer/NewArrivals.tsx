@@ -76,7 +76,7 @@ export default function NewArrivals({ storeSettings }: NewArrivalsProps) {
 
   if (loading) {
     return (
-      <section className="py-16 bg-gradient-to-br from-blue-50 to-indigo-100">
+      <section className="py-16 bg-muted/50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
             <div className="h-8 bg-gray-200 rounded w-64 mx-auto mb-4 animate-pulse"></div>
@@ -94,13 +94,13 @@ export default function NewArrivals({ storeSettings }: NewArrivalsProps) {
 
   if (error || products.length === 0) {
     return (
-      <section className="py-16 bg-gradient-to-br from-blue-50 to-indigo-100">
+      <section className="py-16 bg-muted/50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <div className="inline-flex items-center gap-2 bg-blue-100 text-blue-800 px-4 py-2 rounded-full text-sm font-medium mb-6">
+          <div className="inline-flex items-center gap-2 bg-primary/10 text-primary px-4 py-2 rounded-full text-sm font-medium mb-6">
             <Clock className="h-4 w-4" />
             New Arrivals
           </div>
-          <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
+          <h2 className="font-display text-3xl md:text-4xl font-bold text-gray-900 mb-4">
             Fresh Arrivals Coming Soon
           </h2>
           <p className="text-lg text-gray-600 mb-8 max-w-2xl mx-auto">
@@ -111,7 +111,7 @@ export default function NewArrivals({ storeSettings }: NewArrivalsProps) {
           </p>
           <Link
             href="/products"
-            className="inline-flex items-center gap-2 bg-blue-600 text-white px-8 py-4 rounded-full font-semibold text-lg hover:bg-blue-700 transform hover:-translate-y-1 transition-all duration-300 shadow-lg"
+            className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-8 py-4 rounded-full font-semibold text-lg hover:bg-primary/90 transform hover:-translate-y-1 transition-all duration-300 shadow-lg"
           >
             Browse All Products
             <ArrowRight className="h-5 w-5" />
@@ -124,15 +124,15 @@ export default function NewArrivals({ storeSettings }: NewArrivalsProps) {
   const displayProducts = products.slice(0, 8)
 
   return (
-    <section className="py-16 bg-gradient-to-br from-blue-50 to-indigo-100">
+    <section className="py-16 bg-muted/50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Section Header */}
         <div className="text-center mb-12">
-          <div className="inline-flex items-center gap-2 bg-blue-100 text-blue-800 px-4 py-2 rounded-full text-sm font-medium mb-6">
+          <div className="inline-flex items-center gap-2 bg-primary/10 text-primary px-4 py-2 rounded-full text-sm font-medium mb-6">
             <Clock className="h-4 w-4" />
             New Arrivals 🆕
           </div>
-          <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
+          <h2 className="font-display text-3xl md:text-4xl font-bold text-gray-900 mb-4">
             Fresh Off the Collection
           </h2>
           <p className="text-lg text-gray-600 max-w-2xl mx-auto">
@@ -166,7 +166,7 @@ export default function NewArrivals({ storeSettings }: NewArrivalsProps) {
         <div className="text-center">
           <Link
             href="/products?sort=newest"
-            className="inline-flex items-center gap-2 bg-blue-600 text-white px-8 py-4 rounded-full font-semibold text-lg hover:bg-blue-700 transform hover:-translate-y-1 transition-all duration-300 shadow-lg"
+            className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-8 py-4 rounded-full font-semibold text-lg hover:bg-primary/90 transform hover:-translate-y-1 transition-all duration-300 shadow-lg"
           >
             View All New Arrivals
             <ArrowRight className="h-5 w-5" />

@@ -378,7 +378,7 @@ export default function CheckoutContent() {
     <div className="max-w-6xl mx-auto">
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Checkout</h1>
+        <h1 className="font-display text-3xl font-bold text-gray-900">Checkout</h1>
         <p className="mt-2 text-gray-600">Complete your order securely</p>
       </div>
 
@@ -389,14 +389,14 @@ export default function CheckoutContent() {
             <div key={step} className="flex items-center">
               <div className={`
                 w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium
-                ${currentStep >= step 
-                  ? 'bg-purple-600 text-white' 
+                ${currentStep >= step
+                  ? 'bg-primary text-primary-foreground'
                   : 'bg-gray-200 text-gray-600'}
               `}>
                 {currentStep > step ? <Check className="h-4 w-4" /> : step}
               </div>
               <span className={`ml-2 text-sm font-medium ${
-                currentStep >= step ? 'text-purple-600' : 'text-gray-500'
+                currentStep >= step ? 'text-primary' : 'text-gray-500'
               }`}>
                 {step === 1 && 'Customer Info'}
                 {step === 2 && 'Shipping'}
@@ -569,7 +569,7 @@ export default function CheckoutContent() {
                       <select 
                         value={shippingAddress.country} 
                         onChange={(e) => setShippingAddress({...shippingAddress, country: e.target.value})}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
                         required
                       >
                         <option value="">Select country</option>

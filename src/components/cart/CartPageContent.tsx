@@ -55,7 +55,7 @@ export default function CartPageContent() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
-            <ShoppingBag className="h-8 w-8 text-purple-600" />
+            <ShoppingBag className="h-8 w-8 text-primary" />
             Shopping Cart
           </h1>
           {totalItems > 0 && (
@@ -68,7 +68,7 @@ export default function CartPageContent() {
         {/* Continue Shopping */}
         <Link
           href="/products"
-          className="inline-flex items-center gap-2 text-purple-600 hover:text-purple-700 font-medium transition-colors"
+          className="inline-flex items-center gap-2 text-primary hover:text-primary/90 font-medium transition-colors"
         >
           <ArrowLeft className="h-4 w-4" />
           Continue Shopping
@@ -90,7 +90,7 @@ export default function CartPageContent() {
           </p>
           <Link
             href="/products"
-            className="inline-flex items-center gap-2 bg-purple-600 text-white px-8 py-3 rounded-lg hover:bg-purple-700 transition-colors font-medium"
+            className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-8 py-3 rounded-lg hover:bg-primary/90 transition-colors font-medium"
           >
             Start Shopping
             <ArrowRight className="h-4 w-4" />
@@ -99,7 +99,7 @@ export default function CartPageContent() {
           {/* Featured Categories */}
           <div className="mt-16 grid md:grid-cols-3 gap-6 max-w-4xl mx-auto">
             <Link href="/categories" className="group p-6 bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow">
-              <Package className="h-8 w-8 text-purple-600 mb-4" />
+              <Package className="h-8 w-8 text-primary mb-4" />
               <h3 className="font-semibold text-gray-900 mb-2">Browse Categories</h3>
               <p className="text-sm text-gray-600">Explore our organized collection</p>
             </Link>
@@ -150,22 +150,22 @@ export default function CartPageContent() {
               <div className="grid sm:grid-cols-2 gap-4">
                 <Link
                   href="/products?featured=true"
-                  className="flex items-center gap-3 p-4 border border-gray-200 rounded-lg hover:border-purple-300 hover:bg-purple-50 transition-colors group"
+                  className="flex items-center gap-3 p-4 border border-gray-200 rounded-lg hover:border-primary/50 hover:bg-primary/10 transition-colors group"
                 >
                   <Star className="h-5 w-5 text-amber-500" />
                   <div>
-                    <div className="font-medium text-gray-900 group-hover:text-purple-600">Featured Products</div>
+                    <div className="font-medium text-gray-900 group-hover:text-primary">Featured Products</div>
                     <div className="text-sm text-gray-500">Discover our top picks</div>
                   </div>
                   <ChevronRight className="h-4 w-4 text-gray-400 ml-auto" />
                 </Link>
                 <Link
                   href="/products?sort=newest"
-                  className="flex items-center gap-3 p-4 border border-gray-200 rounded-lg hover:border-purple-300 hover:bg-purple-50 transition-colors group"
+                  className="flex items-center gap-3 p-4 border border-gray-200 rounded-lg hover:border-primary/50 hover:bg-primary/10 transition-colors group"
                 >
                   <Package className="h-5 w-5 text-green-500" />
                   <div>
-                    <div className="font-medium text-gray-900 group-hover:text-purple-600">New Arrivals</div>
+                    <div className="font-medium text-gray-900 group-hover:text-primary">New Arrivals</div>
                     <div className="text-sm text-gray-500">Check out what's new</div>
                   </div>
                   <ChevronRight className="h-4 w-4 text-gray-400 ml-auto" />
@@ -187,7 +187,7 @@ export default function CartPageContent() {
                 <div className="space-y-3 mt-6">
                   <Link
                     href="/checkout"
-                    className="w-full inline-flex items-center justify-center gap-2 bg-purple-600 text-white px-6 py-4 rounded-lg hover:bg-purple-700 transition-colors font-medium text-lg"
+                    className="w-full inline-flex items-center justify-center gap-2 bg-primary text-primary-foreground px-6 py-4 rounded-lg hover:bg-primary/90 transition-colors font-medium text-lg"
                   >
                     Proceed to Checkout
                     <ArrowRight className="h-5 w-5" />

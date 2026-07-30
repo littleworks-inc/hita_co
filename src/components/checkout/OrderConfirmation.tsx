@@ -134,7 +134,7 @@ export default function OrderConfirmation({ order, storeSettings }: OrderConfirm
         <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
           <CheckCircle className="h-8 w-8 text-green-600" />
         </div>
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">
+        <h1 className="font-display text-3xl font-bold text-gray-900 mb-2">
           Order Confirmed!
         </h1>
         <p className="text-lg text-gray-600 mb-4">
@@ -343,7 +343,7 @@ export default function OrderConfirmation({ order, storeSettings }: OrderConfirm
               {storeSettings.email && (
                 <div className="flex items-center gap-2">
                   <Mail className="h-4 w-4 text-gray-400" />
-                  <a href={`mailto:${storeSettings.email}`} className="text-purple-600 hover:underline">
+                  <a href={`mailto:${storeSettings.email}`} className="text-primary hover:underline">
                     {storeSettings.email}
                   </a>
                 </div>
@@ -351,7 +351,7 @@ export default function OrderConfirmation({ order, storeSettings }: OrderConfirm
               {storeSettings.phone && (
                 <div className="flex items-center gap-2">
                   <Phone className="h-4 w-4 text-gray-400" />
-                  <a href={`tel:${storeSettings.phone}`} className="text-purple-600 hover:underline">
+                  <a href={`tel:${storeSettings.phone}`} className="text-primary hover:underline">
                     {storeSettings.phone}
                   </a>
                 </div>

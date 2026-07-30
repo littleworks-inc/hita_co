@@ -196,7 +196,7 @@ export default function AddToCartButton({
   }
 
   const getButtonClasses = () => {
-    const baseClasses = 'inline-flex items-center justify-center font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2'
+    const baseClasses = 'inline-flex items-center justify-center font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2'
     
     const sizeClasses = {
       default: 'px-6 py-3 text-base rounded-lg',
@@ -215,7 +215,7 @@ export default function AddToCartButton({
       if (isValidating) {
         return 'bg-gray-400 text-white cursor-wait'
       }
-      return 'bg-purple-600 text-white hover:bg-purple-700 active:bg-purple-800'
+      return 'bg-primary text-primary-foreground hover:bg-primary/90 active:bg-primary/80'
     })()
 
     return `${baseClasses} ${sizeClasses[variant]} ${stateClasses} ${className}`

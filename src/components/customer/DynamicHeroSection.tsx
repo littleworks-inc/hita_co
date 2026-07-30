@@ -52,7 +52,7 @@ export default function DynamicHeroSection({ storeSettings, initialSlides }: Dyn
       ctaText: 'Shop Collection',
       ctaLink: '/products',
       image: '',
-      gradient: 'from-purple-600 to-pink-600',
+      gradient: 'from-primary to-accent',
       order: 1,
       isActive: true
     },
@@ -64,7 +64,7 @@ export default function DynamicHeroSection({ storeSettings, initialSlides }: Dyn
       ctaText: 'Explore Collection',
       ctaLink: '/products',
       image: '',
-      gradient: 'from-indigo-600 to-purple-600',
+      gradient: 'from-primary via-primary/80 to-accent',
       order: 2,
       isActive: true
     },
@@ -76,7 +76,7 @@ export default function DynamicHeroSection({ storeSettings, initialSlides }: Dyn
       ctaText: 'See New Arrivals',
       ctaLink: '/products?sort=newest',
       image: '',
-      gradient: 'from-pink-600 to-red-600',
+      gradient: 'from-accent to-primary',
       order: 3,
       isActive: true
     }
@@ -191,7 +191,7 @@ export default function DynamicHeroSection({ storeSettings, initialSlides }: Dyn
             </div>
           ) : (
             // Fallback gradient when no image with responsive scaling
-            <div className={`absolute inset-0 bg-gradient-to-br ${currentSlideData.gradient || 'from-purple-600 to-pink-600'}`}>
+            <div className={`absolute inset-0 bg-gradient-to-br ${currentSlideData.gradient || 'from-primary to-accent'}`}>
               {/* Subtle background pattern that scales */}
               <div
                 className="absolute inset-0 opacity-10"
@@ -211,7 +211,7 @@ export default function DynamicHeroSection({ storeSettings, initialSlides }: Dyn
                   {currentSlideData.subtitle}
                 </p>
               )}
-              <h1 className="text-white text-2xl sm:text-4xl lg:text-5xl font-bold leading-tight drop-shadow-lg">
+              <h1 className="font-display text-white text-2xl sm:text-4xl lg:text-5xl font-bold leading-tight drop-shadow-lg">
                 {currentSlideData.title}
               </h1>
               {currentSlideData.description && (

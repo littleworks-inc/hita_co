@@ -299,7 +299,7 @@ export default function CartSummary() {
         {/* Total */}
         <div className="flex justify-between">
           <span className="text-base font-semibold text-gray-900">Total</span>
-          <span className="text-base font-bold text-purple-600">
+          <span className="text-base font-bold text-primary">
             {isLoadingShipping ? '...' : formatAmount(totalWithTaxUSD)}
           </span>
         </div>

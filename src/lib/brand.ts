@@ -4,6 +4,6 @@
 // (some drifted to a stale pre-rebrand color); import these instead.
 
 export const DEFAULT_STORE_NAME = 'Hita&Co'
-export const DEFAULT_PRIMARY_COLOR = '#7c3aed'
+export const DEFAULT_PRIMARY_COLOR = '#1f2937'
 export const DEFAULT_SECONDARY_COLOR = '#ffffff'
 export const DEFAULT_ACCENT_COLOR = '#f59e0b'

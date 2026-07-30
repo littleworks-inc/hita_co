@@ -101,12 +101,12 @@ export default function CartDrawer() {
             {/* Header */}
             <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-white sticky top-0 z-10">
               <div className="flex items-center gap-3">
-                <ShoppingBag className="h-6 w-6 text-purple-600" />
+                <ShoppingBag className="h-6 w-6 text-primary" />
                 <h2 className="text-lg font-semibold text-gray-900">
                   Shopping Cart
                 </h2>
                 {totalItems > 0 && (
-                  <span className="bg-purple-100 text-purple-600 text-sm font-medium px-2 py-1 rounded-full">
+                  <span className="bg-primary/10 text-primary text-sm font-medium px-2 py-1 rounded-full">
                     {totalItems} item{totalItems !== 1 ? 's' : ''}
                   </span>
                 )}
@@ -137,7 +137,7 @@ export default function CartDrawer() {
                   <Link
                     href="/products"
                     onClick={closeCart}
-                    className="inline-flex items-center gap-2 bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 transition-colors font-medium"
+                    className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-6 py-3 rounded-lg hover:bg-primary/90 transition-colors font-medium"
                   >
                     Start Shopping
                     <ArrowRight className="h-4 w-4" />
@@ -148,10 +148,10 @@ export default function CartDrawer() {
                     <Link
                       href="/products?featured=true"
                       onClick={closeCart}
-                      className="p-3 bg-purple-50 rounded-lg hover:bg-purple-100 transition-colors text-center"
+                      className="p-3 bg-primary/10 rounded-lg hover:bg-primary/20 transition-colors text-center"
                     >
-                      <Heart className="h-5 w-5 text-purple-600 mx-auto mb-1" />
-                      <span className="text-xs text-purple-700 font-medium">Featured</span>
+                      <Heart className="h-5 w-5 text-primary mx-auto mb-1" />
+                      <span className="text-xs text-primary font-medium">Featured</span>
                     </Link>
                     <Link
                       href="/products?sort=newest"
@@ -202,7 +202,7 @@ export default function CartDrawer() {
                   <Link
                     href="/cart"
                     onClick={closeCart}
-                    className="w-full inline-flex items-center justify-center gap-2 px-6 py-3 border border-purple-600 text-purple-600 rounded-lg hover:bg-purple-50 transition-colors font-medium"
+                    className="w-full inline-flex items-center justify-center gap-2 px-6 py-3 border border-primary text-primary rounded-lg hover:bg-primary/10 transition-colors font-medium"
                   >
                     <Package className="h-4 w-4" />
                     View Cart
@@ -212,7 +212,7 @@ export default function CartDrawer() {
                   <Link
                     href="/checkout"
                     onClick={closeCart}
-                    className="w-full inline-flex items-center justify-center gap-2 bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 transition-colors font-medium"
+                    className="w-full inline-flex items-center justify-center gap-2 bg-primary text-primary-foreground px-6 py-3 rounded-lg hover:bg-primary/90 transition-colors font-medium"
                   >
                     Proceed to Checkout
                     <ArrowRight className="h-4 w-4" />

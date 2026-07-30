@@ -158,7 +158,7 @@ export default function ProductCard({
           
           {/* Featured badge */}
           {product.isFeatured && (
-            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-primary/10 text-primary">
               <Star className="h-3 w-3 mr-1" />
               Featured
             </span>
@@ -179,7 +179,7 @@ export default function ProductCard({
       <div className="p-4">
         <div className="mb-3">
           <Link href={`/products/${productSlug}`}>
-            <h3 className="font-medium text-gray-900 hover:text-purple-600 transition-colors line-clamp-2 mb-1">
+            <h3 className="font-medium text-gray-900 hover:text-primary transition-colors line-clamp-2 mb-1">
               {product.name}
             </h3>
           </Link>
